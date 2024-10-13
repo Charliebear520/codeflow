@@ -1,0 +1,14 @@
+/* answer.module.css */
+.container {
+  background-color: #edf2ff;
+  height: 90vh; /* 整體 Answer 的高度 */
+  display: flex;
+  flex-direction: column;
+}
+
+.tabContent {
+  flex-grow: 1; /* 保證 Tabs 區域佔據剩餘空間 */
+  display: flex;
+  flex-direction: column;
+  height: 90%;
+}

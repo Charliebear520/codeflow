@@ -1,0 +1,12 @@
+.container {
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 4rem;
+    height: 80vh; /* Takes up full height */
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  

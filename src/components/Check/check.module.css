@@ -1,0 +1,28 @@
+.container {
+  padding: 1rem 1rem 2rem 2rem;
+  display: flex;
+  flex-direction: column; /* 讓子元素垂直排列 */
+  height: 90vh; /* 設定高度為視窗高度 */
+  overflow: hidden; /* 防止滾動條出現 */
+  /* gap:1rem; */
+}
+
+.tutorbox {
+  display: flex;
+  justify-content: flex-end;
+  margin: 1rem;
+}
+
+.topicbox {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
+  flex-grow: 1; /* 占據剩餘空間 */
+  margin-bottom: 1rem; /* 底部留白 */
+  padding: 1rem; /* 增加內邊距 */
+  overflow-y: auto; /* 只在垂直方向允许滚动 */
+  box-sizing: border-box; /* 確保 padding 不會影響元素大小 */
+  height: 100%;
+}
