@@ -40,10 +40,23 @@
 .examplebox {
   width: 100%;
   display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
+  justify-content: flex-start;
+  align-items:center;
 }
 
 .example {
   color: #375bd3;
+  margin: 10px;
+}
+
+.infobox{
+  display: flex;
+  flex-direction: column;
+}
+
+.linkbox{
+  width:100%;
+  display: flex;
+  justify-content: flex-end;
+
 }
