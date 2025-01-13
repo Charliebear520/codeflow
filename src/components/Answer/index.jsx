@@ -2,6 +2,7 @@ import React from "react";
 import { Tabs, ConfigProvider } from "antd";
 import CreateOnline from "../CreateOnline";
 import UploadFlowchart from "../UploadFlowChart";
+import ReactFlowDnd from "../ReactFlowDnd";
 import styles from "./answer.module.css";
 
 const Answer = () => {
@@ -24,7 +25,8 @@ const Answer = () => {
         <div style={{ height: "100%" }}>
           {" "}
           {/* 同樣對第二個 children 設置 */}
-          <CreateOnline />
+          {/* <CreateOnline /> */}
+          <ReactFlowDnd />
         </div>
       ),
     },
