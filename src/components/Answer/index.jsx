@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { ConfigProvider, Tabs,Button } from 'antd';
 import ReactFlowDnd from '../ReactFlowDnd';
-import UploadFlowchart from '../UploadFlowchart';
+import UploadFlowchart from '../UploadFlowChart';
 import styles from './answer.module.css';
 
 // 定义初始节点和边
