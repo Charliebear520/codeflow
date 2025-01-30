@@ -3,7 +3,7 @@
     width: 100px;
     height: 100px;
     background-color: #007bff; /* 菱形顏色 */
-    transform: rotate(45deg); /* 旋轉成菱形 */
+    transform: rotate(-45deg); /* 旋轉成菱形 */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -15,12 +15,12 @@
   }
   
   .label {
-    transform: rotate(-45deg); /* 使文字正常顯示 */
+    transform: rotate(45deg); /* 使文字正常顯示 */
   }
   
   .input {
     width: 80px;
-    transform: rotate(-45deg); /* 使輸入框正常顯示 */
+    transform: rotate(45deg); /* 使輸入框正常顯示 */
     font-size: 14px;
     text-align: center;
     border: 1px solid #ddd;

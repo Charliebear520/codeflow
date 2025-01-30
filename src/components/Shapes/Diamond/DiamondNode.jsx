@@ -5,6 +5,8 @@ import styles from './Diamond.module.css';
 function DiamondNode({ data, id, selected, onChange }) {
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label || 'Default Node');
+  const handleTopStyle = { top: 0 };
+  const handleBottomStyle = { left: 0 };
 
   useEffect(() => {
     setLabel(data.label || 'Default Node');
@@ -29,7 +31,7 @@ function DiamondNode({ data, id, selected, onChange }) {
 
   return (
     <div className={styles.diamondNode} onDoubleClick={handleDoubleClick}>
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Right} style={handleTopStyle}/>
       {isEditing ? (
         <input
           type="text"
@@ -42,7 +44,7 @@ function DiamondNode({ data, id, selected, onChange }) {
       ) : (
         <div className={styles.label}>{label}</div>
       )}
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Bottom} style={handleBottomStyle}/>
     </div>
   );
 }
