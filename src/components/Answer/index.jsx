@@ -1,42 +1,61 @@
-import React from "react";
-import { Tabs, ConfigProvider ,Button} from "antd";
-import CreateOnline from "../CreateOnline";
-import UploadFlowchart from "../UploadFlowChart";
-import ReactFlowDnd from "../ReactFlowDnd";
-import styles from "./answer.module.css";
+import React, { useRef } from 'react';
+import { ConfigProvider, Tabs,Button } from 'antd';
+import ReactFlowDnd from '../ReactFlowDnd';
+import UploadFlowchart from '../UploadFlowchart';
+import styles from './answer.module.css';
+
+// 定义初始节点和边
+const initialNodes = [
+  {
+    id: '1',
+    type: 'input',
+    data: { label: 'input node' },
+    position: { x: 250, y: 5 },
+  },
+];
+
+const initialEdges = []; // 初始边为空
 
 const Answer = () => {
+  const resetFlowRef = useRef(null);
+
+  const handleReset = () => {
+    if (resetFlowRef.current) {
+      resetFlowRef.current();
+    } else {
+      console.error('resetFlow is not set');
+    }
+  };
+
   const items = [
     {
-      key: "1",
-      label: "上傳流程圖",
+      key: '1',
+      label: '上傳流程圖',
       children: (
-        <div style={{ height: "100%" }}>
-          {" "}
-          {/* 確保每個 children 撐滿 */}
+        <div style={{ height: '100%' }}>
           <UploadFlowchart />
         </div>
       ),
     },
     {
-      key: "2",
-      label: "線上製作",
+      key: '2',
+      label: '線上製作',
       children: (
-        <div style={{ height: "100%" }}>
-          {" "}
-          {/* 同樣對第二個 children 設置 */}
-          {/* <CreateOnline /> */}
-          <ReactFlowDnd />
+        <div style={{ height: '100%' }}>
+          <ReactFlowDnd
+            initialNodes={initialNodes}
+            initialEdges={initialEdges}
+            onReset={(resetFlow) => (resetFlowRef.current = resetFlow)}
+          />
         </div>
       ),
     },
   ];
-  // 右側的 Extra Action 按鈕
-   // 右側的兩個按鈕
-   const extraButtons = (
-    <div style={{ display: "flex", gap: "8px" }}>
+
+  const extraButtons = (
+    <div style={{ display: 'flex', gap: '8px' }}>
       <Button type="primary">檢查</Button>
-      <Button danger>清空</Button>
+      <Button danger onClick={handleReset}>清空</Button>
     </div>
   );
 
@@ -45,21 +64,18 @@ const Answer = () => {
       theme={{
         components: {
           Tabs: {
-            horizontalMargin: "0px",
-            height: "100%",
+            horizontalMargin: '0px',
+            height: '100%',
           },
         },
       }}
     >
       <div className={styles.container}>
-        <div style={{ height: "10%" }}>
+      <div style={{ height: "10%" }}>
           <></>
         </div>
-        <div>
-
-        </div>
         <div className={styles.tabContent}>
-          <Tabs defaultActiveKey="1" type="card" items={items} tabBarExtraContent={{ right: extraButtons }}/>
+          <Tabs defaultActiveKey="1" type="card" items={items} tabBarExtraContent={{ right: extraButtons }} />
         </div>
       </div>
     </ConfigProvider>
