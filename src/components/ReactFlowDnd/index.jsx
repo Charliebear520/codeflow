@@ -1,4 +1,5 @@
-import { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { Modal, Input } from 'antd'; // ✅ 新增 Ant Design 組件
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -21,8 +22,8 @@ import Triangle from '../Shapes/Triangle/TringleNode';
 import DiamondNode from '../Shapes/Diamond/DiamondNode';
 
 const nodeTypes = {
-  triangle: Triangle, // 新增 triangle 節點
-  diamond: DiamondNode, // 註冊新節點類型
+  triangle: Triangle,
+  diamond: DiamondNode,
 };
 
 let id = 0;
@@ -35,9 +36,34 @@ const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
   const { screenToFlowPosition } = useReactFlow();
   const [type] = useDnD();
 
+  // ✅ 新增狀態來管理 Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentEdgeId, setCurrentEdgeId] = useState(null);
+  const [newLabel, setNewLabel] = useState('');
+
+  // ✅ 點擊 edge 時開啟 Modal
+  const onEdgeClick = (event, edge) => {
+    setCurrentEdgeId(edge.id);
+    setNewLabel(edge.label || '');
+    setIsModalOpen(true);
+  };
+
+  // ✅ 更新 edge 的 label
+  const handleUpdateEdgeLabel = () => {
+    setEdges((eds) =>
+      eds.map((e) => (e.id === currentEdgeId ? { ...e, label: newLabel } : e))
+    );
+    setIsModalOpen(false);
+  };
+
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
-    [],
+    (params) => setEdges((eds) => addEdge({
+      ...params,
+      label: "請輸入文字",
+      markerEnd: { type: "arrow" },
+      style: { strokeWidth: 2, stroke: "#007bff" },
+    }, eds)),
+    []
   );
 
   const onDragOver = useCallback((event) => {
@@ -100,10 +126,26 @@ const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onEdgeClick={onEdgeClick} // ✅ 讓 edges 可點擊編輯
           nodeTypes={nodeTypes}
           fitView
           style={{ backgroundColor: "#F7F9FB" }}
         >
+          <svg>
+            <defs>
+              <marker
+                id="arrow"
+                viewBox="0 0 10 10"
+                refX="10"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#007bff" />
+              </marker>
+            </defs>
+          </svg>
           <Panel position="bottom-center">
             <Sidebar style={{ backgroundColor: "#F7F9FF" }} />
           </Panel>
@@ -112,6 +154,22 @@ const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
         </ReactFlow>
       </div>
 
+      {/* ✅ Modal 讓使用者輸入新的 edge 文字 */}
+      <Modal
+        title="編輯連線文字"
+        open={isModalOpen}
+        onOk={handleUpdateEdgeLabel}
+        onCancel={() => setIsModalOpen(false)}
+        okText="確認"
+        cancelText="取消"
+      >
+        <Input
+          value={newLabel}
+          onChange={(e) => setNewLabel(e.target.value)}
+          allowClear
+          placeholder="輸入新的連線文字"
+        />
+      </Modal>
     </div>
   );
 };
