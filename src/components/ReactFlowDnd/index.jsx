@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -19,15 +19,6 @@ import { DnDProvider, useDnD } from '../DnDContext';
 import Triangle from '../Shapes/Triangle/TringleNode';
 import DiamondNode from '../Shapes/Diamond/DiamondNode';
 
-const initialNodes = [
-  {
-    id: '1',
-    type: 'input',
-    data: { label: 'input node' },
-    position: { x: 250, y: 5 },
-  },
-];
-
 const nodeTypes = {
   triangle: Triangle, // 新增 triangle 節點
   diamond: DiamondNode, // 註冊新節點類型
@@ -36,10 +27,10 @@ const nodeTypes = {
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
-const DnDFlow = () => {
+const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const { screenToFlowPosition } = useReactFlow();
   const [type] = useDnD();
 
@@ -65,30 +56,37 @@ const DnDFlow = () => {
     (event) => {
       event.preventDefault();
 
-      // check if the dropped element is valid
       if (!type) {
         return;
       }
 
-      // project was renamed to screenToFlowPosition
-      // and you don't need to subtract the reactFlowBounds.left/top anymore
-      // details: https://reactflow.dev/whats-new/2023-11-10
       const position = screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
+
       const newNode = {
         id: getId(),
         type,
         position,
-        // data: { label: `${type} 符號` , onChange: updateNodeLabel},
-        data: { label: `雙擊編輯文字` , onChange: updateNodeLabel},
+        data: { label: `雙擊編輯文字`, onChange: updateNodeLabel },
       };
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [screenToFlowPosition, type],
+    [screenToFlowPosition, type]
   );
+
+  const resetFlow = useCallback(() => {
+    setNodes([...initialNodes]);
+    setEdges([...initialEdges]);
+  }, [initialNodes, initialEdges]);
+
+  useEffect(() => {
+    if (onReset) {
+      onReset(resetFlow);
+    }
+  }, [onReset, resetFlow]);
 
   return (
     <div className={styles.dndflow}>
@@ -101,23 +99,23 @@ const DnDFlow = () => {
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={onDragOver}
-          nodeTypes={nodeTypes} // 傳入自定義節點
+          nodeTypes={nodeTypes}
           fitView
           style={{ backgroundColor: "#F7F9FB" }}
         >
-          <Controls />                  
+          <Controls />
           <Background />
         </ReactFlow>
       </div>
-      <Sidebar style={{ backgroundColor: "#F7F9FF"  }}/> 
+      <Sidebar style={{ backgroundColor: "#F7F9FF" }} />
     </div>
   );
 };
 
-export default () => (
+export default ({ initialNodes, initialEdges, onReset }) => (
   <ReactFlowProvider>
     <DnDProvider>
-      <DnDFlow />
+      <DnDFlow initialNodes={initialNodes} initialEdges={initialEdges} onReset={onReset} />
     </DnDProvider>
   </ReactFlowProvider>
 );
