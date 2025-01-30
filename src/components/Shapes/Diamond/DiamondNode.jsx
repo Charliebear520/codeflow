@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, NodeResizer } from '@xyflow/react';
 import styles from './Diamond.module.css';
 
 function DiamondNode({ data, id, selected, onChange }) {
@@ -30,22 +30,28 @@ function DiamondNode({ data, id, selected, onChange }) {
   };
 
   return (
-    <div className={styles.diamondNode} onDoubleClick={handleDoubleClick}>
-      <Handle type="target" position={Position.Right} style={handleTopStyle}/>
-      {isEditing ? (
-        <input
-          type="text"
-          value={label}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          autoFocus
-          className={styles.input}
-        />
-      ) : (
-        <div className={styles.label}>{label}</div>
-      )}
-      <Handle type="source" position={Position.Bottom} style={handleBottomStyle}/>
+    <div className={styles.diamondNodeContainer}>
+      <div className={styles.diamondNode} onDoubleClick={handleDoubleClick}>
+        {/* 可調整大小的框架 */}
+        <NodeResizer color="#ff0071" isVisible={selected} minWidth={50} minHeight={50} />
+        {/* 連接點 */}
+        <Handle type="target" position={Position.Right} style={handleTopStyle} />
+        {isEditing ? (
+          <input
+            type="text"
+            value={label}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            autoFocus
+            className={styles.input}
+          />
+        ) : (
+          <div className={styles.label}>{label}</div>
+        )}
+        <Handle type="source" position={Position.Bottom} style={handleBottomStyle} />
+      </div>
     </div>
+
   );
 }
 
