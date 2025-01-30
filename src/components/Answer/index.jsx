@@ -1,5 +1,5 @@
 import React from "react";
-import { Tabs, ConfigProvider } from "antd";
+import { Tabs, ConfigProvider ,Button} from "antd";
 import CreateOnline from "../CreateOnline";
 import UploadFlowchart from "../UploadFlowChart";
 import ReactFlowDnd from "../ReactFlowDnd";
@@ -31,6 +31,14 @@ const Answer = () => {
       ),
     },
   ];
+  // 右側的 Extra Action 按鈕
+   // 右側的兩個按鈕
+   const extraButtons = (
+    <div style={{ display: "flex", gap: "8px" }}>
+      <Button type="primary">檢查</Button>
+      <Button danger>清空</Button>
+    </div>
+  );
 
   return (
     <ConfigProvider
@@ -47,8 +55,11 @@ const Answer = () => {
         <div style={{ height: "10%" }}>
           <></>
         </div>
+        <div>
+
+        </div>
         <div className={styles.tabContent}>
-          <Tabs defaultActiveKey="1" type="card" items={items} />
+          <Tabs defaultActiveKey="1" type="card" items={items} tabBarExtraContent={{ right: extraButtons }}/>
         </div>
       </div>
     </ConfigProvider>
