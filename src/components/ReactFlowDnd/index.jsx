@@ -8,6 +8,7 @@ import {
   Controls,
   useReactFlow,
   Background,
+  Panel,
 } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
@@ -103,11 +104,14 @@ const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
           fitView
           style={{ backgroundColor: "#F7F9FB" }}
         >
+          <Panel position="bottom-center">
+            <Sidebar style={{ backgroundColor: "#F7F9FF" }} />
+          </Panel>
           <Controls />
           <Background />
         </ReactFlow>
       </div>
-      <Sidebar style={{ backgroundColor: "#F7F9FF" }} />
+
     </div>
   );
 };
