@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
-import { ConfigProvider, Tabs, Button, message } from "antd";
+import { ConfigProvider, Tabs, Button, message, Upload } from "antd";
 import ReactFlowDnd from "../ReactFlowDnd";
-import Upload from "../upload";
 import Check from "../Check"; // 引入 Check 组件
 import styles from "./answer.module.css";
 import { IKImage } from "imagekitio-react";
@@ -9,6 +8,10 @@ import html2canvas from "html2canvas";
 import { toPng } from "html-to-image";
 import { useDispatch } from "react-redux";
 import { checkFlowchart, resetCheck } from "../../redux/slices/checkSlice";
+import { InboxOutlined } from "@ant-design/icons";
+import UploadImage from "../upload";
+
+const { Dragger } = Upload;
 
 // 定义初始节点和边
 const initialNodes = [
@@ -31,10 +34,30 @@ const Answer = () => {
   });
   const flowRef = useRef(null);
   const dispatch = useDispatch();
+  const [fileList, setFileList] = useState([]);
 
   const handleCheck = async () => {
     try {
-      if (activeKey === "2") {
+      if (activeKey === "1") {
+        if (fileList.length === 0) {
+          message.error("請先上傳流程圖");
+          return;
+        }
+
+        const base64Image = fileList[0].base64;
+        if (!base64Image) {
+          message.error("圖片處理中，請稍後再試");
+          return;
+        }
+
+        const resultAction = await dispatch(checkFlowchart(base64Image));
+
+        if (checkFlowchart.fulfilled.match(resultAction)) {
+          message.success("檢查完成");
+        } else {
+          throw new Error(resultAction.error.message);
+        }
+      } else if (activeKey === "2") {
         const flowElement = document.querySelector(".react-flow");
         if (!flowElement) {
           message.error("找不到流程圖元素");
@@ -67,14 +90,8 @@ const Answer = () => {
 
   const handleReset = () => {
     if (activeKey === "1") {
-      // 重置上傳的圖片
-      setImg({
-        isLoading: false,
-        error: "",
-        dbData: {},
-      });
+      setFileList([]);
     } else if (activeKey === "2") {
-      // 重置線上製作的流程圖
       if (flowRef.current) {
         flowRef.current.resetFlow();
       }
@@ -87,8 +104,8 @@ const Answer = () => {
       key: "1",
       label: "上傳流程圖",
       children: (
-        <div style={{ height: "100%" }}>
-          <Upload img={img} setImg={setImg} />
+        <div className={styles.uploadContainer}>
+          <UploadImage fileList={fileList} setFileList={setFileList} />
         </div>
       ),
     },
