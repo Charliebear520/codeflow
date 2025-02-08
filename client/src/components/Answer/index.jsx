@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { ConfigProvider, Tabs, Button, message, Upload } from "antd";
+import { ConfigProvider, Tabs, Button, App } from "antd";
 import ReactFlowDnd from "../ReactFlowDnd";
 import Check from "../Check"; // 引入 Check 组件
 import styles from "./answer.module.css";
@@ -11,7 +11,7 @@ import { checkFlowchart, resetCheck } from "../../redux/slices/checkSlice";
 import { InboxOutlined } from "@ant-design/icons";
 import UploadImage from "../upload";
 
-const { Dragger } = Upload;
+// const { Dragger } = Upload;
 
 // 定义初始节点和边
 const initialNodes = [
@@ -35,6 +35,7 @@ const Answer = () => {
   const flowRef = useRef(null);
   const dispatch = useDispatch();
   const [fileList, setFileList] = useState([]);
+  const { message } = App.useApp(); // 使用 App 的 message API
 
   const handleCheck = async () => {
     try {
@@ -64,16 +65,12 @@ const Answer = () => {
           return;
         }
 
-        console.log("Converting flow to image...");
         const dataUrl = await toPng(flowElement, {
           backgroundColor: "#ffffff",
           pixelRatio: 2,
         });
 
-        console.log("Preparing image data...");
         const base64Image = dataUrl.split(",")[1];
-
-        console.log("Sending request to backend...");
         const resultAction = await dispatch(checkFlowchart(base64Image));
 
         if (checkFlowchart.fulfilled.match(resultAction)) {
@@ -113,7 +110,7 @@ const Answer = () => {
       key: "2",
       label: "線上製作",
       children: (
-        <div style={{ height: "100%" }}>
+        <div className={styles.flowContainer}>
           <ReactFlowDnd
             ref={flowRef}
             initialNodes={initialNodes}
@@ -146,21 +143,23 @@ const Answer = () => {
         },
       }}
     >
-      <div className={styles.container}>
-        <div style={{ height: "10%" }}>
-          <></>
+      <App>
+        <div className={styles.container}>
+          <div style={{ height: "100%" }}>
+            <></>
+          </div>
+          <div className={styles.tabContent}>
+            <Tabs
+              defaultActiveKey="1"
+              activeKey={activeKey}
+              onChange={setActiveKey}
+              type="card"
+              items={items}
+              tabBarExtraContent={extraButtons}
+            />
+          </div>
         </div>
-        <div className={styles.tabContent}>
-          <Tabs
-            defaultActiveKey="1"
-            activeKey={activeKey}
-            onChange={setActiveKey}
-            type="card"
-            items={items}
-            tabBarExtraContent={extraButtons}
-          />
-        </div>
-      </div>
+      </App>
     </ConfigProvider>
   );
 };
