@@ -1,5 +1,12 @@
-import React, { useRef, useCallback, useEffect, useState } from 'react';
-import { Modal, Input } from 'antd'; // ✅ 新增 Ant Design 組件
+import React, {
+  useRef,
+  useCallback,
+  useEffect,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { Modal, Input } from "antd"; // ✅ 新增 Ant Design 組件
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -10,16 +17,16 @@ import {
   useReactFlow,
   Background,
   Panel,
-} from '@xyflow/react';
+} from "@xyflow/react";
 
-import '@xyflow/react/dist/style.css';
-import styles from './dndflow.module.css';
+import "@xyflow/react/dist/style.css";
+import styles from "./dndflow.module.css";
 
-import Sidebar from '../Sidebar';
-import { DnDProvider, useDnD } from '../DnDContext';
+import Sidebar from "../Sidebar";
+import { DnDProvider, useDnD } from "../DnDContext";
 
-import Triangle from '../Shapes/Triangle/TringleNode';
-import DiamondNode from '../Shapes/Diamond/DiamondNode';
+import Triangle from "../Shapes/Triangle/TringleNode";
+import DiamondNode from "../Shapes/Diamond/DiamondNode";
 
 const nodeTypes = {
   triangle: Triangle,
@@ -29,7 +36,7 @@ const nodeTypes = {
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
-const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
+const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -39,12 +46,20 @@ const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
   // ✅ 新增狀態來管理 Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEdgeId, setCurrentEdgeId] = useState(null);
-  const [newLabel, setNewLabel] = useState('');
+  const [newLabel, setNewLabel] = useState("");
+
+  // ✅ 暴露重置方法給父組件
+  useImperativeHandle(ref, () => ({
+    resetFlow: () => {
+      setNodes(initialNodes);
+      setEdges(initialEdges);
+    },
+  }));
 
   // ✅ 點擊 edge 時開啟 Modal
   const onEdgeClick = (event, edge) => {
     setCurrentEdgeId(edge.id);
-    setNewLabel(edge.label || '');
+    setNewLabel(edge.label || "");
     setIsModalOpen(true);
   };
 
@@ -57,24 +72,32 @@ const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
   };
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge({
-      ...params,
-      label: "請輸入文字",
-      markerEnd: { type: "arrow" },
-      style: { strokeWidth: 2, stroke: "#007bff" },
-    }, eds)),
+    (params) =>
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...params,
+            label: "請輸入文字",
+            markerEnd: { type: "arrow" },
+            style: { strokeWidth: 2, stroke: "#007bff" },
+          },
+          eds
+        )
+      ),
     []
   );
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
+    event.dataTransfer.dropEffect = "move";
   }, []);
 
   const updateNodeLabel = (id, newLabel) => {
     setNodes((nds) =>
       nds.map((node) =>
-        node.id === id ? { ...node, data: { ...node.data, label: newLabel } } : node
+        node.id === id
+          ? { ...node, data: { ...node.data, label: newLabel } }
+          : node
       )
     );
   };
@@ -172,12 +195,13 @@ const DnDFlow = ({ initialNodes, initialEdges, onReset }) => {
       </Modal>
     </div>
   );
-};
+});
 
-export default ({ initialNodes, initialEdges, onReset }) => (
+// 包裝導出的組件
+export default forwardRef((props, ref) => (
   <ReactFlowProvider>
     <DnDProvider>
-      <DnDFlow initialNodes={initialNodes} initialEdges={initialEdges} onReset={onReset} />
+      <DnDFlow {...props} ref={ref} />
     </DnDProvider>
   </ReactFlowProvider>
-);
+));
