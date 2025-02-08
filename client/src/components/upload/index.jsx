@@ -1,11 +1,13 @@
 import React from "react";
-import { Upload as AntUpload, message } from "antd";
+import { Upload as AntUpload, App } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import styles from "./upload.module.css";
 
 const Dragger = AntUpload.Dragger;
 
 const Upload = ({ fileList, setFileList }) => {
+  const { message } = App.useApp();
+
   const uploadProps = {
     name: "file",
     multiple: false,
@@ -67,32 +69,34 @@ const Upload = ({ fileList, setFileList }) => {
   console.log("Current fileList:", fileList);
 
   return (
-    <div className={styles.container}>
-      <Dragger {...uploadProps}>
-        {fileList.length > 0 && fileList[0].previewUrl ? (
-          <div className={styles.uploadedImageContainer}>
-            <img
-              src={fileList[0].previewUrl}
-              alt="上傳的圖片"
-              className={styles.uploadedImage}
-            />
-            <div className={styles.imageOverlay}>
-              <p>點擊或拖曳以更換圖片</p>
+    <App>
+      <div className={styles.container}>
+        <Dragger {...uploadProps}>
+          {fileList.length > 0 && fileList[0].previewUrl ? (
+            <div className={styles.uploadedImageContainer}>
+              <img
+                src={fileList[0].previewUrl}
+                alt="上傳的圖片"
+                className={styles.uploadedImage}
+              />
+              <div className={styles.imageOverlay}>
+                <p>點擊或拖曳以更換圖片</p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <>
-            <p className="ant-upload-drag-icon">
-              <InboxOutlined />
-            </p>
-            <p className="ant-upload-text">點擊或拖曳檔案到此區域上傳</p>
-            <p className="ant-upload-hint">
-              支援單個圖片檔案上傳，檔案大小不超過 10MB
-            </p>
-          </>
-        )}
-      </Dragger>
-    </div>
+          ) : (
+            <>
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined />
+              </p>
+              <p className="ant-upload-text">點擊或拖曳檔案到此區域上傳</p>
+              <p className="ant-upload-hint">
+                支援單個圖片檔案上傳，檔案大小不超過 10MB
+              </p>
+            </>
+          )}
+        </Dragger>
+      </div>
+    </App>
   );
 };
 
