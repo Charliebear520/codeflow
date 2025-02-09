@@ -46,7 +46,7 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   const { screenToFlowPosition } = useReactFlow();
   const [type] = useDnD();
 
-  // 編輯節點與連線相關狀態...
+  // 狀態：編輯節點與邊的相關資料
   const [isEditing, setIsEditing] = useState(false);
   const [currentNodeId, setCurrentNodeId] = useState(null);
   const [newLabel, setNewLabel] = useState("");
@@ -60,7 +60,8 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
     },
   }));
 
-  const onEdgeClick = (event, edge) => {
+  // 這裡我們使用 onEdgeDoubleClick，僅在雙擊時觸發編輯邊文字
+  const onEdgeDoubleClick = (event, edge) => {
     setCurrentEdgeId(edge.id);
     setNewLabel(edge.label || "");
     setIsModalOpen(true);
@@ -168,11 +169,11 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={onDragOver}
-          onEdgeClick={onEdgeClick}
+          onEdgeDoubleClick={onEdgeDoubleClick}  // 使用雙擊事件
           onNodeDoubleClick={handleNodeDoubleClick}
           nodeTypes={nodeTypes}
           defaultzoom={0.5}               // 初始縮放比例
-          defaultposition={[0, 0]}     // 初始偏移，x 與 y 分別代表水平與垂直位移
+          defaultposition={[0, 0]}        // 初始偏移，x 與 y 分別代表水平與垂直位移
           style={{ backgroundColor: "#F7F9FB" }}
         >
           <svg>
@@ -198,7 +199,7 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
         </ReactFlow>
       </div>
 
-      {/* Modal 與編輯節點文字的部分保持不變 */}
+      {/* 編輯連線文字 Modal */}
       <Modal
         title="編輯連線文字"
         open={isModalOpen}
