@@ -1,0 +1,20 @@
+.rectangleNode {
+  background-color: #6c9df7; /* 長方形顏色 */
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.label {
+  color: white;
+  font-size: 14px;
+}
+
+.input {
+  width: 80%;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 2px;
+}

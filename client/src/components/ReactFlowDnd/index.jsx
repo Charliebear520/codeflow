@@ -25,17 +25,20 @@ import styles from "./dndflow.module.css";
 import Sidebar from "../Sidebar";
 import { DnDProvider, useDnD } from "../DnDContext";
 
-import Triangle from "../Shapes/Triangle/TringleNode";
+import RectangleNode from "../Shapes/Rectangle/RectangleNode";
+import DecisionNode from "../Shapes/Decision/DecisionNode";
+import ProcessNode from "../Shapes/Process/ProcessNode";
 import DiamondNode from "../Shapes/Diamond/DiamondNode";
 
 const nodeTypes = {
-  triangle: Triangle,
+  rectangle: RectangleNode,
+  decision: DecisionNode,
+  process: ProcessNode,
   diamond: DiamondNode,
 };
 
 let id = 0;
 const getId = () => `dndnode_${id++}`;
-
 const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -43,10 +46,14 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   const { screenToFlowPosition } = useReactFlow();
   const [type] = useDnD();
 
+  // 新增狀態來管理編輯模式
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentNodeId, setCurrentNodeId] = useState(null);
+  const [newLabel, setNewLabel] = useState("");
+
   // ✅ 新增狀態來管理 Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEdgeId, setCurrentEdgeId] = useState(null);
-  const [newLabel, setNewLabel] = useState("");
 
   // ✅ 暴露重置方法給父組件
   useImperativeHandle(ref, () => ({
@@ -115,17 +122,43 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
         y: event.clientY,
       });
 
+      // 根據 nodeType 設置預設 label
+      const defaultLabels = {
+        rectangle: "處理符號",
+        decision: "判斷符號",
+        process: "流程符號",
+        diamond: "起止符號",
+      };
+
       const newNode = {
         id: getId(),
         type,
         position,
-        data: { label: `雙擊編輯文字`, onChange: updateNodeLabel },
+        data: {
+          label: defaultLabels[type] || "雙擊編輯文字", // 使用對應的預設 label
+          onChange: updateNodeLabel, // 確保這裡傳遞 onChange 函數
+        },
       };
 
       setNodes((nds) => nds.concat(newNode));
     },
     [screenToFlowPosition, type]
   );
+
+  const handleNodeDoubleClick = (event, node) => {
+    setCurrentNodeId(node.id);
+    setNewLabel(node.data.label);
+    setIsEditing(true);
+  };
+
+  const handleLabelChange = (e) => {
+    setNewLabel(e.target.value);
+  };
+
+  const handleLabelSubmit = () => {
+    updateNodeLabel(currentNodeId, newLabel);
+    setIsEditing(false);
+  };
 
   const resetFlow = useCallback(() => {
     setNodes([...initialNodes]);
@@ -150,6 +183,7 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
           onDrop={onDrop}
           onDragOver={onDragOver}
           onEdgeClick={onEdgeClick} // ✅ 讓 edges 可點擊編輯
+          onNodeDoubleClick={handleNodeDoubleClick} // 新增雙擊事件
           nodeTypes={nodeTypes}
           fitView
           style={{ backgroundColor: "#F7F9FB" }}
@@ -193,6 +227,25 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
           placeholder="輸入新的連線文字"
         />
       </Modal>
+
+      {/* 新增輸入框讓用戶編輯節點的 label */}
+      {isEditing && (
+        <Modal
+          title="編輯節點文字"
+          open={isEditing}
+          onOk={handleLabelSubmit}
+          onCancel={() => setIsEditing(false)}
+          okText="確認"
+          cancelText="取消"
+        >
+          <Input
+            value={newLabel}
+            onChange={handleLabelChange}
+            allowClear
+            placeholder="輸入新的節點文字"
+          />
+        </Modal>
+      )}
     </div>
   );
 });
