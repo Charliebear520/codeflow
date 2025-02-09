@@ -1,35 +1,39 @@
 .diamondNodeContainer {
   position: relative;
-  width: 100%; /* 讓 Resizer 控制寬度 */
-  height: auto; /* 高度自適應 */
+  width: 100%;      /* 讓 Resizer 控制寬度 */
+  height: auto;     /* 高度自適應 */
   aspect-ratio: 1 / 1; /* 確保長寬比例為 1:1 */
+  overflow: visible; /* 讓調整大小的控制點不被裁切 */
+  box-sizing: border-box;
 }
 
 .diamondNode {
   width: 100%;
   height: 100%;
-  background-color: #007bff; /* 菱形顏色 */
-  transform: rotate(-45deg); /* 旋轉成菱形 */
+  background-color: #007bff;
+  border: 1px solid #ddd;
+  position: relative;
+  /* 使用 clip-path 裁切成菱形 */
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
   display: flex;
   justify-content: center;
   align-items: center;
   text-align: center;
-  color: white;
-  font-size: 14px;
-  font-weight: bold;
-  border: 1px solid #ddd;
-  position: relative;
+  box-sizing: border-box;
 }
 
 .label {
-  transform: rotate(45deg); /* 讓文字保持正常顯示 */
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  pointer-events: none;
 }
 
 .input {
-  width: 80%;
-  transform: rotate(45deg); /* 讓輸入框正常顯示 */
+  width: 70%;
   font-size: 14px;
   text-align: center;
   border: 1px solid #ddd;
   border-radius: 3px;
+  box-sizing: border-box;
 }

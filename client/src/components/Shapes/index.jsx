@@ -1,23 +1,21 @@
 import { useCallback, useState } from "react";
-import ReactFlow, {
+import {
+  ReactFlow,
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
-  ReactFlowProvider,
-} from "reactflow";
+} from "@xyflow/react";
+
 import RectangleNode from "./Rectangle/RectangleNode.jsx";
 import DecisionNode from "./Decision/DecisionNode.jsx";
 import ProcessNode from "./Process/ProcessNode.jsx";
 import DiamondNode from "./Diamond/DiamondNode.jsx";
-import "reactflow/dist/style.css";
+
+// 改用 @xyflow/react 的 CSS
+import "@xyflow/react/dist/style.css";
 import "./text-updater-node.css";
 
-const rfStyle = {
-  backgroundColor: "#B8CEFF",
-};
-
-// we define the nodeTypes outside of the component to prevent re-renderings
-// you could also use useMemo inside the component
+// 定義 nodeTypes
 const nodeTypes = {
   rectangle: RectangleNode,
   decision: DecisionNode,
@@ -25,8 +23,12 @@ const nodeTypes = {
   diamond: DiamondNode,
 };
 
+// 你在 initialNodes 中用到 updateNodeLabel，需要定義它
+function updateNodeLabel(nodeId, newLabel) {
+  console.log(`Node ${nodeId} label updated to: ${newLabel}`);
+}
+
 function ShapeFlow() {
-  const [btnArray, setBtnArray] = useState([]);
   const initialNodes = [
     {
       id: "node-1",
@@ -53,31 +55,24 @@ function ShapeFlow() {
       data: { label: "起止符號", onChange: updateNodeLabel },
     },
   ];
+
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState([]);
 
-  const handleSetbtnArray = () => {
-    setBtnArray((prev) => btnArray.push("scghsvdghsvc"));
-    console.log(btnArray);
-    setNodes([...nodes]);
-  };
-
   const onNodesChange = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    [setNodes]
+    []
   );
   const onEdgesChange = useCallback(
     (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    [setEdges]
+    []
   );
   const onConnect = useCallback(
     (connection) => setEdges((eds) => addEdge(connection, eds)),
-    [setEdges]
+    []
   );
 
   return (
-    // <ReactFlowProvider>
-    // </ReactFlowProvider>
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -85,8 +80,8 @@ function ShapeFlow() {
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       nodeTypes={nodeTypes}
-      fitView
-      style={rfStyle}
+      // 先移除 fitView 以便觀察節點縮放效果
+      style={{ backgroundColor: "#B8CEFF", width: "100%", height: "100%" }}
     />
   );
 }
