@@ -23,7 +23,18 @@ const initialNodes = [
   },
 ];
 
-const initialEdges = []; // 初始边为空
+const initialEdges = [
+  {
+    id: "e1-2", // 確保每個邊都有唯一的 id
+    source: "1", // 來源節點的 id
+    target: "2", // 目標節點的 id
+    type: "straight", // 設置初始邊的類型為 straight
+    markerEnd: {
+      type: "arrow", // 使用箭頭作為標記
+      color: "#007bff", // 標記顏色
+    },
+  },
+]; // 初始边为空
 
 const Answer = () => {
   const [activeKey, setActiveKey] = useState("1"); // 状态跟踪当前选中的标签页

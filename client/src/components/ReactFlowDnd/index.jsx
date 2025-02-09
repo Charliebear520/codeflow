@@ -78,21 +78,21 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
     setIsModalOpen(false);
   };
 
-  const onConnect = useCallback(
-    (params) =>
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...params,
-            label: "請輸入文字",
-            markerEnd: { type: "arrow" },
-            style: { strokeWidth: 2, stroke: "#007bff" },
+  const onConnect = useCallback((params) => {
+    setEdges((eds) =>
+      addEdge(
+        {
+          ...params,
+          type: "smoothstep",
+          markerEnd: {
+            type: "arrow",
+            color: "#007bff",
           },
-          eds
-        )
-      ),
-    []
-  );
+        },
+        eds
+      )
+    );
+  }, []);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -136,7 +136,6 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
         position,
         data: {
           label: defaultLabels[type] || "雙擊編輯文字", // 使用對應的預設 label
-          onChange: updateNodeLabel, // 確保這裡傳遞 onChange 函數
         },
       };
 
