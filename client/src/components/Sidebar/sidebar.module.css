@@ -1,174 +1,163 @@
 .dndflow {
-    flex-direction: column;
-    display: flex;
-    flex-grow: 1;
-    height: 100%;
+  flex-direction: column;
+  display: flex;
+  flex-grow: 1;
+  height: 100%;
 }
 
 .container {
-    background: #F2F0FF;
-    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
-    border-radius: 10px;
-    /* margin: 1rem; */
-    z-index: 1000;
+  background: #f2f0ff;
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  /* margin: 1rem; */
+  z-index: 1000;
 }
 
 .dndflow aside .description {
-    margin-bottom: 10px;
+  margin-bottom: 10px;
 }
 
 .dndflow .dndnode {
-    height: 20px;
-    padding: 4px;
-    border: 1px solid #1a192b;
-    margin-bottom: 10px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: grab;
+  height: 20px;
+  padding: 4px;
+  border: 1px solid #1a192b;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: grab;
 }
 
-.node_box{
-    display:flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap:10px;
+.node_box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 .dndnode_input_box {
-    display:flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border-color: #0041d0;
-    background-color: #CCDBFF;
-    height:100%;
-    width:50px;
-    gap:10px;
-    padding:1rem;
-    border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-color: #0041d0;
+  background-color: #ccdbff;
+  height: 100%;
+  width: 50px;
+  gap: 10px;
+  padding: 1rem;
+  border-radius: 10px;
 }
 
 .dndnode_input {
-    width:40px;
-    height:30px;
-    border: 4px solid #FFFFFF;
-    border-radius: 10px;
+  width: 40px;
+  height: 30px;
+  border: 4px solid #ffffff;
+  border-radius: 10px;
 }
 
 .dndnode_default {
-    border-color: #1a192b;
-    border-radius: 10px;
-    /* 圓角長方形 */
-    width: 100px;
+  border-color: #1a192b;
+  border-radius: 10px;
+  /* 圓角長方形 */
+  width: 100px;
 }
 
 .dndnode_output_box {
-    display:flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border-color: #0041d0;
-    background-color: #C1E8EE;
-    height:100%;
-    width:50px;
-    gap:10px;
-    padding:0.5rem 1rem;
-    border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-color: #0041d0;
+  background-color: #c1e8ee;
+  height: 100%;
+  width: 50px;
+  gap: 10px;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
 }
 
 .dndnode_output {
-    width:50px;
-    height:30px;
-    border: 4px solid #FFFFFF;
-    border-radius: 30px;
-}
-
-.dndnode_triangle_box {
-    display:flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border-color: #0041d0;
-    background-color: #DFDFDF;
-    height:100%;
-    width:50px;
-    gap:10px;
-    padding:1rem;
-    border-radius: 10px;
-}
-
-.dndnode_triangle {
-    width: 0;
-    height: 0;
-    border-left: 25px solid transparent;
-    border-right: 25px solid transparent;
-    border-bottom: 50px solid #f7f7f7;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  width: 50px;
+  height: 30px;
+  border: 4px solid #ffffff;
+  border-radius: 30px;
 }
 
 .dndnode_diamond_box {
-    display:flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background-color: #B2C8FF;
-    height:100%;
-    width:50px;
-    gap:10px;
-    padding:1rem;
-    border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #b2c8ff;
+  height: 100%;
+  width: 50px;
+  gap: 10px;
+  padding: 1rem;
+  border-radius: 10px;
 }
 
-
 .dndnode_diamond {
-    width: 30px;
-    height: 30px;
-    border: 4px solid #FFFFFF;
-    /* 菱形顏色 */
-    transform: rotate(45deg);
-    /* 旋轉成菱形 */
-    margin: 10px auto;
-    /* 保持居中 */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
-    /* 添加邊框 */
-    cursor: grab;
-    /* 拖拽圖標 */
-    user-select: none;
-    /* 禁止選中文字 */
+  width: 30px;
+  height: 30px;
+  border: 4px solid #ffffff;
+  transform: rotate(45deg);
+  margin: 10px auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: grab;
+  user-select: none;
 }
 
 .dndflow .reactflow_wrapper {
-    flex-grow: 1;
-    height: 100%;
+  flex-grow: 1;
+  height: 100%;
 }
 
 .dndflow .selectall {
-    margin-top: 10px;
+  margin-top: 10px;
 }
 
 .symbolbox {
-    display: flex;
-    padding:1rem;
-    justify-content: space-around;
-    gap:2rem;
+  display: flex;
+  padding: 1rem;
+  justify-content: space-around;
+  gap: 2rem;
+}
+
+.dndnode_process_box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #28a745; /* 流程符號顏色 */
+  height: 100%;
+  width: 50px;
+  gap: 10px;
+  padding: 1rem;
+  border-radius: 10px;
+}
+
+.dndnode_process {
+  width: 40px;
+  height: 30px;
+  border: 4px solid #ffffff;
+  border-radius: 5px; /* 可根據需要調整圓角 */
+  background-color: #ffffff; /* 流程符號背景色 */
 }
 
 @media screen and (min-width: 768px) {
-    .dndflow {
-        flex-direction: row;
-    }
+  .dndflow {
+    flex-direction: row;
+  }
 
-    .dndflow aside {
-        width: 20%;
-        max-width: 250px;
-    }
+  .dndflow aside {
+    width: 20%;
+    max-width: 250px;
+  }
 }

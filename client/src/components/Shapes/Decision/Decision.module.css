@@ -1,0 +1,21 @@
+.decisionNode {
+  background-color: #ffcc00; /* 判斷符號顏色 */
+  border-radius: 10px; /* 圓角 */
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.label {
+  color: black;
+  font-size: 14px;
+}
+
+.input {
+  width: 80%;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 2px;
+}
