@@ -32,7 +32,7 @@ export default () => {
               draggable
             ></div>
           </div>
-          <p style={{ margin: 0 }}>判斷符號</p>
+          <p style={{ margin: 0 }}>起止符號</p>
         </div>
 
         <div className={styles.node_box}>
@@ -43,7 +43,7 @@ export default () => {
               draggable
             ></div>
           </div>
-          <p style={{ margin: 0 }}>起止符號</p>
+          <p style={{ margin: 0 }}>判斷符號</p>
         </div>
 
         <div className={styles.node_box}>
