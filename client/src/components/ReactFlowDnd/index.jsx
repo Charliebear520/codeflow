@@ -6,7 +6,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Modal, Input } from "antd"; // ✅ 新增 Ant Design 組件
+import { Modal, Input } from "antd";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -21,7 +21,6 @@ import {
 
 import "@xyflow/react/dist/style.css";
 import styles from "./dndflow.module.css";
-
 import Sidebar from "../Sidebar";
 import { DnDProvider, useDnD } from "../DnDContext";
 
@@ -39,6 +38,7 @@ const nodeTypes = {
 
 let id = 0;
 const getId = () => `dndnode_${id++}`;
+
 const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -46,16 +46,13 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   const { screenToFlowPosition } = useReactFlow();
   const [type] = useDnD();
 
-  // 新增狀態來管理編輯模式
+  // 編輯節點與連線相關狀態...
   const [isEditing, setIsEditing] = useState(false);
   const [currentNodeId, setCurrentNodeId] = useState(null);
   const [newLabel, setNewLabel] = useState("");
-
-  // ✅ 新增狀態來管理 Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEdgeId, setCurrentEdgeId] = useState(null);
 
-  // ✅ 暴露重置方法給父組件
   useImperativeHandle(ref, () => ({
     resetFlow: () => {
       setNodes(initialNodes);
@@ -63,14 +60,12 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
     },
   }));
 
-  // ✅ 點擊 edge 時開啟 Modal
   const onEdgeClick = (event, edge) => {
     setCurrentEdgeId(edge.id);
     setNewLabel(edge.label || "");
     setIsModalOpen(true);
   };
 
-  // ✅ 更新 edge 的 label
   const handleUpdateEdgeLabel = () => {
     setEdges((eds) =>
       eds.map((e) => (e.id === currentEdgeId ? { ...e, label: newLabel } : e))
@@ -112,33 +107,25 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
-
-      if (!type) {
-        return;
-      }
-
+      if (!type) return;
       const position = screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
-
-      // 根據 nodeType 設置預設 label
       const defaultLabels = {
         rectangle: "處理符號",
         decision: "判斷符號",
         process: "流程符號",
         diamond: "起止符號",
       };
-
       const newNode = {
         id: getId(),
         type,
         position,
         data: {
-          label: defaultLabels[type] || "雙擊編輯文字", // 使用對應的預設 label
+          label: defaultLabels[type] || "雙擊編輯文字",
         },
       };
-
       setNodes((nds) => nds.concat(newNode));
     },
     [screenToFlowPosition, type]
@@ -181,10 +168,11 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={onDragOver}
-          onEdgeClick={onEdgeClick} // ✅ 讓 edges 可點擊編輯
-          onNodeDoubleClick={handleNodeDoubleClick} // 新增雙擊事件
+          onEdgeClick={onEdgeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
           nodeTypes={nodeTypes}
-          fitView
+          defaultzoom={0.5}               // 初始縮放比例
+          defaultposition={[0, 0]}     // 初始偏移，x 與 y 分別代表水平與垂直位移
           style={{ backgroundColor: "#F7F9FB" }}
         >
           <svg>
@@ -210,7 +198,7 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
         </ReactFlow>
       </div>
 
-      {/* ✅ Modal 讓使用者輸入新的 edge 文字 */}
+      {/* Modal 與編輯節點文字的部分保持不變 */}
       <Modal
         title="編輯連線文字"
         open={isModalOpen}
@@ -227,7 +215,6 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
         />
       </Modal>
 
-      {/* 新增輸入框讓用戶編輯節點的 label */}
       {isEditing && (
         <Modal
           title="編輯節點文字"
@@ -249,7 +236,6 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   );
 });
 
-// 包裝導出的組件
 export default forwardRef((props, ref) => (
   <ReactFlowProvider>
     <DnDProvider>
