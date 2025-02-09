@@ -36,7 +36,13 @@ const RectangleNode = ({ data, id, selected, onChange }) => {
         minHeight={50}
       />
       <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Top} />
+      <Handle type="target" position={Position.Right} />
+      <Handle type="source" position={Position.Right} />
+      <Handle type="target" position={Position.Bottom} />
       <Handle type="source" position={Position.Bottom} />
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Left} />
       {isEditing ? (
         <input
           type="text"
