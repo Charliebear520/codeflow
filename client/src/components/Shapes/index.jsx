@@ -40,7 +40,7 @@ function ShapeFlow() {
       id: "node-2",
       type: "decision",
       position: { x: 10, y: 10 },
-      data: { label: "判斷符號", onChange: updateNodeLabel },
+      data: { label: "起止符號", onChange: updateNodeLabel },
     },
     {
       id: "node-3",
@@ -52,7 +52,7 @@ function ShapeFlow() {
       id: "node-4",
       type: "diamond",
       position: { x: 30, y: 30 },
-      data: { label: "起止符號", onChange: updateNodeLabel },
+      data: { label: "判斷符號", onChange: updateNodeLabel },
     },
   ];
 
