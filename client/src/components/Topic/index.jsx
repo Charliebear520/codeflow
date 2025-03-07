@@ -1,10 +1,46 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import styles from "./topic.module.css";
-import { Image, Popover } from "antd";
-import { GlobalOutlined } from "@ant-design/icons";
+import { Image, Popover, Button, message } from "antd";
+import { GlobalOutlined, SyncOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
 const Topic = () => {
+  const [question, setQuestion] = useState("請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。");
+  const [loading, setLoading] = useState(false);
+  
+  // 生成新題目
+  const fetchNewQuestion = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get("http://localhost:3000/api/generate-question");
+      if (response.data.success) {
+        setQuestion(response.data.question);
+        // 將當前題目存儲到 localStorage，以便在提交流程圖時使用
+        localStorage.setItem('currentFlowchartQuestion', response.data.question);
+      } else {
+        message.error("無法生成新題目");
+      }
+    } catch (error) {
+      console.error("Error fetching question:", error);
+      message.error("獲取題目時發生錯誤");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // 初始加載時獲取題目
+  useEffect(() => {
+    // 如果想一開始就有動態題目，取消下面的注釋
+    // fetchNewQuestion();
+    
+    // 或者從 localStorage 獲取先前生成的題目（如果有）
+    const savedQuestion = localStorage.getItem('currentFlowchartQuestion');
+    if (savedQuestion) {
+      setQuestion(savedQuestion);
+    }
+  }, []);
+
   const content = (
     <div>
       <Image
@@ -15,6 +51,7 @@ const Topic = () => {
       />
     </div>
   );
+  
   const example = (
     <div>
       <p style={{ width: "540px", height: "100%" }}>
@@ -32,6 +69,7 @@ const Topic = () => {
       </div>
     </div>
   );
+  
   return (
     <div className={styles.container}>
       <div
@@ -58,10 +96,17 @@ const Topic = () => {
       <div style={{ height: "80%" }}>
         <div className={styles.topicbox}>
           <div>
-            <p>
-              請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是
-              否會下雨。請應用流程圖，幫助你決 定是否需要帶雨傘。
-            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" ,flexDirection: "column"}}>
+              <p style={{ flex: 1 }}>{question}</p>
+              <Button 
+                icon={loading ? <SyncOutlined spin /> : <SyncOutlined />} 
+                onClick={fetchNewQuestion}
+                disabled={loading}
+                style={{ marginLeft: '10px' }}
+              >
+                生成新題目
+              </Button>
+            </div>
             <br />
             <p style={{ color: "#9287EE" }}>提示：這題請一定要使用判斷符號！</p>
           </div>
