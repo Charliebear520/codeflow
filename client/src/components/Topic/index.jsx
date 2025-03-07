@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from "react";
 import styles from "./topic.module.css";
-import { Image, Popover, Button, message } from "antd";
-import { GlobalOutlined, SyncOutlined } from "@ant-design/icons";
+import { Image, Popover, Button, message, Modal } from "antd";
+import { GlobalOutlined, SyncOutlined, BulbOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import axios from "axios";
 
 const Topic = () => {
   const [question, setQuestion] = useState("請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。");
   const [loading, setLoading] = useState(false);
+  const [hintLevel, setHintLevel] = useState(1); // 提示層級，從1開始
+  const [isHintModalVisible, setIsHintModalVisible] = useState(false);
+  const [hintContent, setHintContent] = useState("");
+  const [hintLoading, setHintLoading] = useState(false);
+  // 新增：保存已生成的提示
+  const [hintCache, setHintCache] = useState({});
+  const [regenerating, setRegenerating] = useState(false);
   
   // 生成新題目
   const fetchNewQuestion = async () => {
@@ -18,6 +25,9 @@ const Topic = () => {
         setQuestion(response.data.question);
         // 將當前題目存儲到 localStorage，以便在提交流程圖時使用
         localStorage.setItem('currentFlowchartQuestion', response.data.question);
+        // 重置提示層級和提示緩存
+        setHintLevel(1);
+        setHintCache({});
       } else {
         message.error("無法生成新題目");
       }
@@ -29,17 +39,107 @@ const Topic = () => {
     }
   };
   
+  // 從後端獲取提示
+  const fetchHint = async (forceRegenerate = false) => {
+    // 檢查是否已經有緩存的提示
+    if (!forceRegenerate && hintCache[hintLevel]) {
+      setHintContent(hintCache[hintLevel]);
+      return;
+    }
+    
+    setHintLoading(true);
+    try {
+      const response = await axios.post("http://localhost:3000/api/generate-hint", {
+        question,
+        hintLevel
+      });
+      
+      if (response.data.success) {
+        const newHint = response.data.hint;
+        setHintContent(newHint);
+        
+        // 更新提示緩存
+        setHintCache(prevCache => ({
+          ...prevCache,
+          [hintLevel]: newHint
+        }));
+      } else {
+        message.error("無法獲取提示");
+        setHintContent("抱歉，無法生成提示。請稍後再試。");
+      }
+    } catch (error) {
+      console.error("Error fetching hint:", error);
+      message.error("獲取提示時發生錯誤");
+      setHintContent("抱歉，生成提示時發生錯誤。請稍後再試。");
+    } finally {
+      setHintLoading(false);
+      setRegenerating(false);
+    }
+  };
+  
+  // 重新生成當前層級的提示
+  const regenerateHint = async () => {
+    setRegenerating(true);
+    await fetchHint(true);
+  };
+  
+  // 顯示提示對話框
+  const showHint = async () => {
+    setIsHintModalVisible(true);
+    await fetchHint();
+  };
+  
+  // 前往上一層提示
+  const handlePreviousHint = () => {
+    if (hintLevel > 1) {
+      setHintLevel(prevLevel => prevLevel - 1);
+    }
+  };
+  
+  // 前往下一層提示
+  const handleNextHint = () => {
+    if (hintLevel < 7) {
+      setHintLevel(prevLevel => prevLevel + 1);
+    }
+  };
+  
+  // 提示層級改變時更新內容
+  useEffect(() => {
+    if (isHintModalVisible) {
+      fetchHint();
+    }
+  }, [hintLevel]);
+  
+  // 關閉提示對話框
+  const handleCloseHint = () => {
+    setIsHintModalVisible(false);
+  };
+  
   // 初始加載時獲取題目
   useEffect(() => {
-    // 如果想一開始就有動態題目，取消下面的注釋
-    // fetchNewQuestion();
-    
     // 或者從 localStorage 獲取先前生成的題目（如果有）
     const savedQuestion = localStorage.getItem('currentFlowchartQuestion');
     if (savedQuestion) {
       setQuestion(savedQuestion);
     }
+    
+    // 嘗試從 localStorage 恢復提示緩存
+    const savedHintCache = localStorage.getItem('hintCache');
+    if (savedHintCache) {
+      try {
+        setHintCache(JSON.parse(savedHintCache));
+      } catch (e) {
+        console.error("無法解析保存的提示緩存", e);
+      }
+    }
   }, []);
+  
+  // 保存提示緩存到 localStorage
+  useEffect(() => {
+    if (Object.keys(hintCache).length > 0) {
+      localStorage.setItem('hintCache', JSON.stringify(hintCache));
+    }
+  }, [hintCache]);
 
   const content = (
     <div>
@@ -96,16 +196,25 @@ const Topic = () => {
       <div style={{ height: "80%" }}>
         <div className={styles.topicbox}>
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" ,flexDirection: "column"}}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexDirection: "column"}}>
               <p style={{ flex: 1 }}>{question}</p>
-              <Button 
-                icon={loading ? <SyncOutlined spin /> : <SyncOutlined />} 
-                onClick={fetchNewQuestion}
-                disabled={loading}
-                style={{ marginLeft: '10px' }}
-              >
-                生成新題目
-              </Button>
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <Button 
+                  icon={loading ? <SyncOutlined spin /> : <SyncOutlined />} 
+                  onClick={fetchNewQuestion}
+                  disabled={loading}
+                >
+                  生成新題目
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<BulbOutlined />}
+                  onClick={showHint}
+                  loading={hintLoading}
+                >
+                  {`提示 (${hintLevel}/7)`}
+                </Button>
+              </div>
             </div>
             <br />
             <p style={{ color: "#9287EE" }}>提示：這題請一定要使用判斷符號！</p>
@@ -132,6 +241,74 @@ const Topic = () => {
           </div>
         </div>
       </div>
+      
+      {/* 提示對話框 */}
+      <Modal
+        title={
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>{`繪圖提示 - 步驟 ${hintLevel}/7`}</span>
+            <Button 
+              icon={<ReloadOutlined spin={regenerating} />} 
+              onClick={regenerateHint}
+              disabled={hintLoading || regenerating}
+              size="small"
+              style={{marginRight: "2rem"}}
+            >
+              重新生成提示
+            </Button>
+          </div>
+        }
+        open={isHintModalVisible}
+        onCancel={handleCloseHint}
+        footer={[
+          <Button 
+            key="previous" 
+            onClick={handlePreviousHint} 
+            disabled={hintLevel === 1 || hintLoading}
+          >
+            上一步提示
+          </Button>,
+          <Button key="close" onClick={handleCloseHint}>
+            關閉
+          </Button>,
+          <Button 
+            key="next" 
+            type="primary" 
+            onClick={handleNextHint}
+            disabled={hintLevel === 7 || hintLoading}
+          >
+            {hintLevel < 7 ? "下一步提示" : "完成"}
+          </Button>,
+        ]}
+        width={600}
+      >
+        {hintLoading ? (
+          <div style={{ textAlign: "center", padding: "20px" }}>
+            正在生成提示...
+          </div>
+        ) : (
+          <div>
+            <div style={{ textAlign: "center", marginBottom: "10px" }}>
+              {Array.from({ length: 7 }).map((_, index) => (
+                <Button 
+                  key={index}
+                  type={index + 1 === hintLevel ? "primary" : "default"}
+                  shape="circle"
+                  size="small"
+                  style={{ margin: "0 5px" }}
+                  onClick={() => setHintLevel(index + 1)}
+                  disabled={hintLoading}
+                >
+                  {index + 1}
+                </Button>
+              ))}
+            </div>
+            <div style={{ whiteSpace: "pre-line" }}>
+              {hintContent}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
