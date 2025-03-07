@@ -8,8 +8,8 @@
 }
 
 .diamondNode {
-  width: 100%;
-  height: 100%;
+  width: 150%;
+  height: 150%;
   background-color: #007bff;
   border: 1px solid #ddd;
   position: relative;
