@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import ImageKit from "imagekit";
-import { checkFlowchart, generateFlowchartQuestion } from "./services/geminiService.js";
+import { checkFlowchart, generateFlowchartQuestion, generateFlowchartHint } from "./services/geminiService.js";
 
 // 加載環境變量
 dotenv.config();
@@ -41,6 +41,41 @@ app.get("/api/generate-question", async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: `生成題目時發生錯誤: ${error.message}` 
+    });
+  }
+});
+
+// 新增：生成流程圖提示的API端點
+app.post("/api/generate-hint", async (req, res) => {
+  try {
+    const { question, hintLevel } = req.body;
+    
+    if (!question) {
+      return res.status(400).json({
+        success: false,
+        error: "未提供題目"
+      });
+    }
+    
+    if (!hintLevel || hintLevel < 1 || hintLevel > 7) {
+      return res.status(400).json({
+        success: false,
+        error: "提示層級無效，應為1-7之間的數字"
+      });
+    }
+    
+    console.log(`Generating hint for level ${hintLevel}...`);
+    const hint = await generateFlowchartHint(question, hintLevel);
+    
+    res.json({
+      success: true,
+      hint
+    });
+  } catch (error) {
+    console.error("Error generating hint:", error);
+    res.status(500).json({
+      success: false,
+      error: `生成提示時發生錯誤: ${error.message}`
     });
   }
 });
