@@ -3,6 +3,7 @@ import styles from "./check.module.css";
 import { Button } from "antd";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
+import ReactMarkdown from "react-markdown";
 
 const Check = () => {
   const { result, isChecking } = useSelector((state) => state.check);
@@ -32,7 +33,7 @@ const Check = () => {
           ) : result ? (
             <div>
               <p style={{ color: "#9287EE" }}>流程圖分析結果：</p>
-              <p>{result}</p>
+              <ReactMarkdown>{result}</ReactMarkdown>
             </div>
           ) : null}
         </div>

@@ -17,7 +17,7 @@ export const generateFlowchartQuestion = async () => {
     console.log("Generating flowchart question...");
     
     // 使用 gemini-1.5-pro 模型
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `生成一個流程圖練習題目，使用繁體中文。
     題目應該要求學生為簡單的日常決策過程創建一個流程圖。
@@ -48,7 +48,7 @@ export const generateFlowchartHint = async (question, hintLevel) => {
     console.log(`Generating flowchart hint... Level: ${hintLevel}`);
     
     // 使用 gemini-1.5-pro 模型
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // 根據不同層級生成不同的提示
     const promptBase = `基於以下流程圖題目：「${question}」
@@ -130,7 +130,7 @@ export const checkFlowchart = async (imageData, question) => {
     }
 
     // 使用新的模型名稱 gemini-1.5-pro
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // 修改：根據傳入的題目動態生成 prompt
     const prompt = `題目：${question}
