@@ -4,10 +4,10 @@ import styles from "./Process.module.css";
 
 const ProcessNode = ({ data, id, selected, onChange }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(data.label || "流程符號");
+  const [label, setLabel] = useState(data.label || "輸入/輸出符號");
 
   useEffect(() => {
-    setLabel(data.label || "流程符號");
+    setLabel(data.label || "輸入/輸出符號");
   }, [data.label]);
 
   const handleDoubleClick = () => {

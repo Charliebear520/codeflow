@@ -1,5 +1,5 @@
 .processNode {
-  background-color: #28a745; /* 流程符號顏色 */
+  background-color: #28a745; /* 輸入/輸出符號顏色 */
   padding: 10px;
   display: flex;
   justify-content: center;

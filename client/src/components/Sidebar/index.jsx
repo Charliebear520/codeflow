@@ -54,7 +54,7 @@ export default () => {
               draggable
             ></div>
           </div>
-          <p style={{ margin: 0 }}>流程符號</p>
+          <p style={{ margin: 0 }}>輸入/輸出符號</p>
         </div>
       </div>
     </div>

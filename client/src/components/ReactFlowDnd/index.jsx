@@ -116,7 +116,7 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
       const defaultLabels = {
         rectangle: "處理符號",
         decision: "起止符號",
-        process: "流程符號",
+        process: "輸入/輸出符號",
         diamond: "判斷符號",
       };
       const newNode = {

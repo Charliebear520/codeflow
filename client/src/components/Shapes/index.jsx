@@ -46,7 +46,7 @@ function ShapeFlow() {
       id: "node-3",
       type: "process",
       position: { x: 20, y: 20 },
-      data: { label: "流程符號", onChange: updateNodeLabel },
+      data: { label: "輸入/輸出符號", onChange: updateNodeLabel },
     },
     {
       id: "node-4",
