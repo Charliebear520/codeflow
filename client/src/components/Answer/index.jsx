@@ -156,9 +156,9 @@ const Answer = () => {
     >
       <App>
         <div className={styles.container}>
-          <div style={{ height: "100%" }}>
+          {/* <div style={{ height: "100%" }}>
             <></>
-          </div>
+          </div> */}
           <div className={styles.tabContent}>
             <Tabs
               defaultActiveKey="1"
