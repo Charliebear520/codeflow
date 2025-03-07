@@ -83,7 +83,7 @@ export const generateFlowchartHint = async (question, hintLevel) => {
         指出題目中需要做出哪些決策，以及如何正確表示"是"和"否"的路徑。`;
         break;
       case 6:
-        promptDetails = `第六層提示：判斷流程符號的連接。
+        promptDetails = `第六層提示：判斷輸入/輸出符號的連接。
         提供關於如何用箭頭正確連接各個符號的指導。
         解釋如何確保流程的邏輯順序和完整性。`;
         break;
