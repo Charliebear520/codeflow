@@ -5,6 +5,10 @@
   justify-content: center;
   align-items: center;
   position: relative;
+  /* 修改為平行四邊形 */
+  clip-path: polygon(15% -10%, 100% -10%, 85% 100%, 0% 110%);
+  width: 120px; /* 可根據需要調整 */
+  height: 60px; /* 可根據需要調整 */
 }
 
 .label {
