@@ -483,7 +483,7 @@
   color: #8883bd;
 }
 
-/* 用戶菜單樣式 - 遵循 Clerk 官方設計 */
+/* 用戶菜單樣式 - 完全按照 Clerk 官方設計 */
 .user-menu {
   position: relative;
   display: inline-block;
@@ -498,7 +498,6 @@
   bottom: 0;
   z-index: 1050;
   background-color: transparent;
-  display: none;
 }
 
 .user-menu.menu-open .user-menu-overlay {
@@ -543,30 +542,32 @@
   font-size: 16px;
 }
 
-.user-menu-dropdown {
+/* Clerk 樣式的下拉選單 */
+.user-menu-dropdown.clerk-dropdown {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
   background-color: white;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  width: 240px;
-  z-index: 1100;
+  border-radius: 12px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
+  width: 320px;
+  z-index: 9999;
   max-height: calc(100vh - 100px);
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: none;
   padding: 0;
   margin-top: 0;
-  transform: translateZ(0);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 }
 
-.user-menu-dropdown::-webkit-scrollbar {
+.user-menu-dropdown.clerk-dropdown::-webkit-scrollbar {
   display: none;
 }
 
-.user-menu-dropdown::before {
+.user-menu-dropdown.clerk-dropdown::before {
   content: "";
   position: absolute;
   top: -5px;
@@ -575,78 +576,136 @@
   height: 10px;
   background-color: white;
   transform: rotate(45deg);
-  border-left: 1px solid rgba(0, 0, 0, 0.08);
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 1px solid rgba(0, 0, 0, 0.05);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
   z-index: -1;
 }
 
-.user-menu-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+/* 用戶賬戶部分 */
+.user-account-section {
+  padding: 16px;
 }
 
-.user-menu-info {
+.user-account-item {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.user-account-item.current-account {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 12px;
+}
+
+.account-avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #4a3aff;
+  font-size: 16px;
+  margin-right: 12px;
+}
+
+.account-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  flex-grow: 1;
+  overflow: hidden;
 }
 
-.user-menu-fullname {
+.account-name {
   font-size: 14px;
   font-weight: 500;
-  color: #1c1c1e;
-}
-
-.user-menu-email {
-  font-size: 12px;
-  color: #6b7280;
+  color: #111827;
+  margin-bottom: 2px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.user-menu-item {
-  padding: 8px 16px;
-  color: #1c1c1e;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  transition: background-color 0.2s;
+.account-email {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.user-menu-item:hover {
-  background-color: rgba(74, 58, 255, 0.05);
-}
-
-.user-menu-divider {
-  margin: 4px 0;
+/* 分隔線 */
+.clerk-dropdown-divider {
   height: 1px;
-  background-color: rgba(0, 0, 0, 0.06);
+  background-color: rgba(0, 0, 0, 0.05);
+  margin: 0;
 }
 
-.logout-button {
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 8px 16px;
-  color: #f44336;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 0.2s;
+/* 動作按鈕 */
+.clerk-action-buttons {
+  padding: 8px 16px 16px;
+}
+
+.clerk-action-button {
   display: flex;
   align-items: center;
-}
-
-.logout-button:hover {
-  background-color: rgba(244, 67, 54, 0.05);
-}
-
-.user-menu-loading {
-  display: inline-block;
-  padding: 8px;
-  color: #4a3aff;
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 6px;
   font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.2s;
+  background-color: white;
+  color: #111827;
+}
+
+.clerk-action-button svg {
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.clerk-action-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.clerk-action-button.manage-button {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.clerk-action-button.signout-button {
+  color: #ef4444;
+}
+
+/* Clerk 品牌頁腳 */
+.clerk-brand-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+  font-size: 12px;
+  color: #6b7280;
+  background-color: rgba(0, 0, 0, 0.01);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.clerk-brand-footer span {
+  margin: 0 4px;
 }
 
 /* 確保任何動態生成的類名也有正確的樣式 */
@@ -705,4 +764,71 @@
   .custom-form-field {
     gap: 4px;
   }
+}
+
+/* 用戶菜單載入狀態 */
+.user-menu-loading {
+  display: inline-block;
+  padding: 8px;
+  color: #4a3aff;
+  font-size: 14px;
+}
+
+/* 使用 Portal 渲染的下拉選單需要這些樣式 */
+body > .user-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9990;
+  background-color: transparent;
+}
+
+/* 側邊欄導航樣式 - 用戶個人資料頁面使用 */
+.profile-sidebar {
+  width: 280px;
+  background-color: white;
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 20px 0;
+  height: 100%;
+}
+
+.profile-sidebar-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  padding: 0 20px;
+  margin-bottom: 20px;
+}
+
+.profile-nav-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  font-size: 14px;
+  color: #6b7280;
+  text-decoration: none;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.profile-nav-item svg {
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.profile-nav-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #111827;
+}
+
+.profile-nav-item.active {
+  background-color: #f3f2ff;
+  color: #4a3aff;
+  font-weight: 500;
 }
