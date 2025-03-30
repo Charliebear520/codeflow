@@ -1,234 +1,113 @@
-import React from "react";
-import { SignIn } from "@clerk/clerk-react";
+import React, { useState } from "react";
+import { useSignIn, useAuth } from "@clerk/clerk-react";
 import "../styles/Login.css";
 
 function Login() {
-  // 自定義 Clerk 組件的外觀
-  const appearance = {
-    layout: {
-      socialButtonsVariant: "blockButton",
-      socialButtonsPlacement: "bottom",
-      showOptionalFields: false,
-      logoPlacement: "none",
-      termsPageUrl: "https://clerk.com/terms",
-      privacyPageUrl: "https://clerk.com/privacy",
-    },
-    variables: {
-      borderRadius: "8px",
-      colorBackground: "#ffffff",
-      colorPrimary: "#8883bd",
-      colorText: "#1e1e1e",
-      colorTextSecondary: "#4d4d4d",
-      colorDanger: "#e53935",
-      colorSuccess: "#4caf50",
-      fontFamily: "Arial, sans-serif",
-      fontSize: "14px",
-      fontWeight: {
-        normal: "400",
-        medium: "500",
-        bold: "600",
-      },
-      spacingUnit: "4px",
-    },
-    elements: {
-      rootBox: {
-        boxShadow: "none",
-        width: "100%",
-        maxWidth: "100%",
-        margin: 0,
-        padding: 0,
-        backgroundColor: "transparent",
-      },
-      card: {
-        // boxShadow: "none",
-        border: "1px solid #d9d9d9",
-        borderRadius: "8px",
-        width: "100%",
-        maxWidth: "100%",
-        margin: 0,
-        padding: "20px",
-        backgroundColor: "#ffffff",
-      },
-      header: {
-        fontSize: "28px",
-        fontWeight: "600",
-        color: "#000",
-        textAlign: "center",
-        width: "100%",
-        margin: "0 0 20px 0",
-        padding: "0 10px",
-      },
-      formButtonPrimary: {
-        backgroundColor: "#8883bd",
-        "&:hover": {
-          backgroundColor: "#7671a9",
-        },
-        fontSize: "14px",
-        width: "100%",
-        padding: "8px 16px",
-        margin: "10px 0",
-        boxShadow: "none",
-        borderRadius: "8px",
-        border: "none",
-        outline: "none",
-        height: "40px",
-      },
-      formFieldLabel: {
-        fontSize: "14px",
-        color: "#1e1e1e",
-        fontWeight: "500",
-        margin: "5px 0",
-        padding: "0 2px",
-      },
-      formFieldInput: {
-        borderRadius: "8px",
-        border: "1px solid #d9d9d9",
-        fontSize: "14px",
-        width: "90%",
-        padding: "8px 16px",
-        margin: "5px",
-        boxShadow: "none",
-        height: "40px",
-        boxSizing: "border-box",
-        backgroundColor: "#ffffff",
-        color: "#1e1e1e",
-        outline: "none",
-        "&:focus": {
-          border: "1px solid #8883bd",
-          boxShadow: "none",
-        },
-      },
-      footerActionText: {
-        fontSize: "14px",
-        color: "#1e1e1e",
-        margin: "10px 0",
-        padding: "5px 0",
-      },
-      footerActionLink: {
-        color: "#3759d3",
-        fontWeight: "500",
-        textDecoration: "none",
-        "&:hover": {
-          textDecoration: "underline",
-        },
-      },
-      identityPreview: {
-        borderRadius: "8px",
-        width: "100%",
-        margin: "10px 0",
-        padding: "10px",
-        border: "1px solid #d9d9d9",
-        backgroundColor: "#f9f9f9",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-      },
-      identityPreviewText: {
-        color: "#1e1e1e",
-        fontSize: "14px",
-        fontWeight: "500",
-      },
-      identityPreviewEditButton: {
-        color: "#8883bd",
-        fontSize: "13px",
-        fontWeight: "500",
-        backgroundColor: "transparent",
-        border: "none",
-        padding: "5px 10px",
-        cursor: "pointer",
-        borderRadius: "4px",
-        "&:hover": {
-          backgroundColor: "#f0eef9",
-          textDecoration: "none",
-        },
-      },
-      identityPreviewAvatar: {
-        borderRadius: "50%",
-        width: "32px",
-        height: "32px",
-        overflow: "hidden",
-        border: "1px solid #d9d9d9",
-      },
-      socialButtonsBlockButton: {
-        width: "100%",
-        maxWidth: "100%",
-        margin: "5px 0",
-        padding: "8px 16px",
-        boxShadow: "none",
-        borderRadius: "8px",
-        border: "1px solid #d9d9d9",
-        backgroundColor: "#ffffff",
-        color: "#1e1e1e",
-        height: "40px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        "&:hover": {
-          backgroundColor: "#f2f2f2",
-        },
-      },
-      socialButtonsProviderIcon: {
-        width: "20px",
-        height: "20px",
-        padding: "0",
-        margin: "0 12px 0 0",
-      },
-      socialButtonsBlockButtonText: {
-        fontSize: "14px",
-        fontWeight: "500",
-      },
-      formFieldAction: {
-        color: "#3759d3",
-        fontWeight: "500",
-        textDecoration: "none",
-        "&:hover": {
-          textDecoration: "underline",
-        },
-      },
-      form: {
-        width: "100%",
-        maxWidth: "100%",
-        padding: "0",
-        margin: "0",
-      },
-      formFieldRow: {
-        width: "100%",
-        margin: "10px 0",
-        padding: "0",
-      },
-      main: {
-        width: "100%",
-        maxWidth: "100%",
-        padding: "0",
-        margin: "0 auto",
-      },
-      formFieldInputShowPasswordButton: {
-        boxShadow: "none",
-        border: "none",
-        background: "transparent",
-        padding: "0 10px",
-        margin: "0",
-      },
-      dividerLine: {
-        margin: "15px 0",
-        width: "100%",
-        height: "1px",
-        backgroundColor: "#d9d9d9",
-      },
-      dividerText: {
-        margin: "0 10px",
-        color: "#4d4d4d",
-        fontSize: "14px",
-      },
-      socialButtonsProviderList: {
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-        width: "100%",
-      },
-    },
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const { isLoaded, signIn, setActive } = useSignIn();
+
+  // 狀態管理
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+
+  // 處理電子郵件密碼登入
+  const handleEmailPasswordSignIn = async (e) => {
+    e.preventDefault();
+
+    if (!isLoaded) return;
+
+    try {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      const result = await signIn.create({
+        identifier: email,
+        password,
+      });
+
+      if (result.status === "complete") {
+        // 登入成功，設置活動會話
+        await setActive({ session: result.createdSessionId });
+        window.location.href = "/"; // 重定向到首頁
+      } else if (result.status === "needs_second_factor") {
+        // 處理雙因素驗證
+        setVerifying(true);
+      } else if (
+        result.status === "needs_identifier" ||
+        result.status === "needs_password"
+      ) {
+        setErrorMessage("請輸入有效的電子郵件和密碼");
+      } else {
+        setErrorMessage("登入過程中出現錯誤，請重試");
+      }
+    } catch (err) {
+      console.error("登入錯誤:", err);
+      setErrorMessage(err.errors?.[0]?.message || "登入失敗，請檢查您的憑據");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // 處理驗證碼提交
+  const handleVerificationSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!isLoaded || !verifying) return;
+
+    try {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      const result = await signIn.attemptSecondFactor({
+        strategy: "phone_code",
+        code: verificationCode,
+      });
+
+      if (result.status === "complete") {
+        // 驗證成功，設置活動會話
+        await setActive({ session: result.createdSessionId });
+        window.location.href = "/"; // 重定向到首頁
+      } else {
+        setErrorMessage("驗證失敗，請檢查您的驗證碼");
+      }
+    } catch (err) {
+      console.error("驗證錯誤:", err);
+      setErrorMessage(err.errors?.[0]?.message || "驗證失敗，請重試");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 處理社交登入
+  const handleSocialSignIn = async (provider) => {
+    if (!isLoaded) return;
+
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: provider,
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/",
+      });
+    } catch (err) {
+      console.error(`${provider}登入錯誤:`, err);
+      setErrorMessage(`${provider}登入失敗，請重試`);
+    }
+  };
+
+  // 如果正在載入，顯示載入狀態
+  if (!isLoaded || !isAuthLoaded) {
+    return <div className="loading-container">載入中...</div>;
+  }
+
+  // 如果已登入，重定向到首頁
+  if (isSignedIn) {
+    window.location.href = "/";
+    return null;
+  }
 
   return (
     <div className="login-page">
@@ -236,11 +115,123 @@ function Login() {
         <div className="login-image-section">{/* 左側圖片區域 */}</div>
         <div className="login-form-section">
           <div className="login-form-container">
-            <SignIn
-              appearance={appearance}
-              signUpUrl="/signup"
-              redirectUrl="/"
-            />
+            <div className="custom-auth-container">
+              <h1 className="custom-auth-title">登入</h1>
+
+              {verifying ? (
+                <form
+                  onSubmit={handleVerificationSubmit}
+                  className="custom-auth-form"
+                >
+                  <div className="custom-form-field">
+                    <label htmlFor="verificationCode">驗證碼</label>
+                    <input
+                      id="verificationCode"
+                      type="text"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      placeholder="輸入驗證碼"
+                      required
+                    />
+                  </div>
+
+                  {errorMessage && (
+                    <div className="custom-error-message">{errorMessage}</div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="custom-submit-button"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "驗證中..." : "驗證"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="custom-back-button"
+                    onClick={() => setVerifying(false)}
+                    disabled={isLoading}
+                  >
+                    返回
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <form
+                    onSubmit={handleEmailPasswordSignIn}
+                    className="custom-auth-form"
+                  >
+                    <div className="custom-form-field">
+                      <label htmlFor="email">電子郵件</label>
+                      <input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="your.email@example.com"
+                        required
+                      />
+                    </div>
+
+                    <div className="custom-form-field">
+                      <label htmlFor="password">密碼</label>
+                      <input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="您的密碼"
+                        required
+                      />
+                    </div>
+
+                    {errorMessage && (
+                      <div className="custom-error-message">{errorMessage}</div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="custom-submit-button"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "登入中..." : "登入"}
+                    </button>
+                  </form>
+
+                  <div className="custom-auth-divider">
+                    <span>或</span>
+                  </div>
+
+                  <div className="custom-social-buttons">
+                    <button
+                      type="button"
+                      className="custom-social-button custom-google-button"
+                      onClick={() => handleSocialSignIn("oauth_google")}
+                    >
+                      <span className="custom-social-icon">G</span>
+                      <span>使用Google登入</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="custom-social-button custom-github-button"
+                      onClick={() => handleSocialSignIn("oauth_github")}
+                    >
+                      <span className="custom-social-icon">GH</span>
+                      <span>使用GitHub登入</span>
+                    </button>
+                  </div>
+
+                  <div className="custom-auth-footer">
+                    <span>還沒有賬號？</span>
+                    <a href="/signup" className="custom-auth-link">
+                      註冊
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>

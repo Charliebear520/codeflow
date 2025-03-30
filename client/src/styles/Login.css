@@ -28,9 +28,10 @@
   justify-content: center;
   background-color: #fff;
   padding: 40px;
-  overflow: hidden;
+  overflow-y: hidden;
   max-width: 100%;
   box-sizing: border-box;
+  max-height: 100vh;
 }
 
 .login-form-container {
@@ -38,7 +39,7 @@
   max-width: 488px;
   margin: 0 auto;
   padding: 20px 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* 覆蓋 Clerk 的一些樣式 */
@@ -258,10 +259,16 @@
     padding: 20px;
     width: 100%;
     max-width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
   }
 
   .login-form-container {
     padding: 10px;
+  }
+
+  .custom-auth-container {
+    max-width: 100%;
   }
 }
 
@@ -269,9 +276,433 @@
 @media (max-width: 768px) {
   .login-form-section {
     padding: 15px;
+    max-height: 70vh;
   }
 
   .login-form-container {
     padding: 5px;
+  }
+
+  .custom-form-field {
+    margin-bottom: 12px;
+  }
+
+  .custom-auth-form {
+    gap: 12px;
+  }
+}
+
+/* 針對自定義認證組件的樣式 */
+.custom-auth-container {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 24px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.custom-auth-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #000;
+  text-align: center;
+  margin: 0 0 24px 0;
+}
+
+.custom-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.custom-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.custom-form-field label {
+  font-size: 14px;
+  color: #1e1e1e;
+  font-weight: 500;
+}
+
+.custom-form-field input {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  color: #1e1e1e;
+  outline: none;
+}
+
+.custom-form-field input:focus {
+  border-color: #8883bd;
+}
+
+.custom-form-field small {
+  font-size: 12px;
+  color: #666;
+  margin-top: -2px;
+}
+
+.custom-error-message {
+  color: #e53935;
+  font-size: 14px;
+  background-color: rgba(229, 57, 53, 0.1);
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #e53935;
+}
+
+.custom-submit-button,
+.custom-back-button {
+  height: 38px;
+  background-color: #8883bd;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-top: 4px;
+}
+
+.custom-submit-button:hover {
+  background-color: #7671a9;
+}
+
+.custom-submit-button:disabled {
+  background-color: #d9d9d9;
+  cursor: not-allowed;
+}
+
+.custom-back-button {
+  background-color: #f0f0f0;
+  color: #333;
+  margin-top: 10px;
+}
+
+.custom-back-button:hover {
+  background-color: #e0e0e0;
+}
+
+.custom-auth-divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: #4d4d4d;
+  font-size: 14px;
+}
+
+.custom-auth-divider::before,
+.custom-auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: #d9d9d9;
+}
+
+.custom-auth-divider span {
+  padding: 0 10px;
+}
+
+.custom-social-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.custom-social-button {
+  height: 40px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 16px;
+  color: #222;
+  transition: background-color 0.3s;
+}
+
+.custom-social-button:hover {
+  background-color: #f5f5f5;
+}
+
+.custom-social-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  background-color: #f0f0f0;
+  border-radius: 50%;
+}
+
+.custom-auth-footer {
+  text-align: center;
+  font-size: 14px;
+  margin-top: 10px;
+  color: #1e1e1e;
+}
+
+.custom-auth-link {
+  color: #8883bd;
+  text-decoration: none;
+  font-weight: 500;
+  margin-left: 5px;
+}
+
+.custom-auth-link:hover {
+  text-decoration: underline;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 18px;
+  color: #8883bd;
+}
+
+/* 用戶菜單樣式 - 遵循 Clerk 官方設計 */
+.user-menu {
+  position: relative;
+  display: inline-block;
+  z-index: 1000;
+}
+
+.user-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1050;
+  background-color: transparent;
+  display: none;
+}
+
+.user-menu.menu-open .user-menu-overlay {
+  display: block;
+}
+
+.user-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.user-menu-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  object-fit: cover;
+  display: block;
+}
+
+.user-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #4a3aff;
+  font-size: 16px;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  background-color: white;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  width: 240px;
+  z-index: 1100;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  padding: 0;
+  margin-top: 0;
+  transform: translateZ(0);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.user-menu-dropdown::-webkit-scrollbar {
+  display: none;
+}
+
+.user-menu-dropdown::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: 14px;
+  width: 10px;
+  height: 10px;
+  background-color: white;
+  transform: rotate(45deg);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  z-index: -1;
+}
+
+.user-menu-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.user-menu-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-menu-fullname {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1c1c1e;
+}
+
+.user-menu-email {
+  font-size: 12px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-menu-item {
+  padding: 8px 16px;
+  color: #1c1c1e;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.user-menu-item:hover {
+  background-color: rgba(74, 58, 255, 0.05);
+}
+
+.user-menu-divider {
+  margin: 4px 0;
+  height: 1px;
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.logout-button {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  color: #f44336;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.logout-button:hover {
+  background-color: rgba(244, 67, 54, 0.05);
+}
+
+.user-menu-loading {
+  display: inline-block;
+  padding: 8px;
+  color: #4a3aff;
+  font-size: 14px;
+}
+
+/* 確保任何動態生成的類名也有正確的樣式 */
+[class^="cl-internal-"],
+.cl-cardBox,
+.cl-signIn-start,
+.cl-signUp-start {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* 針對註冊頁面的特殊樣式 */
+.signup-form-container {
+  padding: 20px;
+}
+
+.signup-form .form-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.signup-form .form-row .custom-form-field {
+  flex: 1;
+  min-width: 0; /* 確保子元素不會溢出 */
+}
+
+.signup-form.custom-auth-form {
+  gap: 10px;
+}
+
+.signup-form .custom-form-field input {
+  width: 100%;
+}
+
+/* 小螢幕設備調整 */
+@media (max-width: 576px) {
+  .signup-form .form-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .signup-form-container {
+    padding: 16px;
+  }
+
+  .custom-auth-title {
+    font-size: 24px;
+    margin: 0 0 20px 0;
+  }
+
+  .custom-form-field {
+    gap: 4px;
   }
 }
