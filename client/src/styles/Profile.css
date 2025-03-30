@@ -1,0 +1,130 @@
+.profile-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.profile-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.profile-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.profile-content {
+  display: flex;
+  gap: 24px;
+}
+
+.profile-sidebar {
+  flex: 0 0 300px;
+}
+
+.profile-main {
+  flex: 1;
+}
+
+.profile-card {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.profile-avatar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.profile-avatar-container .ant-avatar {
+  margin-bottom: 16px;
+  background-color: #8883bd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  font-weight: bold;
+}
+
+.profile-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 12px 0 4px;
+  text-align: center;
+}
+
+.profile-email {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 16px;
+  text-align: center;
+}
+
+.upload-button {
+  margin-top: 12px;
+}
+
+.form-help-text {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.security-section {
+  padding: 0 16px;
+}
+
+.security-item {
+  margin-bottom: 24px;
+}
+
+.security-item h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.security-item p {
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.profile-loading,
+.profile-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 16px;
+}
+
+.profile-loading .anticon-spin {
+  font-size: 32px;
+  color: #8883bd;
+}
+
+.profile-error p {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .profile-content {
+    flex-direction: column;
+  }
+
+  .profile-sidebar {
+    flex: 0 0 auto;
+    width: 100%;
+    margin-bottom: 24px;
+  }
+}
