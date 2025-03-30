@@ -22,7 +22,7 @@
   flex-grow: 1; /* 占據剩餘空間 */
   margin-bottom: 1rem; /* 底部留白 */
   padding: 1rem; /* 增加內邊距 */
-  overflow-y: auto; /* 只在垂直方向允许滚动 */
+  overflow-y: hidden; /* 只在垂直方向允许滚动 */
   box-sizing: border-box; /* 確保 padding 不會影響元素大小 */
   height: 100%;
 }

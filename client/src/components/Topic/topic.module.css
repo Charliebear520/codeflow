@@ -1,8 +1,8 @@
 .container {
-  padding: 1rem 1rem 2rem 2rem;
+  padding: 1rem 1rem 2rem 0rem;
   display: flex;
   flex-direction: column; /* 讓子元素垂直排列 */
-  height: 90vh; /* 設定高度為視窗高度 */
+  height: 100vh; /* 設定高度為視窗高度 */
   overflow: hidden; /* 防止滾動條出現 */
   /* gap:1rem; */
 }
@@ -20,7 +20,7 @@
   font-size: large;
   line-height: 33px;
   color: #375bd3;
-  margin:0;
+  margin: 0;
 }
 
 .topicbox {
@@ -32,16 +32,17 @@
   flex-grow: 1; /* 占據剩餘空間 */
   margin-bottom: 1rem; /* 底部留白 */
   padding: 1rem; /* 增加內邊距 */
-  overflow-y: auto; /* 只在垂直方向允许滚动 */
+  overflow-y: hidden; /* 只在垂直方向允许滚动 */
   box-sizing: border-box; /* 確保 padding 不會影響元素大小 */
-  height:100%;
+  height: 100%;
 }
 
 .examplebox {
   width: 100%;
   display: flex;
   justify-content: flex-start;
-  align-items:center;
+  align-items: center;
+  overflow-y: hidden;
 }
 
 .example {
@@ -49,14 +50,13 @@
   margin: 10px;
 }
 
-.infobox{
+.infobox {
   display: flex;
   flex-direction: column;
 }
 
-.linkbox{
-  width:100%;
+.linkbox {
+  width: 100%;
   display: flex;
   justify-content: flex-end;
-
 }
