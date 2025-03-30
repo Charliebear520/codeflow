@@ -224,7 +224,7 @@ function Login() {
                   </div>
 
                   <div className="custom-auth-footer">
-                    <span>還沒有賬號？</span>
+                    <span>還沒有帳號？</span>
                     <a href="/signup" className="custom-auth-link">
                       註冊
                     </a>

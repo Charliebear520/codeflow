@@ -128,8 +128,19 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* 個人資料相關路由 */}
             <Route
               path={"/profile"}
+              element={
+                <ProtectedRoute>
+                  <PageLayout>
+                    <Profile />
+                  </PageLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={"/profile/:section"}
               element={
                 <ProtectedRoute>
                   <PageLayout>
