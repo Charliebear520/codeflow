@@ -169,11 +169,11 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={onDragOver}
-          onEdgeDoubleClick={onEdgeDoubleClick}  // 使用雙擊事件
+          onEdgeDoubleClick={onEdgeDoubleClick} // 使用雙擊事件
           onNodeDoubleClick={handleNodeDoubleClick}
           nodeTypes={nodeTypes}
-          defaultzoom={0.5}               // 初始縮放比例
-          defaultposition={[0, 0]}        // 初始偏移，x 與 y 分別代表水平與垂直位移
+          defaultzoom={0.5} // 初始縮放比例
+          defaultposition={[0, 0]} // 初始偏移，x 與 y 分別代表水平與垂直位移
           style={{ backgroundColor: "#F7F9FB" }}
         >
           <svg>

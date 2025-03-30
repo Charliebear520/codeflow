@@ -193,12 +193,11 @@ const Topic = () => {
           <h5>Ch1,繪製流程圖</h5>
         </div>
       </div>
-      <div style={{ height: "80%" }}>
-        <div className={styles.topicbox}>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexDirection: "column"}}>
-              <p style={{ flex: 1 }}>{question}</p>
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+      <div style={{ height: "100%" ,overflowY: "hidden"}}>
+        <div className={styles.topicbox}>       
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexDirection: "column", overflowY: "hidden"}}>
+              <p style={{ flex: 1 ,padding: "0 1rem"}}>{question}</p>
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px", overflowY: "hidden"}}>
                 <Button 
                   icon={loading ? <SyncOutlined spin /> : <SyncOutlined />} 
                   onClick={fetchNewQuestion}
@@ -215,7 +214,7 @@ const Topic = () => {
                   {`提示 (${hintLevel}/7)`}
                 </Button>
               </div>
-            </div>
+           
             <br />
             <p style={{ color: "#9287EE" }}>提示：這題請一定要使用判斷符號！</p>
           </div>

@@ -360,7 +360,7 @@ const Settings = () => {
 
           <div className="settings-item">
             <h3>時區設置</h3>
-            <Select defaultValue="Asia/Shanghai" style={{ width: 300 }}>
+            <Select defaultValue="Asia/Taipei" style={{ width: 300 }}>
               <Option value="Asia/Shanghai">(GMT+8) 中國標準時間 - 北京</Option>
               <Option value="Asia/Taipei">(GMT+8) 台北</Option>
               <Option value="Asia/Tokyo">(GMT+9) 東京</Option>
@@ -374,9 +374,9 @@ const Settings = () => {
           <div className="settings-item">
             <h3>日期格式</h3>
             <Radio.Group defaultValue="YYYY-MM-DD">
-              <Radio value="YYYY-MM-DD">2023-01-31</Radio>
-              <Radio value="MM/DD/YYYY">01/31/2023</Radio>
-              <Radio value="DD/MM/YYYY">31/01/2023</Radio>
+              <Radio value="YYYY-MM-DD">2025-03-31</Radio>
+              <Radio value="MM/DD/YYYY">03/30/2025</Radio>
+              <Radio value="DD/MM/YYYY">30/03/2025</Radio>
             </Radio.Group>
           </div>
         </div>
