@@ -1,0 +1,277 @@
+.login-page {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.login-container {
+  display: flex;
+  width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+}
+
+.login-image-section {
+  flex: 0 0 50%;
+  background-image: url("/logo.png");
+  background-size: cover;
+  background-position: center;
+  min-height: 100vh;
+}
+
+.login-form-section {
+  flex: 0 0 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  padding: 40px;
+  overflow: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.login-form-container {
+  width: 100%;
+  max-width: 488px;
+  margin: 0 auto;
+  padding: 20px 0;
+  overflow: hidden;
+}
+
+/* 覆蓋 Clerk 的一些樣式 */
+.cl-rootBox {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.cl-card {
+  width: 100% !important;
+  max-width: 488px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+
+/* .cl-internal-b3fm6y {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+} */
+
+/* 針對 Clerk 組件內的所有元素設置 box-sizing */
+.cl-component * {
+  box-sizing: border-box !important;
+}
+
+/* 解決 Clerk 組件中可能的陰影和裁切問題 */
+.cl-component button,
+.cl-component input,
+.cl-component a {
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* 針對社交登入按鈕的容器 */
+.cl-socialButtonsGroup,
+.cl-socialButtonsProviderList {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  box-sizing: border-box !important;
+}
+
+/* 塊狀社交登入按鈕 */
+.cl-socialButtonsBlockButton {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 5px 0 !important;
+  padding: 8px 16px !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  border: 1px solid #d9d9d9 !important;
+  background-color: #ffffff !important;
+  color: #1e1e1e !important;
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+/* 社交登入按鈕圖示 */
+.cl-socialButtonsProviderIcon {
+  margin-right: 12px !important;
+}
+
+.login-title {
+  font-size: 38px;
+  font-weight: 600;
+  margin-bottom: 40px;
+  color: #000;
+  text-align: center;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-field label {
+  font-size: 14px;
+  color: #1e1e1e;
+  font-weight: 500;
+}
+
+.input-field input {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.input-field input::placeholder {
+  color: #b3b3b3;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remember-me input[type="checkbox"] {
+  accent-color: #3759d3;
+  width: 16px;
+  height: 16px;
+}
+
+.remember-me label {
+  font-size: 14px;
+  color: #1e1e1e;
+}
+
+.login-button {
+  height: 40px;
+  background-color: #8883bd;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.login-button:hover {
+  background-color: #7671a9;
+}
+
+.login-button:disabled {
+  background-color: #d9d9d9;
+  cursor: not-allowed;
+}
+
+.signup-link {
+  text-align: center;
+  font-size: 14px;
+  margin: 16px 0;
+  color: #1e1e1e;
+}
+
+.signup-link a {
+  color: #3759d3;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.social-login {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 30px;
+}
+
+.google-login,
+.facebook-login {
+  height: 40px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 16px;
+  color: #222;
+}
+
+.google-login::before,
+.facebook-login::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.error-message {
+  color: #e53935;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* 響應式樣式 */
+@media (max-width: 1024px) {
+  .login-container {
+    flex-direction: column;
+  }
+
+  .login-image-section {
+    flex: initial;
+    height: 30vh;
+    min-height: auto;
+  }
+
+  .login-form-section {
+    flex: initial;
+    padding: 20px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .login-form-container {
+    padding: 10px;
+  }
+}
+
+/* 小螢幕設備 */
+@media (max-width: 768px) {
+  .login-form-section {
+    padding: 15px;
+  }
+
+  .login-form-container {
+    padding: 5px;
+  }
+}
