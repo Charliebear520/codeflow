@@ -11,6 +11,7 @@
   border-radius: 10px;
   margin: 1rem;
   z-index: 1000;
+  width: 100%;
 }
 
 .dndflow aside .description {
@@ -44,7 +45,8 @@
   border-color: #0041d0;
   background-color: #ccdbff;
   height: 100%;
-  width: 50px;
+  min-width: 100%;
+  width:80px;
   gap: 10px;
   padding: 1rem;
   border-radius: 10px;
@@ -72,7 +74,8 @@
   border-color: #0041d0;
   background-color: #c1e8ee;
   height: 100%;
-  width: 50px;
+  min-width: 100%;
+  width:80px;
   gap: 10px;
   padding: 0.5rem 1rem;
   border-radius: 10px;
@@ -92,7 +95,8 @@
   justify-content: center;
   background-color: #b2c8ff;
   height: 100%;
-  width: 50px;
+  min-width: 100%;
+  width:80px;
   gap: 10px;
   padding: 1rem;
   border-radius: 10px;
@@ -127,7 +131,7 @@
   display: flex;
   padding: 1rem 2rem;
   justify-content: space-around;
-  gap: 3rem;
+  gap: 1rem;
 }
 
 .dndnode_process_box {
@@ -138,7 +142,8 @@
   background-color: #28a745;
   /* 輸入/輸出符號顏色 */
   height: 100%;
-  width: 50px;
+  min-width: 100%;
+  width:80px;
   gap: 10px;
   padding: 1rem;
   border-radius: 10px;

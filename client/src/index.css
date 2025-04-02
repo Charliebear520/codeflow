@@ -22,18 +22,7 @@ body {
   background-color: #ffffff;
 }
 
-/* 移除所有元素的水平滾動 */
-div,
-main,
-section,
-article,
-aside,
-nav,
-header,
-footer {
-  max-width: 100%;
-  /* overflow-x: hidden; */
-}
+
 
 /* 確保 Clerk 組件也不會超出寬度 */
 div[class*="cl-"] {
