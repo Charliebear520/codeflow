@@ -6,7 +6,7 @@
     align-items: center;
     padding: 4rem;
     height: 80vh; /* Takes up full height */
-    overflow-y: auto;
+    overflow: hidden;
     box-sizing: border-box;
   }
   

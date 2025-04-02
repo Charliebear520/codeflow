@@ -32,7 +32,7 @@ nav,
 header,
 footer {
   max-width: 100%;
-  overflow-x: hidden;
+  /* overflow-x: hidden; */
 }
 
 /* 確保 Clerk 組件也不會超出寬度 */
