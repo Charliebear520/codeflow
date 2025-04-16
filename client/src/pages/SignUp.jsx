@@ -28,10 +28,10 @@ function SignUpPage() {
 
       // 開始註冊流程
       await signUp.create({
-        firstName,
-        lastName,
         emailAddress: email,
         password,
+        firstName,
+        lastName,
       });
 
       // 發送驗證郵件
@@ -68,7 +68,7 @@ function SignUpPage() {
         return;
       }
 
-      // 驗證成功，設置活動會話
+      // 設置活動會話
       await setActive({ session: completeSignUp.createdSessionId });
 
       // 重定向到首頁
