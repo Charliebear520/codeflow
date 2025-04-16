@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useSignIn, useAuth } from "@clerk/clerk-react";
 import "../styles/Login.css";
+import { Link } from "react-router-dom";
 
 function Login() {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
@@ -184,6 +185,14 @@ function Login() {
                         placeholder="您的密碼"
                         required
                       />
+                      <div className="flex justify-end mt-1">
+                        <Link
+                          to="/forgot-password"
+                          className="text-sm text-indigo-600 hover:text-indigo-500"
+                        >
+                          忘記密碼？
+                        </Link>
+                      </div>
                     </div>
 
                     {errorMessage && (
