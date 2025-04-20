@@ -14,6 +14,33 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // 處理忘記密碼
+  const handleForgotPassword = async () => {
+    if (!isLoaded) return;
+
+    try {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      // 使用 Clerk 的忘記密碼功能
+      await signIn.create({
+        strategy: "reset_password_email",
+        identifier: email,
+      });
+
+      // 顯示成功消息
+      setErrorMessage("重置密碼的郵件已發送到您的郵箱，請查收。");
+    } catch (err) {
+      console.error("忘記密碼錯誤:", err);
+      setErrorMessage(
+        err.errors?.[0]?.message || "發送重置密碼郵件失敗，請重試"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // 處理電子郵件密碼登入
   const handleEmailPasswordSignIn = async (e) => {
@@ -182,17 +209,28 @@ function Login() {
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="您的密碼"
+                        placeholder="請輸入密碼"
                         required
                       />
-                      <div className="flex justify-end mt-1">
-                        <Link
-                          to="/forgot-password"
-                          className="text-sm text-indigo-600 hover:text-indigo-500"
-                        >
-                          忘記密碼？
-                        </Link>
+                    </div>
+
+                    <div className="login-options">
+                      <div className="remember-me">
+                        <input
+                          type="checkbox"
+                          id="remember"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                        />
+                        <label htmlFor="remember">記住密碼</label>
                       </div>
+                      <button
+                        type="button"
+                        className="forgot-password"
+                        onClick={handleForgotPassword}
+                      >
+                        忘記密碼？
+                      </button>
                     </div>
 
                     {errorMessage && (
@@ -215,20 +253,28 @@ function Login() {
                   <div className="custom-social-buttons">
                     <button
                       type="button"
-                      className="custom-social-button custom-google-button"
+                      className="custom-social-button google-button"
                       onClick={() => handleSocialSignIn("oauth_google")}
                     >
-                      <span className="custom-social-icon">G</span>
-                      <span>使用Google登入</span>
+                      <img
+                        src="https://www.google.com/favicon.ico"
+                        alt="Google"
+                        className="social-icon"
+                      />
+                      <span>使用 Google 登入</span>
                     </button>
 
                     <button
                       type="button"
-                      className="custom-social-button custom-github-button"
+                      className="custom-social-button github-button"
                       onClick={() => handleSocialSignIn("oauth_github")}
                     >
-                      <span className="custom-social-icon">GH</span>
-                      <span>使用GitHub登入</span>
+                      <img
+                        src="https://github.githubassets.com/favicons/favicon.svg"
+                        alt="GitHub"
+                        className="social-icon"
+                      />
+                      <span>使用 GitHub 登入</span>
                     </button>
                   </div>
 
