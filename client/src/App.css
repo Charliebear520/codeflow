@@ -30,7 +30,7 @@ body,
   width: 100%;
   height: 100%;
   overflow-x: hidden;
-  overflow-y: hidden;
+  
 }
 
 /* 應用容器 */
@@ -39,6 +39,7 @@ body,
   max-height: 100vh;
   position: relative;
   background-color: #f2f0ff;
+  overflow-y: hidden;
 }
 
 /* 頭部導航欄樣式 */

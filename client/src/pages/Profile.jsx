@@ -11,6 +11,8 @@ import {
   message,
   Spin,
   Upload,
+  DatePicker,
+  Modal,
 } from "antd";
 import {
   UserOutlined,
@@ -20,6 +22,8 @@ import {
   SecurityScanOutlined,
   SettingOutlined,
   UserSwitchOutlined,
+  CameraOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import "../styles/Profile.css";
 
@@ -28,6 +32,10 @@ const ProfileSidebar = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user } = useUser();
+  const [showModal, setShowModal] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [messageApi, contextHolder] = message.useMessage();
 
   // 確定當前活動頁面
   const isActive = (path) => {
@@ -42,22 +50,82 @@ const ProfileSidebar = () => {
   const userInitial =
     user.firstName?.charAt(0) || user.lastName?.charAt(0) || "U";
 
+  // 處理頭像上傳
+  const handleAvatarUpload = async (info) => {
+    if (info.file.status === "uploading") {
+      setUploading(true);
+      return;
+    }
+    if (info.file.status === "done") {
+      try {
+        const file = info.file.originFileObj;
+        await user.setProfileImage({ file });
+        messageApi.success("頭像更新成功！");
+        setShowModal(false);
+      } catch (error) {
+        console.error("頭像上傳失敗:", error);
+        messageApi.error("頭像上傳失敗，請重試");
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
+
+  // 處理頭像移除
+  const handleRemoveAvatar = async () => {
+    try {
+      await user.setProfileImage({ file: null });
+      messageApi.success("頭像已移除");
+      setShowModal(false);
+    } catch (error) {
+      messageApi.error("移除失敗，請重試");
+    }
+  };
+
   return (
     <div className="profile-sidebar">
+      {contextHolder}
       <div className="profile-sidebar-header">
-        <div className="profile-avatar-container">
+        <div
+          className="profile-avatar-container"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          style={{ position: "relative", cursor: "pointer" }}
+          onClick={() => setShowModal(true)}
+        >
           {user.imageUrl ? (
             <Avatar size={64} src={user.imageUrl} />
           ) : (
             <Avatar size={64} style={{ backgroundColor: "#8883bd" }}>
-              {userInitial}
+              {user.firstName?.charAt(0) || user.lastName?.charAt(0) || "U"}
             </Avatar>
           )}
-          <h2 className="profile-sidebar-name">{userFullName}</h2>
-          <p className="profile-sidebar-email">
-            {user.primaryEmailAddress?.emailAddress}
-          </p>
+          {/* 相機icon提示 */}
+          {hovered && (
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                bottom: 6,
+                transform: "translateX(-50%)",
+                background: "rgba(0,0,0,0.6)",
+                borderRadius: "50%",
+                width: 32,
+                height: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}
+            >
+              <CameraOutlined style={{ color: "#fff", fontSize: 18 }} />
+            </div>
+          )}
         </div>
+        <h2 className="profile-sidebar-name">{userFullName}</h2>
+        <p className="profile-sidebar-email">
+          {user.primaryEmailAddress?.emailAddress}
+        </p>
       </div>
 
       <div className="profile-sidebar-title">賬戶設置</div>
@@ -97,6 +165,70 @@ const ProfileSidebar = () => {
           <span>應用設置</span>
         </Link>
       </div>
+
+      {/* Modal for 更換頭像 */}
+      <Modal
+        open={showModal}
+        onCancel={() => setShowModal(false)}
+        footer={null}
+        centered
+        width={340}
+        bodyStyle={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: 32,
+        }}
+        title={null}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          <Avatar
+            size={120}
+            src={user.imageUrl}
+            style={{ marginBottom: 16, backgroundColor: "#8883bd" }}
+          >
+            {!user.imageUrl &&
+              (user.firstName?.charAt(0) || user.lastName?.charAt(0) || "U")}
+          </Avatar>
+          <Upload
+            name="avatar"
+            className="avatar-uploader"
+            showUploadList={false}
+            customRequest={({ file, onSuccess }) => {
+              setTimeout(() => {
+                onSuccess("ok");
+              }, 0);
+            }}
+            onChange={handleAvatarUpload}
+            disabled={uploading}
+          >
+            <Button
+              icon={<CameraOutlined />}
+              loading={uploading}
+              style={{ width: 180, marginBottom: 12 }}
+            >
+              上傳新頭像
+            </Button>
+          </Upload>
+          <Button
+            icon={<DeleteOutlined />}
+            danger
+            style={{ width: 180, marginBottom: 12 }}
+            onClick={handleRemoveAvatar}
+          >
+            移除頭像
+          </Button>
+          <Button style={{ width: 180 }} onClick={() => setShowModal(false)}>
+            取消
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -111,32 +243,13 @@ const ProfileForm = ({ user }) => {
       await user.update({
         firstName: values.firstName,
         lastName: values.lastName,
+        birthday: values.birthday,
+        school: values.school,
       });
       messageApi.success("個人資料更新成功！");
     } catch (error) {
       console.error("更新個人資料失敗:", error);
       messageApi.error("更新個人資料失敗，請重試");
-    }
-  };
-
-  // 處理頭像上傳
-  const handleAvatarUpload = async (info) => {
-    if (info.file.status === "uploading") {
-      return;
-    }
-
-    if (info.file.status === "done") {
-      try {
-        // 獲取上傳的圖片文件
-        const file = info.file.originFileObj;
-
-        // 上傳到Clerk
-        await user.setProfileImage({ file });
-        messageApi.success("頭像更新成功！");
-      } catch (error) {
-        console.error("頭像上傳失敗:", error);
-        messageApi.error("頭像上傳失敗，請重試");
-      }
     }
   };
 
@@ -148,55 +261,50 @@ const ProfileForm = ({ user }) => {
         <p>更新您的個人信息和頭像</p>
       </div>
 
-      <Card className="profile-card">
-        <div className="profile-avatar-upload">
-          {user.imageUrl ? (
-            <Avatar size={100} src={user.imageUrl} />
-          ) : (
-            <Avatar size={100} style={{ backgroundColor: "#8883bd" }}>
-              {user.firstName?.charAt(0) || user.lastName?.charAt(0) || "U"}
-            </Avatar>
-          )}
-          <Upload
-            name="avatar"
-            className="avatar-uploader"
-            showUploadList={false}
-            customRequest={({ file, onSuccess }) => {
-              setTimeout(() => {
-                onSuccess("ok");
-              }, 0);
-            }}
-            onChange={handleAvatarUpload}
-          >
-            <Button icon={<UploadOutlined />} className="upload-button">
-              更換頭像
-            </Button>
-          </Upload>
-        </div>
-
+      <Card
+        className="profile-card"
+        style={{ maxWidth: 500, margin: "0 auto" }}
+      >
         <Form
           layout="vertical"
           initialValues={{
             firstName: user.firstName || "",
             lastName: user.lastName || "",
+            birthday: user.birthday || null,
+            school: user.school || "",
             email: user.primaryEmailAddress?.emailAddress || "",
           }}
           onFinish={handleProfileSubmit}
         >
-          <Form.Item
-            label="名字"
-            name="firstName"
-            rules={[{ required: true, message: "請輸入您的名字" }]}
-          >
-            <Input prefix={<UserOutlined />} placeholder="您的名字" />
-          </Form.Item>
+          <div style={{ display: "flex", gap: 16 }}>
+            <Form.Item
+              label="名字"
+              name="firstName"
+              style={{ flex: 1 }}
+              rules={[{ required: true, message: "請輸入您的名字" }]}
+            >
+              <Input prefix={<UserOutlined />} placeholder="您的名字" />
+            </Form.Item>
+            <Form.Item
+              label="生日"
+              name="birthday"
+              style={{ flex: 1 }}
+              rules={[{ required: true, message: "請選擇生日" }]}
+            >
+              <DatePicker
+                style={{ width: "100%" }}
+                placeholder="西元年月日"
+                format="YYYY-MM-DD"
+              />
+            </Form.Item>
+          </div>
 
           <Form.Item
-            label="姓氏"
-            name="lastName"
-            rules={[{ required: true, message: "請輸入您的姓氏" }]}
+            label="就讀學校"
+            name="school"
+            rules={[{ required: true, message: "請輸入學校名稱" }]}
           >
-            <Input prefix={<UserOutlined />} placeholder="您的姓氏" />
+            <Input placeholder="學校名稱" />
           </Form.Item>
 
           <Form.Item label="電子郵件" name="email">
@@ -210,7 +318,7 @@ const ProfileForm = ({ user }) => {
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" style={{ width: "100%" }}>
               保存更改
             </Button>
           </Form.Item>
