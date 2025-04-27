@@ -13,6 +13,7 @@ import SignUpPage from "./pages/SignUp";
 import Profile from "./pages/Profile";
 import UserMenu from "./components/UserMenu";
 import ForgotPassword from "./pages/ForgotPassword";
+import Stage2Page from "./pages/Stage2Page.jsx";
 
 // 建立一個需要認證的路由元件
 const ProtectedRoute = ({ children }) => {
@@ -167,6 +168,16 @@ function App() {
             />
             <Route path={"/sso-callback"} element={<SSOCallback />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route
+              path={"/stage2"}
+              element={
+                <ProtectedRoute>
+                  <PageLayout>
+                    <Stage2Page />
+                  </PageLayout>
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </BrowserRouter>
       </div>

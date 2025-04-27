@@ -1,0 +1,112 @@
+/* answer.module.css */
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0;
+}
+
+.tabContent {
+  flex-grow: 1; /* 保證 Tabs 區域佔據剩餘空間 */
+  display: flex;
+  flex-direction: column;
+  height: 90%;
+}
+
+.uploadContainer {
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 0 8px 8px 8px;
+  min-height: 400px;
+  height: 100%;
+  border:1px solid #f0f0f0;
+}
+
+.uploadContainer :global(.ant-upload-drag) {
+  height: 350px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.uploadedImageContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.uploadedImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.imageOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  color: white;
+}
+
+.uploadedImageContainer:hover .imageOverlay {
+  opacity: 1;
+}
+
+.removeButton {
+  margin-top: 8px;
+  color: white !important;
+}
+
+.removeButton:hover {
+  color: #ff4d4f !important;
+}
+
+.previewContainer {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.preview {
+  max-width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+:global(.ant-upload-text) {
+  font-size: 16px;
+  margin: 16px 0;
+}
+
+:global(.ant-upload-hint) {
+  font-size: 14px;
+  color: #666;
+}
+
+:global(.ant-upload-drag-icon) {
+  font-size: 48px;
+  color: #375bd3;
+}
+
+/* 添加 React Flow 容器的樣式 */
+.flowContainer {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: #ffffff;
+  border-radius: 8px;
+}

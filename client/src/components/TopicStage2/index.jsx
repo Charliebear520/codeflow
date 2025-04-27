@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import StageSwitcher from "../StageSwitcher";
 
-const Topic = () => {
+const TopicStage2 = () => {
   const [question, setQuestion] = useState("請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。");
   const [loading, setLoading] = useState(false);
   const [hintLevel, setHintLevel] = useState(1); // 提示層級，從1開始
@@ -200,24 +200,6 @@ const Topic = () => {
         <div className={styles.topicbox}>       
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexDirection: "column", overflowY: "hidden"}}>
               <p style={{ flex: 1 ,padding: "0 1rem"}}>{question}</p>
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px", overflowY: "hidden"}}>
-                <Button 
-                  icon={loading ? <SyncOutlined spin /> : <SyncOutlined />} 
-                  onClick={fetchNewQuestion}
-                  disabled={loading}
-                >
-                  生成新題目
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<BulbOutlined />}
-                  onClick={showHint}
-                  loading={hintLoading}
-                >
-                  {`提示 (${hintLevel}/7)`}
-                </Button>
-              </div>
-           
             <br />
               
           </div>
@@ -244,75 +226,8 @@ const Topic = () => {
         </div>
       </div>
       
-      {/* 提示對話框 */}
-      <Modal
-        title={
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>{`繪圖提示 - 步驟 ${hintLevel}/7`}</span>
-            <Button 
-              icon={<ReloadOutlined spin={regenerating} />} 
-              onClick={regenerateHint}
-              disabled={hintLoading || regenerating}
-              size="small"
-              style={{marginRight: "2rem"}}
-            >
-              重新生成提示
-            </Button>
-          </div>
-        }
-        open={isHintModalVisible}
-        onCancel={handleCloseHint}
-        footer={[
-          <Button 
-            key="previous" 
-            onClick={handlePreviousHint} 
-            disabled={hintLevel === 1 || hintLoading}
-          >
-            上一步提示
-          </Button>,
-          <Button key="close" onClick={handleCloseHint}>
-            關閉
-          </Button>,
-          <Button 
-            key="next" 
-            type="primary" 
-            onClick={handleNextHint}
-            disabled={hintLevel === 7 || hintLoading}
-          >
-            {hintLevel < 7 ? "下一步提示" : "完成"}
-          </Button>,
-        ]}
-        width={600}
-      >
-        {hintLoading ? (
-          <div style={{ textAlign: "center", padding: "20px" }}>
-            正在生成提示...
-          </div>
-        ) : (
-          <div>
-            <div style={{ textAlign: "center", marginBottom: "10px" }}>
-              {Array.from({ length: 7 }).map((_, index) => (
-                <Button 
-                  key={index}
-                  type={index + 1 === hintLevel ? "primary" : "default"}
-                  shape="circle"
-                  size="small"
-                  style={{ margin: "0 5px" }}
-                  onClick={() => setHintLevel(index + 1)}
-                  disabled={hintLoading}
-                >
-                  {index + 1}
-                </Button>
-              ))}
-            </div>
-            <div style={{ whiteSpace: "pre-line" }}>
-              {hintContent}
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 };
 
-export default Topic;
+export default TopicStage2;
