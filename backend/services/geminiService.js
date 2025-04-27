@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
+import axios from "axios";
 
 // 確保環境變量被加載
 dotenv.config();
@@ -15,7 +16,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const generateFlowchartQuestion = async () => {
   try {
     console.log("Generating flowchart question...");
-    
+
     // 使用 gemini-1.5-pro 模型
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
@@ -46,7 +47,7 @@ export const generateFlowchartQuestion = async () => {
 export const generateFlowchartHint = async (question, hintLevel) => {
   try {
     console.log(`Generating flowchart hint... Level: ${hintLevel}`);
-    
+
     // 使用 gemini-1.5-pro 模型
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
@@ -54,9 +55,9 @@ export const generateFlowchartHint = async (question, hintLevel) => {
     const promptBase = `基於以下流程圖題目：「${question}」
 
     請生成第${hintLevel}層的繪圖提示，符合下列標準：`;
-    
+
     let promptDetails = "";
-    switch(hintLevel) {
+    switch (hintLevel) {
       case 1:
         promptDetails = `第一層提示：判斷版面是否空白，學生是否完全不明白該如何開始。
         提供關於題目理解與流程圖基本格式的指導。
@@ -167,5 +168,24 @@ export const checkFlowchart = async (imageData, question) => {
   } catch (error) {
     console.error("Detailed Gemini API error:", error);
     throw new Error(`Gemini API error: ${error.message}`);
+  }
+};
+
+export const generatePseudoCode = async (prompt) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  let text = response.text();
+
+  // 去除 markdown code block（如 ```json ... ``` 或 ``` ... ```）
+  text = text.replace(/^```json\s*|^```\s*|```$/gm, "").trim();
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Gemini 回傳內容不是合法 JSON：", text);
+    throw new Error(
+      "Gemini 回傳內容不是合法 JSON，請檢查 prompt 或 API 回應格式"
+    );
   }
 };
