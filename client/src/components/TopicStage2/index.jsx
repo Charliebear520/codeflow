@@ -1,33 +1,39 @@
 import React, { useState, useEffect } from "react";
 import styles from "./topic.module.css";
 import { Image, Popover, Button, message, Modal } from "antd";
-import { GlobalOutlined, SyncOutlined, BulbOutlined, ReloadOutlined } from "@ant-design/icons";
+import {
+  GlobalOutlined,
+  SyncOutlined,
+  BulbOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import StageSwitcher from "../StageSwitcher";
 
-const TopicStage2 = () => {
-  const [question, setQuestion] = useState("請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。");
+const TopicStage2 = ({ question, setQuestion }) => {
   const [loading, setLoading] = useState(false);
   const [hintLevel, setHintLevel] = useState(1); // 提示層級，從1開始
   const [isHintModalVisible, setIsHintModalVisible] = useState(false);
   const [hintContent, setHintContent] = useState("");
   const [hintLoading, setHintLoading] = useState(false);
   const [currentStage, setCurrentStage] = useState(0);
-  // 新增：保存已生成的提示
   const [hintCache, setHintCache] = useState({});
   const [regenerating, setRegenerating] = useState(false);
-  
+
   // 生成新題目
   const fetchNewQuestion = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:3000/api/generate-question");
+      const response = await axios.get(
+        "http://localhost:3000/api/generate-question"
+      );
       if (response.data.success) {
         setQuestion(response.data.question);
-        // 將當前題目存儲到 localStorage，以便在提交流程圖時使用
-        localStorage.setItem('currentFlowchartQuestion', response.data.question);
-        // 重置提示層級和提示緩存
+        localStorage.setItem(
+          "currentFlowchartQuestion",
+          response.data.question
+        );
         setHintLevel(1);
         setHintCache({});
       } else {
@@ -40,7 +46,7 @@ const TopicStage2 = () => {
       setLoading(false);
     }
   };
-  
+
   // 從後端獲取提示
   const fetchHint = async (forceRegenerate = false) => {
     // 檢查是否已經有緩存的提示
@@ -48,22 +54,25 @@ const TopicStage2 = () => {
       setHintContent(hintCache[hintLevel]);
       return;
     }
-    
+
     setHintLoading(true);
     try {
-      const response = await axios.post("http://localhost:3000/api/generate-hint", {
-        question,
-        hintLevel
-      });
-      
+      const response = await axios.post(
+        "http://localhost:3000/api/generate-hint",
+        {
+          question,
+          hintLevel,
+        }
+      );
+
       if (response.data.success) {
         const newHint = response.data.hint;
         setHintContent(newHint);
-        
+
         // 更新提示緩存
-        setHintCache(prevCache => ({
+        setHintCache((prevCache) => ({
           ...prevCache,
-          [hintLevel]: newHint
+          [hintLevel]: newHint,
         }));
       } else {
         message.error("無法獲取提示");
@@ -78,55 +87,52 @@ const TopicStage2 = () => {
       setRegenerating(false);
     }
   };
-  
+
   // 重新生成當前層級的提示
   const regenerateHint = async () => {
     setRegenerating(true);
     await fetchHint(true);
   };
-  
+
   // 顯示提示對話框
   const showHint = async () => {
     setIsHintModalVisible(true);
     await fetchHint();
   };
-  
+
   // 前往上一層提示
   const handlePreviousHint = () => {
     if (hintLevel > 1) {
-      setHintLevel(prevLevel => prevLevel - 1);
+      setHintLevel((prevLevel) => prevLevel - 1);
     }
   };
-  
+
   // 前往下一層提示
   const handleNextHint = () => {
     if (hintLevel < 7) {
-      setHintLevel(prevLevel => prevLevel + 1);
+      setHintLevel((prevLevel) => prevLevel + 1);
     }
   };
-  
+
   // 提示層級改變時更新內容
   useEffect(() => {
     if (isHintModalVisible) {
       fetchHint();
     }
   }, [hintLevel]);
-  
+
   // 關閉提示對話框
   const handleCloseHint = () => {
     setIsHintModalVisible(false);
   };
-  
+
   // 初始加載時獲取題目
   useEffect(() => {
-    // 或者從 localStorage 獲取先前生成的題目（如果有）
-    const savedQuestion = localStorage.getItem('currentFlowchartQuestion');
+    const savedQuestion = localStorage.getItem("currentFlowchartQuestion");
     if (savedQuestion) {
       setQuestion(savedQuestion);
     }
-    
-    // 嘗試從 localStorage 恢復提示緩存
-    const savedHintCache = localStorage.getItem('hintCache');
+    const savedHintCache = localStorage.getItem("hintCache");
     if (savedHintCache) {
       try {
         setHintCache(JSON.parse(savedHintCache));
@@ -134,12 +140,12 @@ const TopicStage2 = () => {
         console.error("無法解析保存的提示緩存", e);
       }
     }
-  }, []);
-  
+  }, [setQuestion]);
+
   // 保存提示緩存到 localStorage
   useEffect(() => {
     if (Object.keys(hintCache).length > 0) {
-      localStorage.setItem('hintCache', JSON.stringify(hintCache));
+      localStorage.setItem("hintCache", JSON.stringify(hintCache));
     }
   }, [hintCache]);
 
@@ -153,7 +159,7 @@ const TopicStage2 = () => {
       />
     </div>
   );
-  
+
   const example = (
     <div>
       <p style={{ width: "540px", height: "100%" }}>
@@ -171,7 +177,7 @@ const TopicStage2 = () => {
       </div>
     </div>
   );
-  
+
   return (
     <div className={styles.container}>
       <div
@@ -196,12 +202,19 @@ const TopicStage2 = () => {
           <h5>Ch1,繪製流程圖</h5>
         </div>
       </div>
-      <div style={{ height: "100%" ,overflowY: "hidden"}}>
-        <div className={styles.topicbox}>       
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexDirection: "column", overflowY: "hidden"}}>
-              <p style={{ flex: 1 ,padding: "0 1rem"}}>{question}</p>
+      <div style={{ height: "100%", overflowY: "hidden" }}>
+        <div className={styles.topicbox}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              flexDirection: "column",
+              overflowY: "hidden",
+            }}
+          >
+            <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
             <br />
-              
           </div>
           <div className={styles.infobox}>
             <div className={styles.examplebox}>
@@ -225,7 +238,6 @@ const TopicStage2 = () => {
           </div>
         </div>
       </div>
-      
     </div>
   );
 };
