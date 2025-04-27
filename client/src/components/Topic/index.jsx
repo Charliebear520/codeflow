@@ -216,7 +216,7 @@ const Topic = () => {
               </div>
            
             <br />
-            <p style={{ color: "#9287EE" }}>提示：這題請一定要使用判斷符號！</p>
+              
           </div>
           <div className={styles.infobox}>
             <div className={styles.examplebox}>
