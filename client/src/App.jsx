@@ -11,7 +11,6 @@ import Tutor from "./pages/Tutor";
 import Login from "./pages/Login";
 import SignUpPage from "./pages/SignUp";
 import Profile from "./pages/Profile";
-import Settings from "./pages/Settings";
 import UserMenu from "./components/UserMenu";
 import ForgotPassword from "./pages/ForgotPassword";
 
@@ -146,16 +145,6 @@ function App() {
                 <ProtectedRoute>
                   <PageLayout>
                     <Profile />
-                  </PageLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path={"/settings"}
-              element={
-                <ProtectedRoute>
-                  <PageLayout>
-                    <Settings />
                   </PageLayout>
                 </ProtectedRoute>
               }

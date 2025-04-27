@@ -155,15 +155,7 @@ const ProfileSidebar = () => {
           <UserSwitchOutlined />
           <span>帳戶管理</span>
         </Link>
-        <Link
-          to="/settings"
-          className={`profile-nav-item ${
-            isActive("/settings") ? "active" : ""
-          }`}
-        >
-          <SettingOutlined />
-          <span>應用設置</span>
-        </Link>
+
       </div>
 
       {/* Modal for 更換頭像 */}
