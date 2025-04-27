@@ -2,6 +2,46 @@ import React, { useState, useEffect } from "react";
 import { Button, App, Spin } from "antd";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
+import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
+import { RangeSetBuilder } from "@codemirror/state";
+import "./blankHighlight.css";
+
+// 方案A：高亮___
+function blankDecorationExtension() {
+  return ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.decorations = this.buildDecorations(view);
+      }
+      update(update) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = this.buildDecorations(update.view);
+        }
+      }
+      buildDecorations(view) {
+        const builder = new RangeSetBuilder();
+        const regex = /___/g;
+        for (let { from, to } of view.visibleRanges) {
+          let text = view.state.doc.sliceString(from, to);
+          let match;
+          while ((match = regex.exec(text))) {
+            const start = from + match.index;
+            const end = start + 3;
+            builder.add(
+              start,
+              end,
+              Decoration.mark({ class: "cm-blank-field" })
+            );
+          }
+        }
+        return builder.finish();
+      }
+    },
+    {
+      decorations: (v) => v.decorations,
+    }
+  );
+}
 
 const OnlineCoding = ({ value, onChange, question }) => {
   const { message: antdMessage } = App.useApp();
@@ -107,8 +147,8 @@ const OnlineCoding = ({ value, onChange, question }) => {
         ) : (
           <CodeMirror
             value={code}
-            height="350px"
-            extensions={[python()]}
+            height="450px"
+            extensions={[python(), blankDecorationExtension()]}
             onChange={handleChange}
             theme="light"
             basicSetup={{
