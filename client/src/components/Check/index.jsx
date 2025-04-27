@@ -12,7 +12,6 @@ const Check = () => {
     <div className={styles.container}>
       <div
         style={{
-          height: "20%",
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-end",
