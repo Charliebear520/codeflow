@@ -2,7 +2,12 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import ImageKit from "imagekit";
-import { checkFlowchart, generateFlowchartQuestion, generateFlowchartHint } from "./services/geminiService.js";
+import {
+  checkFlowchart,
+  generateFlowchartQuestion,
+  generateFlowchartHint,
+  generatePseudoCode,
+} from "./services/geminiService.js";
 
 // 加載環境變量
 dotenv.config();
@@ -38,9 +43,9 @@ app.get("/api/generate-question", async (req, res) => {
     res.json({ success: true, question });
   } catch (error) {
     console.error("Error generating question:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: `生成題目時發生錯誤: ${error.message}` 
+    res.status(500).json({
+      success: false,
+      error: `生成題目時發生錯誤: ${error.message}`,
     });
   }
 });
@@ -49,33 +54,33 @@ app.get("/api/generate-question", async (req, res) => {
 app.post("/api/generate-hint", async (req, res) => {
   try {
     const { question, hintLevel } = req.body;
-    
+
     if (!question) {
       return res.status(400).json({
         success: false,
-        error: "未提供題目"
+        error: "未提供題目",
       });
     }
-    
+
     if (!hintLevel || hintLevel < 1 || hintLevel > 7) {
       return res.status(400).json({
         success: false,
-        error: "提示層級無效，應為1-7之間的數字"
+        error: "提示層級無效，應為1-7之間的數字",
       });
     }
-    
+
     console.log(`Generating hint for level ${hintLevel}...`);
     const hint = await generateFlowchartHint(question, hintLevel);
-    
+
     res.json({
       success: true,
-      hint
+      hint,
     });
   } catch (error) {
     console.error("Error generating hint:", error);
     res.status(500).json({
       success: false,
-      error: `生成提示時發生錯誤: ${error.message}`
+      error: `生成提示時發生錯誤: ${error.message}`,
     });
   }
 });
@@ -85,7 +90,8 @@ app.post("/api/check-flowchart", async (req, res) => {
   try {
     const { imageData, question } = req.body;
     // 如果沒有提供題目，使用默認題目
-    const defaultQuestion = "請根據下方敘述繪製流程圖。你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。";
+    const defaultQuestion =
+      "請根據下方敘述繪製流程圖。你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。";
     const result = await checkFlowchart(imageData, question || defaultQuestion);
     res.json({ result });
   } catch (error) {
@@ -123,8 +129,9 @@ app.post("/api/check", async (req, res) => {
     }
 
     // 使用默認題目，如果沒有提供
-    const defaultQuestion = "請根據下方敘述繪製流程圖。你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。";
-    
+    const defaultQuestion =
+      "請根據下方敘述繪製流程圖。你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。";
+
     console.log("Calling Gemini API...");
     console.log("Using question:", question || defaultQuestion);
     const result = await checkFlowchart(imageData, question || defaultQuestion);
@@ -145,6 +152,18 @@ app.post("/api/check", async (req, res) => {
       error: `檢查流程圖時發生錯誤: ${error.message}`,
       details: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
+  }
+});
+
+// 新增：生成 PseudoCode 的 API 端點
+app.post("/api/generate-pseudocode", async (req, res) => {
+  const { question } = req.body;
+  const prompt = `你是一位 Python 程式設計助教。請根據以下題目，產生一份 Python PseudoCode，並針對題目重點語法或邏輯挖空，讓學生填空。請回傳：\n1. 挖空版 PseudoCode（用 ___ 代表每個空格）\n2. 每個空格的正確答案（依序列出）\n\n題目如下：\n${question}\n\n請用 JSON 格式回覆，例如：\n{\n  \"pseudoCode\": [\n    \"for i in range(___):\",\n    \"    print(i ___ 1)\"\n  ],\n  \"answers\": [\"5\", \"+\"]\n}`;
+  try {
+    const result = await generatePseudoCode(prompt);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
