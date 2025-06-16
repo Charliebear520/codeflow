@@ -43,7 +43,7 @@ function blankDecorationExtension() {
   );
 }
 
-const OnlineCoding = ({ value, onChange, question }) => {
+const OnlineCoding = ({ value, onChange, question, currentStage }) => {
   const { message: antdMessage } = App.useApp();
   const [code, setCode] = useState(value || "");
   const [answers, setAnswers] = useState([]);

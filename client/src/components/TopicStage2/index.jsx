@@ -11,13 +11,17 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import StageSwitcher from "../StageSwitcher";
 
-const TopicStage2 = ({ question, setQuestion }) => {
+const TopicStage2 = ({
+  question,
+  setQuestion,
+  currentStage,
+  setCurrentStage,
+}) => {
   const [loading, setLoading] = useState(false);
   const [hintLevel, setHintLevel] = useState(1); // 提示層級，從1開始
   const [isHintModalVisible, setIsHintModalVisible] = useState(false);
   const [hintContent, setHintContent] = useState("");
   const [hintLoading, setHintLoading] = useState(false);
-  const [currentStage, setCurrentStage] = useState(0);
   const [hintCache, setHintCache] = useState({});
   const [regenerating, setRegenerating] = useState(false);
 
@@ -195,11 +199,24 @@ const TopicStage2 = ({ question, setQuestion }) => {
             width="24"
             height="24"
           />
-          <h4 className={styles.h4}>第一階段</h4>
+          <h4 className={styles.h4}>
+            {currentStage === 0
+              ? "第一階段"
+              : currentStage === 1
+              ? "第二階段"
+              : `第${currentStage + 1}階段`}
+          </h4>
         </div>
         <StageSwitcher current={currentStage} onChange={setCurrentStage} />
         <div>
-          <h5>Ch1,繪製流程圖</h5>
+          <h5>
+            Ch1,
+            {currentStage === 0
+              ? "繪製流程圖"
+              : currentStage === 1
+              ? "製作pseudocode"
+              : ""}
+          </h5>
         </div>
       </div>
       <div style={{ height: "100%", overflowY: "hidden" }}>
