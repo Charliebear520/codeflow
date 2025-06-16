@@ -7,19 +7,33 @@ import OnlineCoding from "../components/OnlineCoding";
 import React, { useState } from "react";
 
 export default function Stage2Page() {
-  // 取得題目內容，這裡假設和 TopicStage2 的初始題目一致
-  const [question, setQuestion] = useState(
-    "請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。"
-  );
+  // 新增 currentStage 狀態
+  const [currentStage, setCurrentStage] = useState(1); // 預設第二階段
+  // 根據 currentStage 切換題目內容
+  const questions = [
+    "請根據下方敘述繪製流程圖。你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。",
+    "請根據下方敘述以虛擬碼（pseudocode）形式描述流程。你正要出門上學，但需要判斷門外是否會下雨。請應用虛擬碼，幫助你決定是否需要帶雨傘。",
+  ];
+  const [question, setQuestion] = useState(questions[currentStage]);
+
+  // 當 currentStage 改變時，切換題目
+  React.useEffect(() => {
+    setQuestion(questions[currentStage]);
+  }, [currentStage]);
 
   return (
     <div>
       <Row>
         <Col span={6}>
-          <TopicStage2 question={question} setQuestion={setQuestion} />
+          <TopicStage2
+            question={question}
+            setQuestion={setQuestion}
+            currentStage={currentStage}
+            setCurrentStage={setCurrentStage}
+          />
         </Col>
         <Col span={12}>
-          <OnlineCoding question={question} />
+          <OnlineCoding question={question} currentStage={currentStage} />
         </Col>
         <Col span={6}>
           <Check />
