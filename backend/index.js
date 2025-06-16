@@ -7,6 +7,7 @@ import {
   generateFlowchartQuestion,
   generateFlowchartHint,
   generatePseudoCode,
+  checkPseudoCode,
 } from "./services/geminiService.js";
 
 // 加載環境變量
@@ -164,6 +165,26 @@ app.post("/api/generate-pseudocode", async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// 新增：檢查 pseudocode 的 API 端點
+app.post("/api/check-pseudocode", async (req, res) => {
+  try {
+    const { question, userPseudoCode } = req.body;
+    if (!question || !userPseudoCode) {
+      return res.status(400).json({
+        success: false,
+        error: "缺少題目或學生虛擬碼內容",
+      });
+    }
+    const feedback = await checkPseudoCode(question, userPseudoCode);
+    res.json({ success: true, feedback });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 

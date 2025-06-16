@@ -19,10 +19,10 @@
   justify-content: space-between;
   background: #ffffff;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
-  flex-grow: 1; /* 占據剩餘空間 */
-  margin-bottom: 1rem; /* 底部留白 */
-  padding: 1rem; /* 增加內邊距 */
-  overflow-y: hidden; /* 只在垂直方向允许滚动 */
-  box-sizing: border-box; /* 確保 padding 不會影響元素大小 */
+  flex-grow: 1; 
+  margin-bottom: 1rem; 
+  padding: 1.5rem; 
+  overflow-y: scroll; 
+  box-sizing: border-box;
   height: 100%;
 }

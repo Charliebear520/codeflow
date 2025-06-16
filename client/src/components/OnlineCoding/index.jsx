@@ -43,7 +43,14 @@ function blankDecorationExtension() {
   );
 }
 
-const OnlineCoding = ({ value, onChange, question, currentStage }) => {
+const OnlineCoding = ({
+  value,
+  onChange,
+  question,
+  currentStage,
+  onFeedback,
+  onChecking,
+}) => {
   const { message: antdMessage } = App.useApp();
   const [code, setCode] = useState(value || "");
   const [answers, setAnswers] = useState([]);
@@ -82,23 +89,34 @@ const OnlineCoding = ({ value, onChange, question, currentStage }) => {
     // eslint-disable-next-line
   }, [question]);
 
-  const handleCheck = () => {
-    // 比對用戶填寫的內容與正確答案
-    if (!answers.length) {
-      antdMessage.info("無正確答案可檢查");
+  const handleCheck = async () => {
+    if (!code || !question) {
+      antdMessage.info("請先輸入虛擬碼與確認題目");
       return;
     }
-    // 取出所有 ___ 的填空
-    const userInputs = [];
-    const regex = /___/g;
-    let match;
-    let codeCopy = code;
-    while ((match = regex.exec(codeCopy))) {
-      // 取得 ___ 的實際填寫內容
-      // 這裡可進一步優化為用戶填空的內容
+    if (onChecking) onChecking(true);
+    setApiError("");
+    try {
+      const res = await fetch("http://localhost:3000/api/check-pseudocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, userPseudoCode: code }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        antdMessage.success("Gemini 檢查回饋已顯示於右側助教區");
+        if (onFeedback) onFeedback(data.feedback);
+      } else {
+        antdMessage.error(data.error || "檢查失敗");
+        if (onFeedback) onFeedback("");
+      }
+    } catch (e) {
+      setApiError("檢查失敗，請稍後再試。");
+      antdMessage.error("檢查失敗，請稍後再試。");
+      if (onFeedback) onFeedback("");
+    } finally {
+      if (onChecking) onChecking(false);
     }
-    // 你可以根據需求進行更進階的比對
-    antdMessage.info("檢查功能請根據需求自訂");
   };
 
   const handleReset = () => {
