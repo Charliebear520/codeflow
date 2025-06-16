@@ -189,3 +189,28 @@ export const generatePseudoCode = async (prompt) => {
     );
   }
 };
+
+export const checkPseudoCode = async (question, userPseudoCode) => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const prompt = `你是一位程式教學助教。請根據下方題目，檢查學生撰寫的虛擬碼（pseudocode）是否正確，並用繁體中文給予回饋：
+---
+題目：${question}
+---
+學生虛擬碼：
+${userPseudoCode}
+---
+請依下列格式回覆：
+1. 邏輯正確性：[簡要評語]
+2. 語意完整性：[簡要評語]
+3. 改進建議：[具體建議]
+
+請勿直接給出完整答案，請以引導為主。`;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error("Error checking pseudocode:", error);
+    throw new Error(`Gemini API pseudocode check error: ${error.message}`);
+  }
+};
