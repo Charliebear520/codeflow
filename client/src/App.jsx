@@ -4,6 +4,8 @@ import {
   SignedOut,
   useAuth,
   ClerkProvider,
+  useSignIn,
+  useClerk,
 } from "@clerk/clerk-react";
 import "./App.css";
 import Home from "./pages/Home";
@@ -14,6 +16,8 @@ import Profile from "./pages/Profile";
 import UserMenu from "./components/UserMenu";
 import ForgotPassword from "./pages/ForgotPassword";
 import Stage2Page from "./pages/Stage2Page.jsx";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 // 建立一個需要認證的路由元件
 const ProtectedRoute = ({ children }) => {
@@ -42,16 +46,54 @@ const PublicOnlyRoute = ({ children }) => {
 // SSO 回調組件
 const SSOCallback = () => {
   const { isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
+  const { handleRedirectCallback } = useClerk();
 
-  if (!isLoaded) {
-    return <div className="loading-container">處理登入...</div>;
-  }
+  useEffect(() => {
+    const handleCallback = async () => {
+      try {
+        console.log("開始處理 SSO 回調...");
+        const result = await handleRedirectCallback();
+        console.log("SSO 回調結果:", result);
 
-  if (isSignedIn) {
-    return <Navigate to="/" replace />;
-  }
+        // 檢查認證狀態
+        setTimeout(() => {
+          if (isSignedIn) {
+            console.log("用戶已登入，重定向到首頁");
+            navigate("/", { replace: true });
+          } else {
+            console.log("認證成功但用戶未登入");
+            navigate("/login", { replace: true });
+          }
+        }, 500);
+      } catch (err) {
+        console.error("處理回調時發生錯誤:", err);
+        console.error("錯誤詳情:", {
+          name: err.name,
+          message: err.message,
+          stack: err.stack,
+        });
+        navigate("/login", { replace: true });
+      }
+    };
 
-  return <Navigate to="/login" replace />;
+    if (isLoaded) {
+      console.log("Clerk 已載入，開始處理回調");
+      handleCallback();
+    } else {
+      console.log("等待 Clerk 載入...");
+    }
+  }, [isLoaded, isSignedIn, navigate, handleRedirectCallback]);
+
+  // 顯示載入狀態
+  return (
+    <div className="loading-container">
+      <div>處理登入中...</div>
+      <div style={{ fontSize: "14px", marginTop: "10px", color: "#666" }}>
+        請稍候，正在完成登入流程
+      </div>
+    </div>
+  );
 };
 
 // 添加導航欄組件

@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSignIn, useAuth } from "@clerk/clerk-react";
 import "../styles/Login.css";
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 function Login() {
+  const navigate = useNavigate();
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { isLoaded, signIn, setActive } = useSignIn();
 
@@ -15,6 +17,7 @@ function Login() {
   const [verifying, setVerifying] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
 
   // 處理忘記密碼
   const handleForgotPassword = async () => {
@@ -110,30 +113,43 @@ function Login() {
     }
   };
 
-  // 處理社交登入
-  const handleSocialSignIn = async (provider) => {
-    if (!isLoaded) return;
-
+  // 處理第三方登入
+  const handleSocialSignIn = async (strategy) => {
     try {
+      setIsLoading(true);
+      console.log(`開始 ${strategy} 登入流程...`);
+
+      // 使用 signIn.authenticateWithRedirect
       await signIn.authenticateWithRedirect({
-        strategy: provider,
-        redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/",
+        strategy,
+        redirectUrl: window.location.origin + "/sso-callback",
+        redirectUrlComplete: window.location.origin + "/",
       });
+
+      console.log(`${strategy} 登入重定向已啟動`);
     } catch (err) {
-      console.error(`${provider}登入錯誤:`, err);
-      setErrorMessage(`${provider}登入失敗，請重試`);
+      console.error(`${strategy} 登入失敗:`, err);
+      setErrorMessage(err.message || "登入失敗，請稍後再試");
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // 如果已登入，重定向到首頁
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      console.log("User is already signed in, redirecting to home");
+      window.location.href = "/";
+    }
+  }, [isLoaded, isSignedIn]);
 
   // 如果正在載入，顯示載入狀態
   if (!isLoaded || !isAuthLoaded) {
     return <div className="loading-container">載入中...</div>;
   }
 
-  // 如果已登入，重定向到首頁
+  // 如果已登入，不顯示登入頁面
   if (isSignedIn) {
-    window.location.href = "/";
     return null;
   }
 
