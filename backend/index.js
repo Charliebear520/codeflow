@@ -8,6 +8,7 @@ import {
   generateFlowchartHint,
   generatePseudoCode,
   checkPseudoCode,
+  checkCode,
 } from "./services/geminiService.js";
 import { exec } from "child_process";
 
@@ -313,6 +314,26 @@ app.post("/api/run-code", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "執行程式時發生錯誤: " + err,
+    });
+  }
+});
+
+// 新增：檢查第三階段程式碼的 API 端點
+app.post("/api/check-code", async (req, res) => {
+  try {
+    const { question, code, language } = req.body;
+    if (!question || !code || !language) {
+      return res.status(400).json({
+        success: false,
+        error: "缺少題目、程式碼或語言參數",
+      });
+    }
+    const feedback = await checkCode(question, code, language);
+    res.json({ success: true, feedback });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });
