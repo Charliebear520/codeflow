@@ -145,6 +145,18 @@ const OnlineCoding = ({
   };
 
   const handleReset = () => {
+    if (!isStage3) {
+      // 只清空填空區與芙蓉助教提醒
+      if (answers.length > 0 && code) {
+        // 將所有 ___ 之間的內容清空，保留 ___
+        const blanked = code.replace(/___.*?(?=\n|$)/g, "___");
+        setCode(blanked);
+        onChange && onChange(blanked);
+      }
+      onFeedback && onFeedback("");
+      return;
+    }
+    // 第三階段維持原本清空行為
     setCode("");
     onChange && onChange("");
   };
