@@ -42,12 +42,12 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
             <div className={styles.examplebox}>
               <img src={"/Book.png"} height={14} width={14} />
               <h5 className={styles.example}>
-                請用主流程式語言（Python/JavaScript/C）完成題目
+                可自由選擇程式語言（Python/JavaScript/C）完成題目
               </h5>
             </div>
             <div className={styles.examplebox}>
               <img src={"/Graduation.png"} height={14} width={14} />
-              <h5 className={styles.example}>可使用下方編譯器測試程式碼</h5>
+              <h5 className={styles.example}>可使用右方編譯器測試程式碼</h5>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Button, App, Spin } from "antd";
+import { Button, App, Spin, Splitter } from "antd";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
@@ -199,6 +199,9 @@ const OnlineCoding = ({
           borderRadius: 8,
           padding: 24,
           boxSizing: "border-box",
+          height: "85vh",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <div
@@ -254,58 +257,69 @@ const OnlineCoding = ({
         ) : apiError ? (
           <div style={{ color: "red", marginTop: 12 }}>{apiError}</div>
         ) : null}
-        <CodeMirror
-          value={code}
-          height="450px"
-          extensions={
-            isStage3
-              ? [getLanguageExtension(), blankDecorationExtension()]
-              : [blankDecorationExtension()]
-          }
-          onChange={handleChange}
-          theme="light"
-          basicSetup={{
-            lineNumbers: true,
-            highlightActiveLine: true,
-          }}
-        />
-        {/* 執行結果區塊（第三階段預設顯示） */}
-        {isStage3 && (
-          <div
-            style={{
-              background: "#f6f6f6",
-              borderRadius: 6,
-              marginTop: 20,
-              padding: 16,
-              fontFamily: "monospace",
-              minHeight: 60,
-              maxHeight: 200,
-              overflowY: "auto",
-              boxSizing: "border-box",
-            }}
+        <Splitter layout="vertical" style={{ flex: 1, minHeight: 0 }}>
+          <Splitter.Panel
+            min={100}
+            defaultSize={350}
+            style={{ overflow: "auto" }}
           >
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>執行結果</div>
-            {runResult && runResult.stdout && (
-              <div>
-                <div style={{ color: "#333", marginBottom: 4 }}>輸出：</div>
-                <pre style={{ margin: 0, color: "#222" }}>
-                  {runResult.stdout}
-                </pre>
+            <CodeMirror
+              value={code}
+              height="100%"
+              extensions={
+                isStage3
+                  ? [getLanguageExtension(), blankDecorationExtension()]
+                  : [blankDecorationExtension()]
+              }
+              onChange={handleChange}
+              theme="light"
+              basicSetup={{
+                lineNumbers: true,
+                highlightActiveLine: true,
+              }}
+            />
+          </Splitter.Panel>
+          {isStage3 && (
+            <Splitter.Panel
+              min={60}
+              defaultSize={120}
+              style={{ overflow: "auto" }}
+            >
+              <div
+                style={{
+                  background: "#f6f6f6",
+                  borderRadius: 6,
+                  padding: 16,
+                  fontFamily: "monospace",
+                  minHeight: 60,
+                  height: "100%",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>執行結果</div>
+                {runResult && runResult.stdout && (
+                  <div>
+                    <div style={{ color: "#333", marginBottom: 4 }}>輸出：</div>
+                    <pre style={{ margin: 0, color: "#222" }}>
+                      {runResult.stdout}
+                    </pre>
+                  </div>
+                )}
+                {runResult && runResult.stderr && (
+                  <div>
+                    <div style={{ color: "#c00", marginTop: 8 }}>錯誤：</div>
+                    <pre style={{ margin: 0, color: "#c00" }}>
+                      {runResult.stderr}
+                    </pre>
+                  </div>
+                )}
+                {!runResult && (
+                  <div style={{ color: "#888" }}>（尚未執行程式）</div>
+                )}
               </div>
-            )}
-            {runResult && runResult.stderr && (
-              <div>
-                <div style={{ color: "#c00", marginTop: 8 }}>錯誤：</div>
-                <pre style={{ margin: 0, color: "#c00" }}>
-                  {runResult.stderr}
-                </pre>
-              </div>
-            )}
-            {!runResult && (
-              <div style={{ color: "#888" }}>（尚未執行程式）</div>
-            )}
-          </div>
-        )}
+            </Splitter.Panel>
+          )}
+        </Splitter>
       </div>
     </App>
   );
