@@ -160,7 +160,28 @@ app.post("/api/check", async (req, res) => {
 // 新增：生成 PseudoCode 的 API 端點
 app.post("/api/generate-pseudocode", async (req, res) => {
   const { question } = req.body;
-  const prompt = `你是一位 Python 程式設計助教。請根據以下題目，產生一份 Python PseudoCode，並針對題目重點語法或邏輯挖空，讓學生填空。請回傳：\n1. 挖空版 PseudoCode（用 ___ 代表每個空格）\n2. 每個空格的正確答案（依序列出）\n\n題目如下：\n${question}\n\n請用 JSON 格式回覆，例如：\n{\n  \"pseudoCode\": [\n    \"for i in range(___):\",\n    \"    print(i ___ 1)\"\n  ],\n  \"answers\": [\"5\", \"+\"]\n}`;
+  const prompt = `你是一位專業的 Python 程式設計助教。請根據下方題目，產生一份 Python PseudoCode，並依據以下規則進行策略性挖空（用 ___ 代表每個空格）：
+
+【挖空規則】
+1. 只針對「關鍵知識點」挖空，例如：條件判斷（如 if/else 的條件）、迴圈（如 for/while 的範圍或條件）、變數初始化、輸入/輸出語句、主要運算式、函數名稱或調用。
+2. 優先挖空學生最容易出錯或最重要的部分。
+3. 挖空內容需能幫助學生理解程式邏輯，並為第三階段的完整程式撰寫做準備。
+4. 不要挖空無意義的細節（如縮排、括號、無關變數名等）。
+
+【回傳格式】
+請用 JSON 格式回覆，例如：
+{
+  "pseudoCode": [
+    "for i in range(___):",
+    "    if i ___ 1:",
+    "        print(___)"
+  ],
+  "answers": ["5", "==", "i"]
+}
+
+題目如下：
+${question}
+`;
   try {
     const result = await generatePseudoCode(prompt);
     res.json(result);

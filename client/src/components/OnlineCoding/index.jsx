@@ -166,6 +166,9 @@ const OnlineCoding = ({
     onChange && onChange(val);
   };
 
+  // 判斷是否為第三階段
+  const isStage3 = !currentStage || currentStage === 2;
+
   return (
     <App>
       <div
@@ -180,64 +183,74 @@ const OnlineCoding = ({
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
+            justifyContent: isStage3 ? "space-between" : "flex-end",
             gap: 8,
             marginBottom: 12,
           }}
         >
-          {/* 語言選擇器 */}
-          <div
-            style={{ display: "flex", alignItems: "center", marginBottom: 12 }}
-          >
-            <span style={{ marginRight: 8, fontWeight: 500 }}>語言：</span>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+          {isStage3 && (
+            <div
               style={{
-                padding: "4px 8px",
-                borderRadius: 4,
-                border: "1px solid #ccc",
-                fontSize: 15,
+                display: "flex",
+                alignItems: "center",
+                marginBottom: 12,
               }}
             >
-              <option value="python">Python</option>
-              <option value="javascript">JavaScript</option>
-              <option value="c">C</option>
-            </select>
-          </div>
+              <span style={{ marginRight: 8, fontWeight: 500 }}>語言：</span>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 4,
+                  border: "1px solid #ccc",
+                  fontSize: 15,
+                }}
+              >
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
+                <option value="c">C</option>
+              </select>
+            </div>
+          )}
           <div
-            style={{
-              display: "flex",
-              gap: 8,
-            }}
+          style={{
+            display: "flex",
+            gap: 8,
+          }}
           >
-            {" "}
-            <Button onClick={handleCheck}>檢查</Button>
-            <Button onClick={handleReset}>清空</Button>
+          <Button onClick={handleCheck}>檢查</Button>
+          <Button onClick={handleReset}>清空</Button>
+          {isStage3 && (
             <Button type="primary" onClick={handleRun} loading={runLoading}>
               Run
             </Button>
+          )}
           </div>
+ 
         </div>
         {loading ? (
           <Spin />
         ) : apiError ? (
           <div style={{ color: "red", marginTop: 12 }}>{apiError}</div>
-        ) : (
-          <CodeMirror
-            value={code}
-            height="450px"
-            extensions={[getLanguageExtension(), blankDecorationExtension()]}
-            onChange={handleChange}
-            theme="light"
-            basicSetup={{
-              lineNumbers: true,
-              highlightActiveLine: true,
-            }}
-          />
-        )}
-        {/* 執行結果區塊 */}
-        {runResult && (
+        ) : null}
+        <CodeMirror
+          value={code}
+          height="450px"
+          extensions={
+            isStage3
+              ? [getLanguageExtension(), blankDecorationExtension()]
+              : [blankDecorationExtension()]
+          }
+          onChange={handleChange}
+          theme="light"
+          basicSetup={{
+            lineNumbers: true,
+            highlightActiveLine: true,
+          }}
+        />
+        {/* 執行結果區塊（第三階段預設顯示） */}
+        {isStage3 && (
           <div
             style={{
               background: "#f6f6f6",
@@ -252,7 +265,7 @@ const OnlineCoding = ({
             }}
           >
             <div style={{ fontWeight: 600, marginBottom: 8 }}>執行結果</div>
-            {runResult.stdout && (
+            {runResult && runResult.stdout && (
               <div>
                 <div style={{ color: "#333", marginBottom: 4 }}>輸出：</div>
                 <pre style={{ margin: 0, color: "#222" }}>
@@ -260,7 +273,7 @@ const OnlineCoding = ({
                 </pre>
               </div>
             )}
-            {runResult.stderr && (
+            {runResult && runResult.stderr && (
               <div>
                 <div style={{ color: "#c00", marginTop: 8 }}>錯誤：</div>
                 <pre style={{ margin: 0, color: "#c00" }}>
@@ -268,8 +281,8 @@ const OnlineCoding = ({
                 </pre>
               </div>
             )}
-            {!runResult.stdout && !runResult.stderr && (
-              <div style={{ color: "#888" }}>（無輸出）</div>
+            {!runResult && (
+              <div style={{ color: "#888" }}>（尚未執行程式）</div>
             )}
           </div>
         )}
