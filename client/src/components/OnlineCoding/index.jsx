@@ -116,24 +116,42 @@ const OnlineCoding = ({
 
   const handleCheck = async () => {
     if (!code || !question) {
-      antdMessage.info("請先輸入虛擬碼與確認題目");
+      antdMessage.info("請先輸入程式碼與確認題目");
       return;
     }
     if (onChecking) onChecking(true);
     setApiError("");
     try {
-      const res = await fetch("http://localhost:3000/api/check-pseudocode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, userPseudoCode: code }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        antdMessage.success("Gemini 檢查回饋已顯示於右側助教區");
-        if (onFeedback) onFeedback(data.feedback);
+      if (isStage3) {
+        // 第三階段：檢查程式語法
+        const res = await fetch("http://localhost:3000/api/check-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, code, language }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          antdMessage.success("語法檢查回饋已顯示於右側助教區");
+          if (onFeedback) onFeedback(data.feedback);
+        } else {
+          antdMessage.error(data.error || "檢查失敗");
+          if (onFeedback) onFeedback(data.feedback || "");
+        }
       } else {
-        antdMessage.error(data.error || "檢查失敗");
-        if (onFeedback) onFeedback("");
+        // 第二階段：檢查 pseudocode
+        const res = await fetch("http://localhost:3000/api/check-pseudocode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, userPseudoCode: code }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          antdMessage.success("Gemini 檢查回饋已顯示於右側助教區");
+          if (onFeedback) onFeedback(data.feedback);
+        } else {
+          antdMessage.error(data.error || "檢查失敗");
+          if (onFeedback) onFeedback("");
+        }
       }
     } catch (e) {
       setApiError("檢查失敗，請稍後再試。");
@@ -156,9 +174,11 @@ const OnlineCoding = ({
       onFeedback && onFeedback("");
       return;
     }
-    // 第三階段維持原本清空行為
+    // 第三階段：全部清空，包含執行結果與助教回饋
     setCode("");
+    setRunResult(null);
     onChange && onChange("");
+    onFeedback && onFeedback("");
   };
 
   const handleRun = async () => {

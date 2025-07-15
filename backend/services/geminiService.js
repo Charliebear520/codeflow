@@ -214,3 +214,28 @@ ${userPseudoCode}
     throw new Error(`Gemini API pseudocode check error: ${error.message}`);
   }
 };
+
+export const checkCode = async (question, code, language) => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const prompt = `你是一位專業的程式教學助教。請根據下方題目與學生撰寫的程式碼，檢查其語法、邏輯與結構，並用繁體中文給予詳細回饋：
+---
+題目：${question}
+---
+學生程式碼（語言：${language}）：
+${code}
+---
+請依下列格式回覆：
+1. 語法正確性：[簡要評語]
+2. 邏輯完整性：[簡要評語]
+3. 改進建議：[具體建議]
+
+請勿直接給出完整答案，請以引導為主。`;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error("Error checking code:", error);
+    throw new Error(`Gemini API code check error: ${error.message}`);
+  }
+};
