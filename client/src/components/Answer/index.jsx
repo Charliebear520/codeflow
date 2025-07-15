@@ -34,10 +34,10 @@ const initialEdges = [
       color: "#007bff", // 標記顏色
     },
   },
-]; // 初始边为空
+]; 
 
 const Answer = () => {
-  const [activeKey, setActiveKey] = useState("1"); // 状态跟踪当前选中的标签页
+  const [activeKey, setActiveKey] = useState("1");
   const [img, setImg] = useState({
     isLoading: false,
     error: "",
