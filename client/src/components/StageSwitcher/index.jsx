@@ -9,6 +9,7 @@ export default function StageSwitcher({ current, onChange }) {
     onChange && onChange(idx);
     if (idx === 0) navigate("/");
     else if (idx === 1) navigate("/stage2");
+    else if (idx === 2) navigate("/stage3");
     // 你可以根據需求擴充更多階段
   };
   return (
