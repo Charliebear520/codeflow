@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Button, App, Spin } from "antd";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
+import { javascript } from "@codemirror/lang-javascript";
+import { cpp } from "@codemirror/lang-cpp";
 import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import "./blankHighlight.css";
@@ -50,12 +52,25 @@ const OnlineCoding = ({
   currentStage,
   onFeedback,
   onChecking,
+  fullscreen = false,
+  setFullscreen,
 }) => {
   const { message: antdMessage } = App.useApp();
   const [code, setCode] = useState(value || "");
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [runResult, setRunResult] = useState(null); // { stdout, stderr }
+  const [runLoading, setRunLoading] = useState(false);
+  const [language, setLanguage] = useState("python");
+
+  // 語言對應 CodeMirror extension
+  const getLanguageExtension = () => {
+    if (language === "python") return python();
+    if (language === "javascript") return javascript();
+    if (language === "c") return cpp();
+    return python();
+  };
 
   // 自動請求後端生成 PseudoCode
   useEffect(() => {
@@ -124,8 +139,28 @@ const OnlineCoding = ({
     onChange && onChange("");
   };
 
-  const handleRun = () => {
-    antdMessage.info("Run 功能尚未實作");
+  const handleRun = async () => {
+    setRunLoading(true);
+    setRunResult(null);
+    setApiError("");
+    try {
+      const res = await fetch("http://localhost:3000/api/run-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language }),
+      });
+      const data = await res.json();
+      setRunResult({ stdout: data.stdout, stderr: data.stderr });
+      if (!data.success) {
+        antdMessage.error("執行失敗");
+      }
+    } catch (e) {
+      setApiError("執行失敗，請稍後再試。");
+      setRunResult(null);
+      antdMessage.error("執行失敗，請稍後再試。");
+    } finally {
+      setRunLoading(false);
+    }
   };
 
   const handleChange = (val) => {
@@ -137,13 +172,51 @@ const OnlineCoding = ({
     <App>
       <div
         style={{
-          width: "100%",
+          width: fullscreen ? "100vw" : "100%",
+          height: fullscreen ? "100vh" : undefined,
+          position: fullscreen ? "fixed" : "relative",
+          top: fullscreen ? 0 : undefined,
+          left: fullscreen ? 0 : undefined,
+          zIndex: fullscreen ? 9999 : undefined,
           background: "#fff",
-          borderRadius: 8,
-          padding: 24,
+          borderRadius: fullscreen ? 0 : 8,
+          padding: fullscreen ? 0 : 24,
           boxSizing: "border-box",
+          transition: "all 0.3s cubic-bezier(.4,2,.6,1)",
         }}
       >
+        {/* 放大/縮小按鈕 */}
+        <div
+          style={{ position: "absolute", top: 16, right: 24, zIndex: 10000 }}
+        >
+          <Button
+            type="text"
+            style={{ fontSize: 20 }}
+            onClick={() => setFullscreen && setFullscreen(!fullscreen)}
+          >
+            {fullscreen ? "⤢" : "⤢"}
+          </Button>
+        </div>
+        {/* 語言選擇器 */}
+        <div
+          style={{ display: "flex", alignItems: "center", marginBottom: 12 }}
+        >
+          <span style={{ marginRight: 8, fontWeight: 500 }}>語言：</span>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{
+              padding: "4px 8px",
+              borderRadius: 4,
+              border: "1px solid #ccc",
+              fontSize: 15,
+            }}
+          >
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="c">C</option>
+          </select>
+        </div>
         <div
           style={{
             display: "flex",
@@ -154,7 +227,7 @@ const OnlineCoding = ({
         >
           <Button onClick={handleCheck}>檢查</Button>
           <Button onClick={handleReset}>清空</Button>
-          <Button type="primary" onClick={handleRun}>
+          <Button type="primary" onClick={handleRun} loading={runLoading}>
             Run
           </Button>
         </div>
@@ -165,8 +238,8 @@ const OnlineCoding = ({
         ) : (
           <CodeMirror
             value={code}
-            height="450px"
-            extensions={[python(), blankDecorationExtension()]}
+            height={fullscreen ? "calc(80vh - 60px)" : "450px"}
+            extensions={[getLanguageExtension(), blankDecorationExtension()]}
             onChange={handleChange}
             theme="light"
             basicSetup={{
@@ -174,6 +247,43 @@ const OnlineCoding = ({
               highlightActiveLine: true,
             }}
           />
+        )}
+        {/* 執行結果區塊 */}
+        {runResult && (
+          <div
+            style={{
+              background: "#f6f6f6",
+              borderRadius: 6,
+              marginTop: 20,
+              padding: 16,
+              fontFamily: "monospace",
+              minHeight: 60,
+              maxHeight: fullscreen ? "30vh" : 200,
+              overflowY: "auto",
+              boxSizing: "border-box",
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>執行結果</div>
+            {runResult.stdout && (
+              <div>
+                <div style={{ color: "#333", marginBottom: 4 }}>輸出：</div>
+                <pre style={{ margin: 0, color: "#222" }}>
+                  {runResult.stdout}
+                </pre>
+              </div>
+            )}
+            {runResult.stderr && (
+              <div>
+                <div style={{ color: "#c00", marginTop: 8 }}>錯誤：</div>
+                <pre style={{ margin: 0, color: "#c00" }}>
+                  {runResult.stderr}
+                </pre>
+              </div>
+            )}
+            {!runResult.stdout && !runResult.stderr && (
+              <div style={{ color: "#888" }}>（無輸出）</div>
+            )}
+          </div>
         )}
       </div>
     </App>

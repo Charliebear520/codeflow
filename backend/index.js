@@ -9,6 +9,7 @@ import {
   generatePseudoCode,
   checkPseudoCode,
 } from "./services/geminiService.js";
+import { exec } from "child_process";
 
 // 加載環境變量
 dotenv.config();
@@ -184,6 +185,99 @@ app.post("/api/check-pseudocode", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+    });
+  }
+});
+
+// === 新增：線上執行 Python 程式碼 API ===
+app.post("/api/run-code", async (req, res) => {
+  const { code, language } = req.body;
+  if (!code || !language) {
+    return res.status(400).json({
+      success: false,
+      error: "缺少 code 或 language 參數",
+    });
+  }
+  const fs = await import("fs/promises");
+  const path = await import("path");
+  const tmpDir = path.resolve("./temp");
+  const id = `run_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  let filename,
+    filepath,
+    execCmd,
+    cleanupFiles = [];
+  try {
+    await fs.mkdir(tmpDir, { recursive: true });
+    if (language === "python") {
+      filename = `${id}.py`;
+      filepath = path.join(tmpDir, filename);
+      await fs.writeFile(filepath, code, "utf-8");
+      execCmd = `python3 "${filepath}"`;
+      cleanupFiles = [filepath];
+    } else if (language === "javascript") {
+      filename = `${id}.js`;
+      filepath = path.join(tmpDir, filename);
+      await fs.writeFile(filepath, code, "utf-8");
+      execCmd = `node "${filepath}"`;
+      cleanupFiles = [filepath];
+    } else if (language === "c") {
+      filename = `${id}.c`;
+      filepath = path.join(tmpDir, filename);
+      const outputExe = path.join(tmpDir, `${id}_out`);
+      await fs.writeFile(filepath, code, "utf-8");
+      // 編譯 C 程式
+      await new Promise((resolve, reject) => {
+        exec(
+          `gcc "${filepath}" -o "${outputExe}"`,
+          { timeout: 2000 },
+          (err, stdout, stderr) => {
+            if (err) {
+              reject(stderr || err.message);
+            } else {
+              resolve();
+            }
+          }
+        );
+      });
+      execCmd = `"${outputExe}"`;
+      cleanupFiles = [filepath, outputExe];
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "不支援的語言，目前僅支援 Python、JavaScript、C",
+      });
+    }
+    // 執行程式，3 秒 timeout
+    exec(
+      execCmd,
+      { timeout: 3000, maxBuffer: 1024 * 100 },
+      async (error, stdout, stderr) => {
+        // 刪除暫存檔案
+        await Promise.all(
+          cleanupFiles.map((f) => fs.unlink(f).catch(() => {}))
+        );
+        if (error) {
+          return res.json({
+            success: false,
+            stdout: stdout || "",
+            stderr: stderr || error.message,
+          });
+        }
+        res.json({
+          success: true,
+          stdout,
+          stderr,
+        });
+      }
+    );
+  } catch (err) {
+    // 嘗試清理暫存檔案
+    if (cleanupFiles && cleanupFiles.length) {
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+    }
+    res.status(500).json({
+      success: false,
+      error: "執行程式時發生錯誤: " + err,
     });
   }
 });

@@ -12,6 +12,8 @@
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
     "@clerk/clerk-react": "^5.25.5",
+    "@codemirror/lang-cpp": "^6.0.3",
+    "@codemirror/lang-javascript": "^6.2.4",
     "@codemirror/lang-python": "^6.2.0",
     "@codemirror/language": "^6.11.0",
     "@codemirror/state": "^6.5.2",
