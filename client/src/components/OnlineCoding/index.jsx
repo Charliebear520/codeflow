@@ -70,9 +70,21 @@ const OnlineCoding = ({
     return python();
   };
 
+  // 判斷是否為第三階段
+  const isStage3 = !currentStage || currentStage === 2;
+
   // 自動請求後端生成 PseudoCode
   useEffect(() => {
     if (!question) return;
+    if (isStage3) {
+      // 第三階段：每次切換題目都清空編輯器
+      setCode("");
+      setAnswers([]);
+      setApiError("");
+      setLoading(false);
+      onChange && onChange("");
+      return;
+    }
     setLoading(true);
     setApiError("");
     fetch("http://localhost:3000/api/generate-pseudocode", {
@@ -166,9 +178,6 @@ const OnlineCoding = ({
     onChange && onChange(val);
   };
 
-  // 判斷是否為第三階段
-  const isStage3 = !currentStage || currentStage === 2;
-
   return (
     <App>
       <div
@@ -214,20 +223,19 @@ const OnlineCoding = ({
             </div>
           )}
           <div
-          style={{
-            display: "flex",
-            gap: 8,
-          }}
+            style={{
+              display: "flex",
+              gap: 8,
+            }}
           >
-          <Button onClick={handleCheck}>檢查</Button>
-          <Button onClick={handleReset}>清空</Button>
-          {isStage3 && (
-            <Button type="primary" onClick={handleRun} loading={runLoading}>
-              Run
-            </Button>
-          )}
+            <Button onClick={handleCheck}>檢查</Button>
+            <Button onClick={handleReset}>清空</Button>
+            {isStage3 && (
+              <Button type="primary" onClick={handleRun} loading={runLoading}>
+                Run
+              </Button>
+            )}
           </div>
- 
         </div>
         {loading ? (
           <Spin />
