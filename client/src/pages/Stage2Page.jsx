@@ -6,9 +6,14 @@ import { Row, Col } from "antd";
 import OnlineCoding from "../components/OnlineCoding";
 import React, { useState } from "react";
 
+import styles from "./Stage2Page.module.css";
+
 export default function Stage2Page() {
   // 新增 currentStage 狀態
   const [currentStage, setCurrentStage] = useState(1); // 預設第二階段
+  // 新增放大模式狀態
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // 題目從 localStorage 取得，若無則用預設
   const defaultQuestion =
     "請根據下方敘述繪製流程圖。你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。";
@@ -18,10 +23,30 @@ export default function Stage2Page() {
   const [feedback, setFeedback] = useState("");
   const [isChecking, setIsChecking] = useState(false);
 
+  // 處理放大/縮小切換
+  const handleToggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  // 處理芙蓉助教按鈕點擊
+  const handleTutorClick = () => {
+    setIsExpanded(false); // 縮回原本大小
+  };
+
+  // 動態計算列寬
+  const getColumnSpans = () => {
+    if (isExpanded) {
+      return { left: 6, center: 18, right: 0 };
+    }
+    return { left: 6, center: 12, right: 6 };
+  };
+
+  const spans = getColumnSpans();
+
   return (
-    <div>
+    <div className={styles.stage2Container}>
       <Row>
-        <Col span={6}>
+        <Col span={spans.left}>
           <TopicStage2
             question={question}
             setQuestion={setQuestion}
@@ -29,17 +54,26 @@ export default function Stage2Page() {
             setCurrentStage={setCurrentStage}
           />
         </Col>
-        <Col span={12}>
+        <Col span={spans.center}>
           <OnlineCoding
             question={question}
             currentStage={currentStage}
             onFeedback={setFeedback}
             onChecking={setIsChecking}
+            isExpanded={isExpanded}
+            onToggleExpand={handleToggleExpand}
+            onTutorClick={handleTutorClick}
           />
         </Col>
-        <Col span={6}>
-          <Check feedback={feedback} isChecking={isChecking} />
-        </Col>
+        {!isExpanded && (
+          <Col span={spans.right} className={styles.fadeIn}>
+            <Check
+              feedback={feedback}
+              isChecking={isChecking}
+              onTutorClick={handleTutorClick}
+            />
+          </Col>
+        )}
       </Row>
     </div>
   );
