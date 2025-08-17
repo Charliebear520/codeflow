@@ -17,6 +17,7 @@ import UserMenu from "./components/UserMenu";
 import ForgotPassword from "./pages/ForgotPassword";
 import Stage2Page from "./pages/Stage2Page.jsx";
 import Stage3Page from "./pages/Stage3Page.jsx";
+import StageSwitcherDemo from "./pages/StageSwitcherDemo.jsx";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -227,6 +228,16 @@ function App() {
                 <ProtectedRoute>
                   <PageLayout>
                     <Stage3Page />
+                  </PageLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={"/stage-switcher-demo"}
+              element={
+                <ProtectedRoute>
+                  <PageLayout>
+                    <StageSwitcherDemo />
                   </PageLayout>
                 </ProtectedRoute>
               }

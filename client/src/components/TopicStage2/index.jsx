@@ -207,7 +207,9 @@ const TopicStage2 = ({
               : `第${currentStage + 1}階段`}
           </h4>
         </div>
-        <StageSwitcher current={currentStage} onChange={setCurrentStage} />
+        <div style={{ width: "100%", overflow: "hidden" }}>
+          <StageSwitcher current={currentStage} onChange={setCurrentStage} />
+        </div>
         <div>
           <h5>
             Ch1,

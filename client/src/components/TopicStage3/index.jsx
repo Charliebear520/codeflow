@@ -22,7 +22,9 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
           />
           <h4 className={styles.h4}>第三階段</h4>
         </div>
-        <StageSwitcher current={currentStage} onChange={setCurrentStage} />
+        <div style={{ width: "100%", overflow: "hidden" }}>
+          <StageSwitcher current={currentStage} onChange={setCurrentStage} />
+        </div>
         <div>
           <h5>Ch1,主流程式語言實作</h5>
         </div>
