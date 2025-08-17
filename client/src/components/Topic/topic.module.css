@@ -1,5 +1,5 @@
 .container {
-  padding: 1rem 1rem 2rem 0rem;
+  padding: 0 1rem 2rem 0rem;
   display: flex;
   flex-direction: column; /* 讓子元素垂直排列 */
   max-height: 100vh; /* 設定高度為視窗高度 */
