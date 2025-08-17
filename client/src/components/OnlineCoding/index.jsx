@@ -273,10 +273,63 @@ const OnlineCoding = ({
               alignItems: "center",
             }}
           >
-            <Button onClick={handleCheck}>檢查</Button>
-            <Button onClick={handleReset}>清空</Button>
+            <Button
+              onClick={handleCheck}
+              style={{
+                backgroundColor: "#B2C8FF",
+                color: "#223687",
+                border: "none",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#9BB8FF";
+                e.target.style.transform = "scale(1.02)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "#B2C8FF";
+                e.target.style.transform = "scale(1)";
+              }}
+            >
+              檢查
+            </Button>
+            <Button
+              onClick={handleReset}
+              style={{
+                backgroundColor: "#9287ee94",
+                color: "#223687",
+                border: "none",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#7A6FD8";
+                e.target.style.transform = "scale(1.02)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "#9287EE";
+                e.target.style.transform = "scale(1)";
+              }}
+            >
+              清空
+            </Button>
             {isStage3 && (
-              <Button type="primary" onClick={handleRun} loading={runLoading}>
+              <Button
+                onClick={handleRun}
+                loading={runLoading}
+                style={{
+                  backgroundColor: "#C1E8EE",
+                  color: "#223687",
+                  border: "none",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = "#A8D8DE";
+                  e.target.style.transform = "scale(1.02)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = "#C1E8EE";
+                  e.target.style.transform = "scale(1)";
+                }}
+              >
                 Run
               </Button>
             )}
@@ -297,7 +350,7 @@ const OnlineCoding = ({
                   e.target.style.transform = "scale(1)";
                 }}
               >
-                {isExpanded ? "縮小" : "放大"}
+                {/* {isExpanded ? "縮小" : "放大"} */}
               </Button>
             )}
             {/* 芙蓉助教按鈕 - 只在放大模式下顯示 */}
