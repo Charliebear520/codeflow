@@ -1,41 +1,42 @@
 .stage-switcher-container {
   display: flex;
   align-items: center;
-  margin-bottom: 24px;
-  gap: 16px;
+  margin-bottom: 10px;
+  gap: 6px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  /* 減少整體高度，與中間標籤頁對齊 */
+  height: 40px;
 }
 
 .nav-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border: none;
-  border-radius: 50%;
-  background: #b2c8ff;
+  background: transparent;
   color: #375bd3;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-size: 12px;
+  font-size: 14px;
   flex-shrink: 0;
   /* 為懸停放大效果預留空間 */
-  margin: 6px 0;
+  margin: 4px 0;
 }
 
 .nav-button:hover:not(.disabled) {
-  background: #375bd3;
-  color: white;
+  background: transparent;
+  color: #375bd3;
   transform: scale(1.1);
   /* 確保懸停放大時不會被裁切 */
   margin: 0;
 }
 
 .nav-button.disabled {
-  background: #f0f0f0;
+  background: transparent;
   color: #ccc;
   cursor: not-allowed;
 }
@@ -48,15 +49,15 @@
   min-width: 0;
   /* overflow: hidden; */
   /* 為放大效果預留空間 */
-  padding: 8px 0;
+  padding: 4px 0;
 }
 
 .step-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 50%;
   background: #b2c8ff;
@@ -64,18 +65,18 @@
   cursor: pointer;
   transition: all 0.3s ease;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   position: relative;
   flex-shrink: 0;
   /* 為放大效果預留空間 */
-  margin: 8px 0;
+  margin: 4px 0;
 }
 
 .step-button.active {
   background: #375bd3;
   color: white;
-  transform: scale(1.15);
-  box-shadow: 0 4px 12px rgba(55, 91, 211, 0.3);
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(55, 91, 211, 0.3);
   z-index: 2;
   /* 確保放大時不會被裁切 */
   margin: 0;
@@ -83,23 +84,23 @@
 
 .step-button:hover:not(.active) {
   background: #9bb8ff;
-  transform: scale(1.05);
+  transform: scale(1.03);
 }
 
 .step-button:active {
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .step-number {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .step-connector {
-  width: 32px;
+  width: 28px;
   height: 2px;
   background: #b2c8ff;
-  margin: 0 6px;
+  margin: 0 4px;
   transition: all 0.3s ease;
   position: relative;
   flex-shrink: 0;
@@ -115,32 +116,33 @@
 /* 响应式设计 */
 @media (max-width: 768px) {
   .stage-switcher-container {
-    gap: 8px;
+    gap: 6px;
+    height: 36px;
   }
 
   .steps-container {
-    padding: 6px 0;
+    padding: 3px 0;
   }
 
   .step-button {
-    width: 32px;
-    height: 32px;
-    margin: 6px 0;
+    width: 28px;
+    height: 28px;
+    margin: 3px 0;
   }
 
   .step-number {
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .step-connector {
-    width: 24px;
-    margin: 0 4px;
+    width: 20px;
+    margin: 0 3px;
   }
 
   .nav-button {
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
-    margin: 4px 0;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    margin: 3px 0;
   }
 }

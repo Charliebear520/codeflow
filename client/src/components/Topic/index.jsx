@@ -197,7 +197,7 @@ const Topic = () => {
           justifyContent: "flex-end",
         }}
       >
-        <div className={styles.parsebox}>
+        {/* <div className={styles.parsebox}>
           <img
             src="./public/Icon.svg"
             alt="rightarrow"
@@ -205,12 +205,16 @@ const Topic = () => {
             height="24"
           />
           <h4 className={styles.h4}>第一階段</h4>
-        </div>
-        <div style={{ width: "100%", overflow: "hidden" }}>
+        </div> */}
+        <div
+          style={{
+            width: "100%",
+            overflow: "hidden",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
           <StageSwitcher current={currentStage} onChange={setCurrentStage} />
-        </div>
-        <div>
-          <h5>Ch1,繪製流程圖</h5>
         </div>
       </div>
       <div style={{ height: "100%", overflowY: "hidden" }}>
@@ -224,6 +228,9 @@ const Topic = () => {
               overflowY: "hidden",
             }}
           >
+            <div>
+              <h3>Ch1,繪製流程圖</h3>
+            </div>
             <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
             <div
               style={{
