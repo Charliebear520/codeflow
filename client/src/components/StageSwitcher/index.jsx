@@ -1,44 +1,63 @@
-import { Steps, Button } from "antd";
+import React from "react";
 import { useNavigate } from "react-router-dom";
+import { LeftOutlined, RightOutlined } from "@ant-design/icons";
+import styles from "./stageSwitcher.module.css";
 
 const steps = [1, 2, 3];
 
 export default function StageSwitcher({ current, onChange }) {
   const navigate = useNavigate();
+
   const handleChange = (idx) => {
     onChange && onChange(idx);
     if (idx === 0) navigate("/");
     else if (idx === 1) navigate("/stage2");
     else if (idx === 2) navigate("/stage3");
-    // 你可以根據需求擴充更多階段
   };
+
   return (
-    <div style={{ display: "flex", alignItems: "center", marginBottom: 24 }}>
-      <Button
-        shape="circle"
-        icon="<"
+    <div className={styles["stage-switcher-container"]}>
+      <button
+        className={`${styles["nav-button"]} ${
+          current === 0 ? styles.disabled : ""
+        }`}
         disabled={current === 0}
         onClick={() => handleChange(current - 1)}
-        style={{ marginRight: 16 }}
-      />
-      <Steps
-        current={current}
-        size="small"
-        style={{ flex: 1 }}
-        items={steps.map((num, idx) => ({
-          title: "", // 不顯示title
-          icon: <span style={{ fontWeight: 700, fontSize: 18 }}>{num}</span>,
-          onClick: () => handleChange(idx),
-        }))}
-        onChange={handleChange}
-      />
-      <Button
-        shape="circle"
-        icon=">"
+      >
+        <LeftOutlined />
+      </button>
+
+      <div className={styles["steps-container"]}>
+        {steps.map((num, idx) => (
+          <React.Fragment key={idx}>
+            <button
+              className={`${styles["step-button"]} ${
+                idx === current ? styles.active : ""
+              }`}
+              onClick={() => handleChange(idx)}
+            >
+              <span className={styles["step-number"]}>{num}</span>
+            </button>
+            {idx < steps.length - 1 && (
+              <div
+                className={`${styles["step-connector"]} ${
+                  idx < current ? styles.active : ""
+                }`}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <button
+        className={`${styles["nav-button"]} ${
+          current === steps.length - 1 ? styles.disabled : ""
+        }`}
         disabled={current === steps.length - 1}
         onClick={() => handleChange(current + 1)}
-        style={{ marginLeft: 16 }}
-      />
+      >
+        <RightOutlined />
+      </button>
     </div>
   );
 }
