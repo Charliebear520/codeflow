@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import ReactMarkdown from "react-markdown";
 
-const Check = ({ feedback, isChecking }) => {
+const Check = ({ feedback, isChecking, onTutorClick }) => {
   const { result } = useSelector((state) => state.check);
 
   return (
@@ -17,13 +17,16 @@ const Check = ({ feedback, isChecking }) => {
           justifyContent: "flex-end",
         }}
       >
-        <div className={styles.tutorbox}>
-          <Link to="/tutor">
-            <Button style={{ backgroundColor: "#375BD3", color: "#FFFFFF" }}>
+        {onTutorClick && (
+          <div className={styles.tutorbox}>
+            <Button
+              style={{ backgroundColor: "#375BD3", color: "#FFFFFF" }}
+              onClick={onTutorClick}
+            >
               詢問沐芙助教
             </Button>
-          </Link>
-        </div>
+          </div>
+        )}
       </div>
       <div style={{ height: "80%" }}>
         <div className={styles.topicbox}>
