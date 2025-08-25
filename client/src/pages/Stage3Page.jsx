@@ -32,6 +32,9 @@ export default function Stage3Page() {
             question={question}
             onFeedback={setFeedback}
             onChecking={setIsChecking}
+            isExpanded={false}
+            onToggleExpand={() => {}}
+            onTutorClick={() => {}}
           />
         </Col>
         <Col span={6}>

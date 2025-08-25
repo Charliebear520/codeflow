@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button, App, Spin, Splitter } from "antd";
+import { ArrowsAltOutlined, ShrinkOutlined } from "@ant-design/icons";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
@@ -52,6 +53,9 @@ const OnlineCoding = ({
   currentStage,
   onFeedback,
   onChecking,
+  isExpanded,
+  onToggleExpand,
+  onTutorClick,
 }) => {
   const { message: antdMessage } = App.useApp();
   const [code, setCode] = useState(value || "");
@@ -226,48 +230,140 @@ const OnlineCoding = ({
       >
         <div
           style={{
+            background: "#E4EBFF",
+            padding: "12px 16px",
+            borderRadius: "8px",
+            marginBottom: "16px",
             display: "flex",
-            justifyContent: isStage3 ? "space-between" : "flex-end",
-            gap: 8,
-            marginBottom: 12,
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          {isStage3 && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
-              <span style={{ marginRight: 8, fontWeight: 500 }}>語言：</span>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                style={{
-                  padding: "4px 8px",
-                  borderRadius: 4,
-                  border: "1px solid #ccc",
-                  fontSize: 15,
-                }}
-              >
-                <option value="python">Python</option>
-                <option value="javascript">JavaScript</option>
-                <option value="c">C</option>
-              </select>
-            </div>
-          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            {isStage3 && (
+              <>
+                <span style={{ marginRight: 8, fontWeight: 500 }}>語言：</span>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: 4,
+                    border: "1px solid #ccc",
+                    fontSize: 15,
+                  }}
+                >
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="c">C</option>
+                </select>
+              </>
+            )}
+          </div>
           <div
             style={{
               display: "flex",
               gap: 8,
+              alignItems: "center",
             }}
           >
-            <Button onClick={handleCheck}>檢查</Button>
-            <Button onClick={handleReset}>清空</Button>
+            <Button
+              onClick={handleCheck}
+              style={{
+                backgroundColor: "#B2C8FF",
+                color: "#223687",
+                border: "none",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#9BB8FF";
+                e.target.style.transform = "scale(1.02)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "#B2C8FF";
+                e.target.style.transform = "scale(1)";
+              }}
+            >
+              檢查
+            </Button>
+            <Button
+              onClick={handleReset}
+              style={{
+                backgroundColor: "#9287ee94",
+                color: "#223687",
+                border: "none",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#7A6FD8";
+                e.target.style.transform = "scale(1.02)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "#9287EE";
+                e.target.style.transform = "scale(1)";
+              }}
+            >
+              清空
+            </Button>
             {isStage3 && (
-              <Button type="primary" onClick={handleRun} loading={runLoading}>
+              <Button
+                onClick={handleRun}
+                loading={runLoading}
+                style={{
+                  backgroundColor: "#C1E8EE",
+                  color: "#223687",
+                  border: "none",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = "#A8D8DE";
+                  e.target.style.transform = "scale(1.02)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = "#C1E8EE";
+                  e.target.style.transform = "scale(1)";
+                }}
+              >
                 Run
+              </Button>
+            )}
+            {/* 第二階段顯示放大/縮小按鈕 */}
+            {!isStage3 && (
+              <Button
+                type="default"
+                icon={isExpanded ? <ShrinkOutlined /> : <ArrowsAltOutlined />}
+                onClick={onToggleExpand}
+                title={isExpanded ? "縮小" : "放大"}
+                style={{
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = "scale(1)";
+                }}
+              >
+                {/* {isExpanded ? "縮小" : "放大"} */}
+              </Button>
+            )}
+            {/* 芙蓉助教按鈕 - 只在放大模式下顯示 */}
+            {isExpanded && (
+              <Button
+                style={{
+                  backgroundColor: "#375BD3",
+                  color: "#FFFFFF",
+                  border: "none",
+                }}
+                onClick={onTutorClick || (() => {})}
+              >
+                詢問沐芙助教
               </Button>
             )}
           </div>

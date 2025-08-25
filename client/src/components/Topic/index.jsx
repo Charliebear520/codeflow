@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from "react";
 import styles from "./topic.module.css";
 import { Image, Popover, Button, message, Modal } from "antd";
-import { GlobalOutlined, SyncOutlined, BulbOutlined, ReloadOutlined } from "@ant-design/icons";
+import {
+  GlobalOutlined,
+  SyncOutlined,
+  BulbOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import StageSwitcher from "../StageSwitcher";
 
 const Topic = () => {
-  const [question, setQuestion] = useState("請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。");
+  const [question, setQuestion] = useState(
+    "請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。"
+  );
   const [loading, setLoading] = useState(false);
   const [hintLevel, setHintLevel] = useState(1); // 提示層級，從1開始
   const [isHintModalVisible, setIsHintModalVisible] = useState(false);
@@ -17,7 +24,7 @@ const Topic = () => {
   // 新增：保存已生成的提示
   const [hintCache, setHintCache] = useState({});
   const [regenerating, setRegenerating] = useState(false);
-  
+
   // 生成新題目
   const fetchNewQuestion = async () => {
     setLoading(true);
@@ -26,7 +33,10 @@ const Topic = () => {
       if (response.data.success) {
         setQuestion(response.data.question);
         // 將當前題目存儲到 localStorage，以便在提交流程圖時使用
-        localStorage.setItem('currentFlowchartQuestion', response.data.question);
+        localStorage.setItem(
+          "currentFlowchartQuestion",
+          response.data.question
+        );
         // 重置提示層級和提示緩存
         setHintLevel(1);
         setHintCache({});
@@ -40,7 +50,7 @@ const Topic = () => {
       setLoading(false);
     }
   };
-  
+
   // 從後端獲取提示
   const fetchHint = async (forceRegenerate = false) => {
     // 檢查是否已經有緩存的提示
@@ -48,7 +58,7 @@ const Topic = () => {
       setHintContent(hintCache[hintLevel]);
       return;
     }
-    
+
     setHintLoading(true);
     try {
       const response = await axios.post("http://localhost:5000/api/generate-hint", {
@@ -59,11 +69,11 @@ const Topic = () => {
       if (response.data.success) {
         const newHint = response.data.hint;
         setHintContent(newHint);
-        
+
         // 更新提示緩存
-        setHintCache(prevCache => ({
+        setHintCache((prevCache) => ({
           ...prevCache,
-          [hintLevel]: newHint
+          [hintLevel]: newHint,
         }));
       } else {
         message.error("無法獲取提示");
@@ -78,55 +88,55 @@ const Topic = () => {
       setRegenerating(false);
     }
   };
-  
+
   // 重新生成當前層級的提示
   const regenerateHint = async () => {
     setRegenerating(true);
     await fetchHint(true);
   };
-  
+
   // 顯示提示對話框
   const showHint = async () => {
     setIsHintModalVisible(true);
     await fetchHint();
   };
-  
+
   // 前往上一層提示
   const handlePreviousHint = () => {
     if (hintLevel > 1) {
-      setHintLevel(prevLevel => prevLevel - 1);
+      setHintLevel((prevLevel) => prevLevel - 1);
     }
   };
-  
+
   // 前往下一層提示
   const handleNextHint = () => {
     if (hintLevel < 7) {
-      setHintLevel(prevLevel => prevLevel + 1);
+      setHintLevel((prevLevel) => prevLevel + 1);
     }
   };
-  
+
   // 提示層級改變時更新內容
   useEffect(() => {
     if (isHintModalVisible) {
       fetchHint();
     }
   }, [hintLevel]);
-  
+
   // 關閉提示對話框
   const handleCloseHint = () => {
     setIsHintModalVisible(false);
   };
-  
+
   // 初始加載時獲取題目
   useEffect(() => {
     // 或者從 localStorage 獲取先前生成的題目（如果有）
-    const savedQuestion = localStorage.getItem('currentFlowchartQuestion');
+    const savedQuestion = localStorage.getItem("currentFlowchartQuestion");
     if (savedQuestion) {
       setQuestion(savedQuestion);
     }
-    
+
     // 嘗試從 localStorage 恢復提示緩存
-    const savedHintCache = localStorage.getItem('hintCache');
+    const savedHintCache = localStorage.getItem("hintCache");
     if (savedHintCache) {
       try {
         setHintCache(JSON.parse(savedHintCache));
@@ -135,11 +145,11 @@ const Topic = () => {
       }
     }
   }, []);
-  
+
   // 保存提示緩存到 localStorage
   useEffect(() => {
     if (Object.keys(hintCache).length > 0) {
-      localStorage.setItem('hintCache', JSON.stringify(hintCache));
+      localStorage.setItem("hintCache", JSON.stringify(hintCache));
     }
   }, [hintCache]);
 
@@ -153,7 +163,7 @@ const Topic = () => {
       />
     </div>
   );
-  
+
   const example = (
     <div>
       <p style={{ width: "540px", height: "100%" }}>
@@ -171,7 +181,7 @@ const Topic = () => {
       </div>
     </div>
   );
-  
+
   return (
     <div className={styles.container}>
       <div
@@ -182,7 +192,7 @@ const Topic = () => {
           justifyContent: "flex-end",
         }}
       >
-        <div className={styles.parsebox}>
+        {/* <div className={styles.parsebox}>
           <img
             src="./public/Icon.svg"
             alt="rightarrow"
@@ -190,36 +200,59 @@ const Topic = () => {
             height="24"
           />
           <h4 className={styles.h4}>第一階段</h4>
-        </div>
-        <StageSwitcher current={currentStage} onChange={setCurrentStage} />
-        <div>
-          <h5>Ch1,繪製流程圖</h5>
+        </div> */}
+        <div
+          style={{
+            width: "100%",
+            overflow: "hidden",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <StageSwitcher current={currentStage} onChange={setCurrentStage} />
         </div>
       </div>
-      <div style={{ height: "100%" ,overflowY: "hidden"}}>
-        <div className={styles.topicbox}>       
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexDirection: "column", overflowY: "hidden"}}>
-              <p style={{ flex: 1 ,padding: "0 1rem"}}>{question}</p>
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px", overflowY: "hidden"}}>
-                <Button 
-                  icon={loading ? <SyncOutlined spin /> : <SyncOutlined />} 
-                  onClick={fetchNewQuestion}
-                  disabled={loading}
-                >
-                  生成新題目
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<BulbOutlined />}
-                  onClick={showHint}
-                  loading={hintLoading}
-                >
-                  {`提示 (${hintLevel}/7)`}
-                </Button>
-              </div>
-           
+      <div style={{ height: "100%", overflowY: "hidden" }}>
+        <div className={styles.topicbox}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              flexDirection: "column",
+              overflowY: "hidden",
+            }}
+          >
+            <div>
+              <h3>Ch1,繪製流程圖</h3>
+            </div>
+            <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                marginTop: "10px",
+                overflowY: "hidden",
+              }}
+            >
+              <Button
+                icon={loading ? <SyncOutlined spin /> : <SyncOutlined />}
+                onClick={fetchNewQuestion}
+                disabled={loading}
+              >
+                生成新題目
+              </Button>
+              <Button
+                type="primary"
+                icon={<BulbOutlined />}
+                onClick={showHint}
+                loading={hintLoading}
+              >
+                {`提示 (${hintLevel}/7)`}
+              </Button>
+            </div>
+
             <br />
-              
           </div>
           <div className={styles.infobox}>
             <div className={styles.examplebox}>
@@ -243,18 +276,24 @@ const Topic = () => {
           </div>
         </div>
       </div>
-      
+
       {/* 提示對話框 */}
       <Modal
         title={
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <span>{`繪圖提示 - 步驟 ${hintLevel}/7`}</span>
-            <Button 
-              icon={<ReloadOutlined spin={regenerating} />} 
+            <Button
+              icon={<ReloadOutlined spin={regenerating} />}
               onClick={regenerateHint}
               disabled={hintLoading || regenerating}
               size="small"
-              style={{marginRight: "2rem"}}
+              style={{ marginRight: "2rem" }}
             >
               重新生成提示
             </Button>
@@ -263,9 +302,9 @@ const Topic = () => {
         open={isHintModalVisible}
         onCancel={handleCloseHint}
         footer={[
-          <Button 
-            key="previous" 
-            onClick={handlePreviousHint} 
+          <Button
+            key="previous"
+            onClick={handlePreviousHint}
             disabled={hintLevel === 1 || hintLoading}
           >
             上一步提示
@@ -273,9 +312,9 @@ const Topic = () => {
           <Button key="close" onClick={handleCloseHint}>
             關閉
           </Button>,
-          <Button 
-            key="next" 
-            type="primary" 
+          <Button
+            key="next"
+            type="primary"
             onClick={handleNextHint}
             disabled={hintLevel === 7 || hintLoading}
           >
@@ -292,7 +331,7 @@ const Topic = () => {
           <div>
             <div style={{ textAlign: "center", marginBottom: "10px" }}>
               {Array.from({ length: 7 }).map((_, index) => (
-                <Button 
+                <Button
                   key={index}
                   type={index + 1 === hintLevel ? "primary" : "default"}
                   shape="circle"
@@ -305,9 +344,7 @@ const Topic = () => {
                 </Button>
               ))}
             </div>
-            <div style={{ whiteSpace: "pre-line" }}>
-              {hintContent}
-            </div>
+            <div style={{ whiteSpace: "pre-line" }}>{hintContent}</div>
           </div>
         )}
       </Modal>

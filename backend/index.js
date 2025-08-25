@@ -270,7 +270,7 @@ app.post("/api/run-code", async (req, res) => {
       filename = `${id}.js`;
       filepath = path.join(tmpDir, filename);
       await fs.writeFile(filepath, code, "utf-8");
-      execCmd = `node "${filepath}"`;
+      execCmd = `node --input-type=commonjs`;
       cleanupFiles = [filepath];
     } else if (language === "c") {
       filename = `${id}.c`;
@@ -301,7 +301,7 @@ app.post("/api/run-code", async (req, res) => {
     }
     // 執行程式，3 秒 timeout
     exec(
-      execCmd,
+      language === "javascript" ? `${execCmd} < "${filepath}"` : execCmd,
       { timeout: 3000, maxBuffer: 1024 * 100 },
       async (error, stdout, stderr) => {
         // 刪除暫存檔案
