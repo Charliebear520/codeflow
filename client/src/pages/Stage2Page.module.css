@@ -1,0 +1,42 @@
+.stage2Container {
+  transition: all 0.3s ease-in-out;
+}
+
+.expandButton {
+  transition: all 0.2s ease;
+}
+
+.expandButton:hover {
+  transform: scale(1.05);
+}
+
+/* 動畫效果 */
+.fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.fadeOut {
+  animation: fadeOut 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}

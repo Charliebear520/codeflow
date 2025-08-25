@@ -13,19 +13,19 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
           justifyContent: "flex-end",
         }}
       >
-        <div className={styles.parsebox}>
-          <img
-            src="./public/Icon.svg"
-            alt="rightarrow"
-            width="24"
-            height="24"
-          />
-          <h4 className={styles.h4}>第三階段</h4>
+          {/* <div className={styles.parsebox}>
+            <img
+              src="./public/Icon.svg"
+              alt="rightarrow"
+              width="24"
+              height="24"
+            />
+            <h4 className={styles.h4}>第三階段</h4>
+          </div> */}
+        <div style={{ width: "100%", overflow: "hidden" }}>
+          <StageSwitcher current={currentStage} onChange={setCurrentStage} />
         </div>
-        <StageSwitcher current={currentStage} onChange={setCurrentStage} />
-        <div>
-          <h5>Ch1,主流程式語言實作</h5>
-        </div>
+
       </div>
       <div style={{ height: "100%", overflowY: "hidden" }}>
         <div className={styles.topicbox}>
@@ -36,6 +36,9 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
               overflowY: "hidden",
             }}
           >
+            <div>
+              <h3>Ch3,撰寫程式碼</h3>
+            </div>
             <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
           </div>
           <div className={styles.infobox}>

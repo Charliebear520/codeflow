@@ -192,7 +192,7 @@ const TopicStage2 = ({
           justifyContent: "flex-end",
         }}
       >
-        <div className={styles.parsebox}>
+        {/* <div className={styles.parsebox}>
           <img
             src="./public/Icon.svg"
             alt="rightarrow"
@@ -206,17 +206,9 @@ const TopicStage2 = ({
               ? "第二階段"
               : `第${currentStage + 1}階段`}
           </h4>
-        </div>
-        <StageSwitcher current={currentStage} onChange={setCurrentStage} />
-        <div>
-          <h5>
-            Ch1,
-            {currentStage === 0
-              ? "繪製流程圖"
-              : currentStage === 1
-              ? "製作pseudocode"
-              : ""}
-          </h5>
+        </div> */}
+        <div style={{ width: "100%", overflow: "hidden" }}>
+          <StageSwitcher current={currentStage} onChange={setCurrentStage} />
         </div>
       </div>
       <div style={{ height: "100%", overflowY: "hidden" }}>
@@ -230,6 +222,9 @@ const TopicStage2 = ({
               overflowY: "hidden",
             }}
           >
+            <div>
+              <h3>Ch2,製作pseudocode</h3>
+            </div>
             <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
             <br />
           </div>
