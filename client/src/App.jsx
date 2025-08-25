@@ -19,6 +19,7 @@ import Stage2Page from "./pages/Stage2Page.jsx";
 import Stage3Page from "./pages/Stage3Page.jsx";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import AddQuestion from "./pages/AddQuestion"; 
 
 // 建立一個需要認證的路由元件
 const ProtectedRoute = ({ children }) => {
@@ -230,6 +231,16 @@ function App() {
                   </PageLayout>
                 </ProtectedRoute>
               }
+            />
+            <Route
+            path="add-question"
+            element={
+              <ProtectedRoute>
+                <PageLayout>
+                  <AddQuestion />
+                </PageLayout>
+              </ProtectedRoute>
+            }
             />
           </Routes>
         </BrowserRouter>

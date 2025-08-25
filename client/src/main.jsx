@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { Provider } from "react-redux";
 import { App as AntApp } from "antd";
 import { store } from "./redux/store";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 

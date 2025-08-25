@@ -12,6 +12,9 @@ import {
 } from "./services/geminiService.js";
 import { exec } from "child_process";
 
+import mongoose from "mongoose";
+import Question from "./models/Question.js"; // ← 後端才可以 import
+
 // 加載環境變量
 dotenv.config();
 
@@ -19,12 +22,12 @@ const port = process.env.PORT || 3000;
 const app = express();
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.CLIENT_URL,
     methods: ["GET", "POST"],
     credentials: true,
   })
 );
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: "50mb" }));// 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 const imagekit = new ImageKit({
@@ -32,6 +35,19 @@ const imagekit = new ImageKit({
   publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
   privateKey: process.env.IMAGE_KIT_PRIVATE_KEY,
 });
+
+app.get("/api/health", (req, res) => {
+  const state = mongoose.connection.readyState; // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
+  const states = ["disconnected", "connected", "connecting", "disconnecting"];
+  res.json({
+    ok: state === 1,
+    stateCode: state,
+    stateText: states[state] || "unknown",
+    host: mongoose.connection.host || null,
+    dbName: mongoose.connection.name || null,
+  });
+});
+
 
 app.get("/api/upload", (req, res) => {
   const result = imagekit.getAuthenticationParameters();
@@ -356,3 +372,90 @@ app.listen(port, "0.0.0.0", () => {
   console.log("- GEMINI_API_KEY available:", !!process.env.GEMINI_API_KEY);
   console.log("- NODE_ENV:", process.env.NODE_ENV);
 });
+
+// 資料表連接
+// const mongoose = require("mongoose");
+
+const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
+
+mongoose
+  .connect(mongoUri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("MongoDB connection error:", err));
+
+  //儲存題目到資料庫
+  app.post("/api/add-question", async (req, res) => {
+  // try {
+  //   const { questionId, stage1, stage2, stage3 } = req.body;
+  //   res.json({ success: true });
+  // } catch (error) {
+  //   res.status(500).json({ success: false, error: error.message });
+  // }
+
+    try {
+    const { questionId, stage1, stage2, stage3 } = req.body;
+    const newQuestion = new Question({ questionId, stage1, stage2, stage3 });
+    await newQuestion.save();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// 列出題目（支援關鍵字、分頁）
+app.get("/api/questions", async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const pageSize = Math.min(parseInt(req.query.pageSize) || 10, 100);
+    const q = (req.query.q || "").trim();
+
+    const filter = q
+      ? {
+          $or: [
+            { questionId: new RegExp(q, "i") },
+            { stage1: new RegExp(q, "i") },
+            { stage2: new RegExp(q, "i") },
+            { stage3: new RegExp(q, "i") },
+          ],
+        }
+      : {};
+
+    const [total, items] = await Promise.all([
+      Question.countDocuments(filter),
+      Question.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize),
+    ]);
+
+    res.json({ success: true, total, page, pageSize, items });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 以 questionId 取得單一題目
+app.get("/api/questions/:questionId", async (req, res) => {
+  try {
+    const doc = await Question.findOne({ questionId: req.params.questionId });
+    if (!doc) return res.status(404).json({ success: false, error: "Not found" });
+    res.json({ success: true, item: doc });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// app.post("/api/add-question", async (req, res) => {
+//   try {
+//     const { questionId, stage1, stage2, stage3 } = req.body;
+//     const newQuestion = new Question({ questionId, stage1, stage2, stage3 });
+//     await newQuestion.save();
+//     res.json({ success: true });
+//   } catch (error) {
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// });
