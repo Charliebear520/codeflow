@@ -9,7 +9,7 @@ export const checkFlowchart = createAsyncThunk(
     // 從 localStorage 獲取當前問題（如果沒有直接提供）
     const currentQuestion = question || localStorage.getItem('currentFlowchartQuestion');
     
-    const response = await fetch("http://localhost:3000/api/check", {
+    const response = await fetch("http://localhost:5000/api/check", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

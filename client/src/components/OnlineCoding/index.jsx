@@ -87,7 +87,7 @@ const OnlineCoding = ({
     }
     setLoading(true);
     setApiError("");
-    fetch("http://localhost:3000/api/generate-pseudocode", {
+    fetch("http://localhost:5000/api/generate-pseudocode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
@@ -124,7 +124,7 @@ const OnlineCoding = ({
     try {
       if (isStage3) {
         // 第三階段：檢查程式語法
-        const res = await fetch("http://localhost:3000/api/check-code", {
+        const res = await fetch("http://localhost:5000/api/check-code", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, code, language }),
@@ -139,7 +139,7 @@ const OnlineCoding = ({
         }
       } else {
         // 第二階段：檢查 pseudocode
-        const res = await fetch("http://localhost:3000/api/check-pseudocode", {
+        const res = await fetch("http://localhost:5000/api/check-pseudocode", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, userPseudoCode: code }),
@@ -186,7 +186,7 @@ const OnlineCoding = ({
     setRunResult(null);
     setApiError("");
     try {
-      const res = await fetch("http://localhost:3000/api/run-code", {
+      const res = await fetch("http://localhost:5000/api/run-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, language }),
