@@ -17,7 +17,6 @@ import UserMenu from "./components/UserMenu";
 import ForgotPassword from "./pages/ForgotPassword";
 import Stage2Page from "./pages/Stage2Page.jsx";
 import Stage3Page from "./pages/Stage3Page.jsx";
-import StageSwitcherDemo from "./pages/StageSwitcherDemo.jsx";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AddQuestion from "./pages/AddQuestion"; 
@@ -234,14 +233,14 @@ function App() {
               }
             />
             <Route
-              path={"/stage-switcher-demo"}
-              element={
-                <ProtectedRoute>
-                  <PageLayout>
-                    <StageSwitcherDemo />
-                  </PageLayout>
-                </ProtectedRoute>
-              }
+            path="add-question"
+            element={
+              <ProtectedRoute>
+                <PageLayout>
+                  <AddQuestion />
+                </PageLayout>
+              </ProtectedRoute>
+            }
             />
           </Routes>
         </BrowserRouter>
