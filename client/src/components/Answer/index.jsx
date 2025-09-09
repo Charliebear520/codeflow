@@ -13,7 +13,7 @@ import UploadImage from "../upload";
 
 // const { Dragger } = Upload;
 
-// 定义初始节点和边
+// 定義出初始節點和邊
 const initialNodes = [
   {
     id: "1",

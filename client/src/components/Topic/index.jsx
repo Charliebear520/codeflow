@@ -29,7 +29,9 @@ const Topic = () => {
   const fetchNewQuestion = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("http://localhost:5000/api/generate-question");
+      const response = await axios.get(
+        "http://localhost:3000/api/generate-question"
+      );
       if (response.data.success) {
         setQuestion(response.data.question);
         // 將當前題目存儲到 localStorage，以便在提交流程圖時使用
@@ -61,11 +63,14 @@ const Topic = () => {
 
     setHintLoading(true);
     try {
-      const response = await axios.post("http://localhost:5000/api/generate-hint", {
-        question,
-        hintLevel
-      });
-      
+      const response = await axios.post(
+        "http://localhost:3000/api/generate-hint",
+        {
+          question,
+          hintLevel,
+        }
+      );
+
       if (response.data.success) {
         const newHint = response.data.hint;
         setHintContent(newHint);

@@ -26,20 +26,20 @@ export default function AddQuestion() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  try {
-    const res = await fetch("http://localhost:5000/api/add-question", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    setMsg(data.success ? "新增成功" : "新增失敗：" + data.error);
-  } catch (err) {
-    setMsg("API 錯誤：" + err.message);
-  }
-};
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("http://localhost:3000/api/add-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      setMsg(data.success ? "新增成功" : "新增失敗：" + data.error);
+    } catch (err) {
+      setMsg("API 錯誤：" + err.message);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit}>
@@ -71,7 +71,7 @@ const handleSubmit = async (e) => {
         onChange={handleChange}
       />
       <br />
-      <button type="submit">新增題目</button>
+      <button type="submit" style={{ backgroundColor: "#375BD3", color: "#FFFFFF", border: "none" }}>新增題目</button>
       <div>{msg}</div>
     </form>
   );
