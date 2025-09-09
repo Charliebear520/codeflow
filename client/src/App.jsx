@@ -20,7 +20,6 @@ import Stage3Page from "./pages/Stage3Page.jsx";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AddQuestion from "./pages/AddQuestion";
-import ErrorTest from "./pages/ErrorTest";
 
 // 建立一個需要認證的路由元件
 const ProtectedRoute = ({ children }) => {
@@ -243,16 +242,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/error-test"
-              element={
-                <ProtectedRoute>
-                  <PageLayout>
-                    <ErrorTest />
-                  </PageLayout>
-                </ProtectedRoute>
-              }
-            />
+            {/* 已移除 /error-test 路由 */}
           </Routes>
         </BrowserRouter>
       </div>
