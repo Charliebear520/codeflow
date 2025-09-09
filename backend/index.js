@@ -10,6 +10,7 @@ import {
   checkPseudoCode,
   checkCode,
 } from "./services/geminiService.js";
+import { explainError } from "./services/errorExplainer.js";
 import { exec } from "child_process";
 
 import mongoose from "mongoose";
@@ -18,16 +19,32 @@ import Question from "./models/Question.js"; // ← 後端才可以 import
 // 加載環境變量
 dotenv.config();
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 const app = express();
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL,
-    methods: ["GET", "POST"],
-    credentials: true,
-  })
+
+// CORS 設定：允許本地前端與環境變數指定的 URL，並處理預檢請求
+const allowedOrigins = [process.env.CLIENT_URL, "http://localhost:5173"].filter(
+  Boolean
 );
-app.use(express.json({ limit: "50mb" }));// 讓 JSON 進來變成 req.body
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // 例如 Postman 或同源
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+  ],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 const imagekit = new ImageKit({
@@ -47,7 +64,6 @@ app.get("/api/health", (req, res) => {
     dbName: mongoose.connection.name || null,
   });
 });
-
 
 app.get("/api/upload", (req, res) => {
   const result = imagekit.getAuthenticationParameters();
@@ -309,10 +325,19 @@ app.post("/api/run-code", async (req, res) => {
           cleanupFiles.map((f) => fs.unlink(f).catch(() => {}))
         );
         if (error) {
+          // 使用AI錯誤解釋
+          const errorExplanation = await explainError(
+            stderr || error.message,
+            language,
+            code
+          );
+
           return res.json({
             success: false,
             stdout: stdout || "",
             stderr: stderr || error.message,
+            errorExplanation: errorExplanation.explanation,
+            errorType: errorExplanation.errorType,
           });
         }
         res.json({
@@ -362,6 +387,32 @@ app.get("/test", (req, res) => {
   });
 });
 
+// AI錯誤解釋功能的API端点
+app.post("/api/test-error-explanation", async (req, res) => {
+  try {
+    const { errorMessage, language, code } = req.body;
+
+    if (!errorMessage || !language) {
+      return res.status(400).json({
+        success: false,
+        error: "缺少錯誤訊息或語言參數",
+      });
+    }
+
+    const result = await explainError(errorMessage, language, code || "");
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // 檢查環境變量
 console.log("API Key available:", !!process.env.GEMINI_API_KEY);
 
@@ -379,15 +430,12 @@ app.listen(port, "0.0.0.0", () => {
 const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
 
 mongoose
-  .connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(mongoUri)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-  //儲存題目到資料庫
-  app.post("/api/add-question", async (req, res) => {
+//儲存題目到資料庫
+app.post("/api/add-question", async (req, res) => {
   // try {
   //   const { questionId, stage1, stage2, stage3 } = req.body;
   //   res.json({ success: true });
@@ -395,7 +443,7 @@ mongoose
   //   res.status(500).json({ success: false, error: error.message });
   // }
 
-    try {
+  try {
     const { questionId, stage1, stage2, stage3 } = req.body;
     const newQuestion = new Question({ questionId, stage1, stage2, stage3 });
     await newQuestion.save();
@@ -404,7 +452,6 @@ mongoose
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
 
 // 列出題目（支援關鍵字、分頁）
 app.get("/api/questions", async (req, res) => {
@@ -442,7 +489,8 @@ app.get("/api/questions", async (req, res) => {
 app.get("/api/questions/:questionId", async (req, res) => {
   try {
     const doc = await Question.findOne({ questionId: req.params.questionId });
-    if (!doc) return res.status(404).json({ success: false, error: "Not found" });
+    if (!doc)
+      return res.status(404).json({ success: false, error: "Not found" });
     res.json({ success: true, item: doc });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

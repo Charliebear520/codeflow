@@ -9,7 +9,7 @@ import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import "./blankHighlight.css";
 
-// 方案A：高亮___
+// 方案A：Highlight ___
 function blankDecorationExtension() {
   return ViewPlugin.fromClass(
     class {
@@ -91,7 +91,7 @@ const OnlineCoding = ({
     }
     setLoading(true);
     setApiError("");
-    fetch("http://localhost:5000/api/generate-pseudocode", {
+    fetch("http://localhost:3000/api/generate-pseudocode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
@@ -128,7 +128,7 @@ const OnlineCoding = ({
     try {
       if (isStage3) {
         // 第三階段：檢查程式語法
-        const res = await fetch("http://localhost:5000/api/check-code", {
+        const res = await fetch("http://localhost:3000/api/check-code", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, code, language }),
@@ -143,7 +143,7 @@ const OnlineCoding = ({
         }
       } else {
         // 第二階段：檢查 pseudocode
-        const res = await fetch("http://localhost:5000/api/check-pseudocode", {
+        const res = await fetch("http://localhost:3000/api/check-pseudocode", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, userPseudoCode: code }),
@@ -190,13 +190,18 @@ const OnlineCoding = ({
     setRunResult(null);
     setApiError("");
     try {
-      const res = await fetch("http://localhost:5000/api/run-code", {
+      const res = await fetch("http://localhost:3000/api/run-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, language }),
       });
       const data = await res.json();
-      setRunResult({ stdout: data.stdout, stderr: data.stderr });
+      setRunResult({
+        stdout: data.stdout,
+        stderr: data.stderr,
+        errorExplanation: data.errorExplanation,
+        errorType: data.errorType,
+      });
       if (!data.success) {
         antdMessage.error("執行失敗");
       }
@@ -407,8 +412,8 @@ const OnlineCoding = ({
                   borderRadius: 6,
                   padding: 16,
                   fontFamily: "monospace",
-                  minHeight: 60,
-                  height: "100%",
+                  minHeight: "100%",
+                  // height: "100%",
                   boxSizing: "border-box",
                 }}
               >
@@ -423,10 +428,53 @@ const OnlineCoding = ({
                 )}
                 {runResult && runResult.stderr && (
                   <div>
-                    <div style={{ color: "#c00", marginTop: 8 }}>錯誤：</div>
-                    <pre style={{ margin: 0, color: "#c00" }}>
-                      {runResult.stderr}
-                    </pre>
+                    {runResult.errorExplanation && (
+                      <div style={{ marginTop: 12 }}>
+                        <div
+                          style={{
+                            color: "#d63384",
+                            fontWeight: 600,
+                            marginBottom: 8,
+                            fontSize: 14,
+                          }}
+                        >
+                          🤖 錯誤說明
+                        </div>
+                        <div
+                          style={{
+                            background: "#fff3cd",
+                            border: "1px solid #ffeaa7",
+                            borderRadius: 6,
+                            padding: 12,
+                            fontSize: 13,
+                            lineHeight: 1.5,
+                            whiteSpace: "pre-wrap",
+                            wordWrap: "break-word",
+                            overflowWrap: "break-word",
+                            maxWidth: "100%",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {runResult.errorExplanation}
+                        </div>
+                        <div style={{ color: "#c00", marginTop: 8 }}>
+                          錯誤：
+                        </div>
+                        <pre
+                          style={{
+                            margin: 0,
+                            color: "#c00",
+                            wordWrap: "break-word",
+                            overflowWrap: "break-word",
+                            whiteSpace: "pre-wrap",
+                            maxWidth: "100%",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {runResult.stderr}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
                 {!runResult && (

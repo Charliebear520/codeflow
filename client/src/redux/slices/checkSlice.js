@@ -4,19 +4,21 @@ export const checkFlowchart = createAsyncThunk(
   "check/checkFlowchart",
   async (payload) => {
     // 解構 payload 以獲取 imageData 和 question
-    const { imageData, question } = typeof payload === 'object' ? payload : { imageData: payload };
-    
+    const { imageData, question } =
+      typeof payload === "object" ? payload : { imageData: payload };
+
     // 從 localStorage 獲取當前問題（如果沒有直接提供）
-    const currentQuestion = question || localStorage.getItem('currentFlowchartQuestion');
-    
-    const response = await fetch("http://localhost:5000/api/check", {
+    const currentQuestion =
+      question || localStorage.getItem("currentFlowchartQuestion");
+
+    const response = await fetch("http://localhost:3000/api/check", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         imageData,
-        question: currentQuestion 
+        question: currentQuestion,
       }),
     });
 

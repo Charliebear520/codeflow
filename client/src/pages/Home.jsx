@@ -33,7 +33,7 @@ const Home = () => {
       */}
 
       <button
-        style={{ position: "fixed", bottom: 20, right: 20 }}
+        style={{ position: "fixed", bottom: 20, right: 20,backgroundColor: "#375BD3", color: "#FFFFFF", border: "none" }}
         onClick={() => navigate("/add-question")}
       >
         前往AddQuestion頁面（測試用）
