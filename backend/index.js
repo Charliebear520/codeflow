@@ -10,10 +10,13 @@ import {
   checkPseudoCode,
   checkCode,
 } from "./services/geminiService.js";
+import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";
 import { exec } from "child_process";
 
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
+import Student from "./models/Student.js";
+import Submission from "./models/Submission.js";
 
 // 加載環境變量
 dotenv.config();
@@ -29,11 +32,73 @@ app.use(
 );
 app.use(express.json({ limit: "50mb" }));// 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(clerkMiddleware());// 解析前端帶來的 Authorization: Bearer <token>
 
 const imagekit = new ImageKit({
   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
   publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
   privateKey: process.env.IMAGE_KIT_PRIVATE_KEY,
+});
+
+// 小工具：確保 Student 存在並同步 name/email
+async function ensureStudent(userId) {
+  const u = await clerkClient.users.getUser(userId);
+  const fullName =
+    u.fullName ||
+    [u.firstName, u.lastName].filter(Boolean).join(" ") ||
+    u.username ||
+    u.primaryEmailAddress?.emailAddress ||
+    "";
+  const email =
+    u.primaryEmailAddress?.emailAddress ||
+    u.emailAddresses?.[0]?.emailAddress ||
+    null;
+
+  const update = { $setOnInsert: { userId } };
+  const toSet = {};
+  if (fullName) toSet.name = fullName;
+  if (email) toSet.email = email.toLowerCase();
+  if (Object.keys(toSet).length) update.$set = toSet;
+
+  return Student.findOneAndUpdate({ userId }, update, { new: true, upsert: true });
+}
+
+// 取得當前登入學生基本資料（若無則自動建立）
+app.get("/api/me", requireAuth(), async (req, res) => {
+  try {
+    const { userId } = req.auth;
+
+    // 從 Clerk 取使用者資料
+    const u = await clerkClient.users.getUser(userId);
+    const fullName =
+      u.fullName ||
+      [u.firstName, u.lastName].filter(Boolean).join(" ") ||
+      u.username ||
+      u.primaryEmailAddress?.emailAddress ||
+      "";
+    const email =
+      u.primaryEmailAddress?.emailAddress ||
+      u.emailAddresses?.[0]?.emailAddress ||
+      null;
+
+    // 只 $set 有值的欄位，避免把 name 設成 undefined
+    const update = { $setOnInsert: { userId } };
+    const toSet = {};
+    if (fullName) toSet.name = fullName;
+    if (email) toSet.email = email.toLowerCase();
+    if (Object.keys(toSet).length) update.$set = toSet;
+
+    // upsert + 回傳最新
+    const student = await Student.findOneAndUpdate(
+      { userId },
+      update,
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, student });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.get("/api/health", (req, res) => {
@@ -306,7 +371,7 @@ app.post("/api/run-code", async (req, res) => {
       async (error, stdout, stderr) => {
         // 刪除暫存檔案
         await Promise.all(
-          cleanupFiles.map((f) => fs.unlink(f).catch(() => {}))
+          cleanupFiles.map((f) => fs.unlink(f).catch(() => { }))
         );
         if (error) {
           return res.json({
@@ -325,7 +390,7 @@ app.post("/api/run-code", async (req, res) => {
   } catch (err) {
     // 嘗試清理暫存檔案
     if (cleanupFiles && cleanupFiles.length) {
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     }
     res.status(500).json({
       success: false,
@@ -386,8 +451,8 @@ mongoose
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-  //儲存題目到資料庫
-  app.post("/api/add-question", async (req, res) => {
+//儲存題目到資料庫
+app.post("/api/add-question", async (req, res) => {
   // try {
   //   const { questionId, stage1, stage2, stage3 } = req.body;
   //   res.json({ success: true });
@@ -395,9 +460,9 @@ mongoose
   //   res.status(500).json({ success: false, error: error.message });
   // }
 
-    try {
-    const { questionId, stage1, stage2, stage3 } = req.body;
-    const newQuestion = new Question({ questionId, stage1, stage2, stage3 });
+  try {
+    const { questionTitle, description } = req.body;
+    const newQuestion = new Question({ questionTitle, description });
     await newQuestion.save();
     res.json({ success: true });
   } catch (error) {
@@ -415,13 +480,11 @@ app.get("/api/questions", async (req, res) => {
 
     const filter = q
       ? {
-          $or: [
-            { questionId: new RegExp(q, "i") },
-            { stage1: new RegExp(q, "i") },
-            { stage2: new RegExp(q, "i") },
-            { stage3: new RegExp(q, "i") },
-          ],
-        }
+        $or: [
+          { questionTitle: new RegExp(q, "i") },
+          { description: new RegExp(q, "i") },
+        ],
+      }
       : {};
 
     const [total, items] = await Promise.all([
@@ -439,23 +502,77 @@ app.get("/api/questions", async (req, res) => {
 });
 
 // 以 questionId 取得單一題目
-app.get("/api/questions/:questionId", async (req, res) => {
+app.get("/api/questions/:id", async (req, res) => {
+  const { id } = req.params;
+
+  // 避免 CastError：非 24 hex 先擋掉
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ success: false, error: "invalid id" });
+  }
+
+  const doc = await Question.findById(id).lean();
+  if (!doc) return res.status(404).json({ success: false, error: "not found" });
+
+  res.json({ success: true, item: doc });
+});
+
+//儲存 stage1 的流程圖
+app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
   try {
-    const doc = await Question.findOne({ questionId: req.params.questionId });
-    if (!doc) return res.status(404).json({ success: false, error: "Not found" });
-    res.json({ success: true, item: doc });
+    const { userId } = req.auth; // Clerk 的 user_xxx
+    const { questionId, graph, imageBase64, completed = false } = req.body || {};
+
+    if (!questionId) return res.status(400).json({ success: false, error: "questionId 必填" });
+    if (!graph && !imageBase64)
+      return res.status(400).json({ success: false, error: "需提供 graph 或 imageBase64 其一" });
+
+    const student = await ensureStudent(userId);
+    console.log("Student:", student);
+
+    const stage1 = {
+      ...(graph ? { graph } : {}),
+      ...(imageBase64 ? { imageBase64 } : {}),
+      completed,
+      updatedAt: new Date(),
+    };
+    const update = {
+      $set: {
+        "stages.stage1": stage1,
+        studentName:  student.name ?? null,               // ✅ 快照
+        studentEmail: student.email?.toLowerCase() ?? null,
+      },
+      $setOnInsert: {
+        student: student._id,
+        questionId,
+      },
+    };
+
+    const doc = await Submission.findOneAndUpdate(
+      { student: student._id, questionId },  // ✅ 只用這兩個當唯一條件
+      update,                                // ✅ 用我們組好的 update
+      { new: true, upsert: true }
+    );
+
+    res.status(201).json({ success: true, submissionId: doc._id });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// app.post("/api/add-question", async (req, res) => {
-//   try {
-//     const { questionId, stage1, stage2, stage3 } = req.body;
-//     const newQuestion = new Question({ questionId, stage1, stage2, stage3 });
-//     await newQuestion.save();
-//     res.json({ success: true });
-//   } catch (error) {
-//     res.status(500).json({ success: false, error: error.message });
-//   }
-// });
+app.get("/api/get_answer/stage1", requireAuth(), async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const { questionId } = req.query;
+    if (!questionId) return res.status(400).json({ success: false, error: "questionId 必填" });
+
+    const student = await Student.findOne({ userId });
+    if (!student) return res.status(404).json({ success: false, error: "學生不存在" });
+
+    const sub = await Submission.findOne({ student: student._id, questionId });
+    if (!sub?.stages?.stage1) return res.status(404).json({ success: false, error: "尚無作答" });
+
+    res.json({ success: true, stage1: sub.stages.stage1 });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});

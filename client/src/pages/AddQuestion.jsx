@@ -15,10 +15,8 @@ import React, { useState } from "react";
 
 export default function AddQuestion() {
   const [form, setForm] = useState({
-    questionId: "",
-    stage1: "",
-    stage2: "",
-    stage3: "",
+    questionTitle: "",
+    description: "",
   });
   const [msg, setMsg] = useState("");
 
@@ -44,33 +42,18 @@ const handleSubmit = async (e) => {
   return (
     <form onSubmit={handleSubmit}>
       <input
-        name="questionId"
-        placeholder="問題編號"
-        value={form.questionId}
+        name="questionTitle"
+        placeholder="題目標題"
+        value={form.questionTitle}
         onChange={handleChange}
       />
       <br />
       <textarea
-        name="stage1"
-        placeholder="第一階段提問"
-        value={form.stage1}
+        name="description"
+        placeholder="題目敘述"
+        value={form.description}
         onChange={handleChange}
       />
-      <br />
-      <textarea
-        name="stage2"
-        placeholder="第二階段提問"
-        value={form.stage2}
-        onChange={handleChange}
-      />
-      <br />
-      <textarea
-        name="stage3"
-        placeholder="第三階段提問"
-        value={form.stage3}
-        onChange={handleChange}
-      />
-      <br />
       <button type="submit">新增題目</button>
       <div>{msg}</div>
     </form>
