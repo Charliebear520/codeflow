@@ -55,7 +55,7 @@
 
 .password-input-container input {
   width: 100%;
-  padding-right: 45px; 
+  padding-right: 45px;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -471,7 +471,7 @@
 .custom-form-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1rem;
   margin-bottom: 2px;
 }
 
@@ -511,6 +511,21 @@
   padding: 10px;
   border-radius: 4px;
   border: 1px solid #e53935;
+}
+
+.custom-success-message {
+  color: #059669;
+  font-size: 14px;
+  background-color: rgba(5, 150, 105, 0.1);
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #059669;
+  margin-bottom: 10px;
+}
+
+.custom-success-message p {
+  margin: 0 0 8px 0;
+  font-weight: 500;
 }
 
 .custom-submit-button,
@@ -937,6 +952,44 @@ body > .user-menu-overlay {
   bottom: 0;
   z-index: 9990;
   background-color: transparent;
+}
+
+/* Ant Design OTP 組件自定義樣式 */
+.ant-otp {
+  column-gap: 12px !important;
+}
+
+.ant-otp.ant-otp-lg .ant-otp-input {
+  padding-inline: 14px !important;
+}
+
+/* 驗證碼標籤樣式 */
+.otp-label {
+  padding: 0 1.5rem !important;
+}
+
+/* 重新傳送驗證碼按鈕樣式 */
+.resend-code-button {
+  background-color: #9287ee !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  height: 36px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: background-color 0.3s !important;
+  width: 100% !important;
+  margin-bottom: 20px !important;
+}
+
+.resend-code-button:hover:not(:disabled) {
+  background-color: #7c71d8 !important;
+}
+
+.resend-code-button:disabled {
+  background-color: #d9d9d9 !important;
+  cursor: not-allowed !important;
 }
 
 /* 側邊欄導航樣式 - 用戶個人資料頁面使用 */
