@@ -16,6 +16,30 @@ function SignUpPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // 密码强度检查
+  const [passwordChecks, setPasswordChecks] = useState({
+    length: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    special: false,
+  });
+
+  // 密碼顯示/隱藏狀態
+  const [showPassword, setShowPassword] = useState(false);
+
+  // 檢查密碼強度
+  const checkPasswordStrength = (password) => {
+    const checks = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /\d/.test(password),
+      special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    };
+    setPasswordChecks(checks);
+  };
+
   // 處理註冊
   const handleSignUp = async (e) => {
     e.preventDefault();
@@ -30,8 +54,6 @@ function SignUpPage() {
       await signUp.create({
         emailAddress: email,
         password,
-        firstName,
-        lastName,
       });
 
       // 發送驗證郵件
@@ -41,7 +63,37 @@ function SignUpPage() {
       setPendingVerification(true);
     } catch (err) {
       console.error("註冊錯誤:", err);
-      setErrorMessage(err.errors?.[0]?.message || "註冊失敗，請檢查您的信息");
+
+      // 解析並顯示更具體的錯誤信息
+      let errorMsg = "註冊失敗，請重試";
+
+      if (err.errors && err.errors.length > 0) {
+        const error = err.errors[0];
+        switch (error.code) {
+          case "form_identifier_exists":
+            errorMsg = "此電子郵件已被註冊，請使用其他郵箱或直接登入";
+            break;
+          case "form_password_pwned":
+            errorMsg =
+              "此密碼安全性不足，為了您的帳戶安全，請選擇一個全新的密碼";
+            break;
+          case "form_password_size_in_bytes":
+            errorMsg = "密碼長度不符合要求，請輸入至少8個字符";
+            break;
+          case "form_identifier_invalid":
+            errorMsg = "電子郵件格式不正確，請檢查後重試";
+            break;
+          case "form_password_not_strong_enough":
+            errorMsg = "密碼強度不足，請包含字母、數字和特殊字符";
+            break;
+          default:
+            errorMsg = error.message || "註冊失敗，請檢查您的信息";
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+
+      setErrorMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +127,30 @@ function SignUpPage() {
       window.location.href = "/";
     } catch (err) {
       console.error("驗證錯誤:", err);
-      setErrorMessage(err.errors?.[0]?.message || "驗證失敗，請重試");
+
+      // 解析並顯示更具體的驗證錯誤信息
+      let errorMsg = "驗證失敗，請重試";
+
+      if (err.errors && err.errors.length > 0) {
+        const error = err.errors[0];
+        switch (error.code) {
+          case "form_code_incorrect":
+            errorMsg = "驗證碼不正確，請檢查後重試";
+            break;
+          case "form_code_expired":
+            errorMsg = "驗證碼已過期，請重新發送驗證碼";
+            break;
+          case "form_code_invalid":
+            errorMsg = "驗證碼格式不正確，請檢查後重試";
+            break;
+          default:
+            errorMsg = error.message || "驗證失敗，請重試";
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+
+      setErrorMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +168,27 @@ function SignUpPage() {
       });
     } catch (err) {
       console.error(`${provider}註冊錯誤:`, err);
-      setErrorMessage(`${provider}註冊失敗，請重試`);
+
+      // 解析社交登入錯誤信息
+      let errorMsg = `${provider}註冊失敗，請重試`;
+
+      if (err.errors && err.errors.length > 0) {
+        const error = err.errors[0];
+        switch (error.code) {
+          case "oauth_access_denied":
+            errorMsg = `${provider}登入被取消，請重試`;
+            break;
+          case "oauth_account_already_exists":
+            errorMsg = `此${provider}帳號已存在，請直接登入`;
+            break;
+          default:
+            errorMsg = error.message || `${provider}註冊失敗，請重試`;
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+
+      setErrorMessage(errorMsg);
     }
   };
 
@@ -193,15 +288,104 @@ function SignUpPage() {
 
                     <div className="custom-form-field">
                       <label htmlFor="password">密碼</label>
-                      <input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="創建密碼"
-                        required
-                      />
-                      <small>密碼至少包含8個字符</small>
+                      <div className="password-input-container">
+                        <input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            checkPasswordStrength(e.target.value);
+                          }}
+                          placeholder="創建密碼"
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle-btn"
+                          onClick={() => setShowPassword(!showPassword)}
+                          tabIndex="-1"
+                        >
+                          {showPassword ? (
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          ) : (
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+
+                      {password && (
+                        <div className="password-strength-checker">
+                          <div className="password-requirement">
+                            {passwordChecks.length ? (
+                              <span className="requirement-check">✓</span>
+                            ) : (
+                              <span className="requirement-dot invalid"></span>
+                            )}
+                            <span
+                              className={`requirement-text ${
+                                passwordChecks.length ? "valid" : "invalid"
+                              }`}
+                            >
+                              至少8個字符
+                            </span>
+                          </div>
+                          <div className="password-requirement">
+                            {passwordChecks.uppercase &&
+                            passwordChecks.lowercase ? (
+                              <span className="requirement-check">✓</span>
+                            ) : (
+                              <span className="requirement-dot invalid"></span>
+                            )}
+                            <span
+                              className={`requirement-text ${
+                                passwordChecks.uppercase &&
+                                passwordChecks.lowercase
+                                  ? "valid"
+                                  : "invalid"
+                              }`}
+                            >
+                              包含大小寫字母 (a-z, A-Z)
+                            </span>
+                          </div>
+                          <div className="password-requirement">
+                            {passwordChecks.number || passwordChecks.special ? (
+                              <span className="requirement-check">✓</span>
+                            ) : (
+                              <span className="requirement-dot invalid"></span>
+                            )}
+                            <span
+                              className={`requirement-text ${
+                                passwordChecks.number || passwordChecks.special
+                                  ? "valid"
+                                  : "invalid"
+                              }`}
+                            >
+                              包含數字 (0-9) 或特殊符號
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {errorMessage && (
@@ -227,17 +411,12 @@ function SignUpPage() {
                       className="custom-social-button custom-google-button"
                       onClick={() => handleSocialSignUp("oauth_google")}
                     >
-                      <span className="custom-social-icon">G</span>
+                      <img
+                        src="https://www.google.com/favicon.ico"
+                        alt="Google"
+                        className="social-icon"
+                      />
                       <span>使用Google註冊</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="custom-social-button custom-github-button"
-                      onClick={() => handleSocialSignUp("oauth_github")}
-                    >
-                      <span className="custom-social-icon">GH</span>
-                      <span>使用GitHub註冊</span>
                     </button>
                   </div>
 
