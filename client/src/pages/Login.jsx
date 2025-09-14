@@ -19,30 +19,9 @@ function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
 
-  // 處理忘記密碼
-  const handleForgotPassword = async () => {
-    if (!isLoaded) return;
-
-    try {
-      setIsLoading(true);
-      setErrorMessage("");
-
-      // 使用 Clerk 的忘記密碼功能
-      await signIn.create({
-        strategy: "reset_password_email",
-        identifier: email,
-      });
-
-      // 顯示成功消息
-      setErrorMessage("重置密碼的郵件已發送到您的郵箱，請查收。");
-    } catch (err) {
-      console.error("忘記密碼錯誤:", err);
-      setErrorMessage(
-        err.errors?.[0]?.message || "發送重置密碼郵件失敗，請重試"
-      );
-    } finally {
-      setIsLoading(false);
-    }
+  // 處理忘記密碼 - 導航到忘記密碼頁面
+  const handleForgotPassword = () => {
+    navigate("/forgot-password");
   };
 
   // 處理電子郵件密碼登入
