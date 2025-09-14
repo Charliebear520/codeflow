@@ -279,19 +279,6 @@ function Login() {
                       />
                       <span>使用 Google 登入</span>
                     </button>
-
-                    <button
-                      type="button"
-                      className="custom-social-button github-button"
-                      onClick={() => handleSocialSignIn("oauth_github")}
-                    >
-                      <img
-                        src="https://github.githubassets.com/favicons/favicon.svg"
-                        alt="GitHub"
-                        className="social-icon"
-                      />
-                      <span>使用 GitHub 登入</span>
-                    </button>
                   </div>
 
                   <div className="custom-auth-footer">
