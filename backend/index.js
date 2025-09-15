@@ -11,7 +11,7 @@ import {
   checkCode,
 } from "./services/geminiService.js";
 import { explainError } from "./services/errorExplainer.js";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
@@ -21,6 +21,9 @@ dotenv.config();
 
 const port = process.env.PORT || 5000;
 const app = express();
+
+// 存儲活躍的程序
+const activeProcesses = new Map();
 
 // CORS 設定：允許本地前端與環境變數指定的 URL，並處理預檢請求
 const allowedOrigins = [process.env.CLIENT_URL, "http://localhost:5173"].filter(
@@ -355,6 +358,259 @@ app.post("/api/run-code", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "執行程式時發生錯誤: " + err,
+    });
+  }
+});
+
+// === 新增：互動式程式執行 API ===
+app.post("/api/run-code-interactive", async (req, res) => {
+  const { code, language } = req.body;
+  if (!code || !language) {
+    return res.status(400).json({
+      success: false,
+      error: "缺少 code 或 language 參數",
+    });
+  }
+
+  const fs = await import("fs/promises");
+  const path = await import("path");
+  const tmpDir = path.resolve("./temp");
+  const processId = `proc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  let filename,
+    filepath,
+    execCmd,
+    cleanupFiles = [];
+
+  try {
+    await fs.mkdir(tmpDir, { recursive: true });
+
+    if (language === "python") {
+      filename = `${processId}.py`;
+      filepath = path.join(tmpDir, filename);
+      await fs.writeFile(filepath, code, "utf-8");
+      execCmd = "python3";
+      cleanupFiles = [filepath];
+    } else if (language === "javascript") {
+      filename = `${processId}.js`;
+      filepath = path.join(tmpDir, filename);
+      await fs.writeFile(filepath, code, "utf-8");
+      execCmd = "node";
+      cleanupFiles = [filepath];
+    } else if (language === "c") {
+      filename = `${processId}.c`;
+      filepath = path.join(tmpDir, filename);
+      const outputExe = path.join(tmpDir, `${processId}_out`);
+      await fs.writeFile(filepath, code, "utf-8");
+
+      // 編譯 C 程式
+      await new Promise((resolve, reject) => {
+        exec(
+          `gcc "${filepath}" -o "${outputExe}"`,
+          { timeout: 2000 },
+          (err, stdout, stderr) => {
+            if (err) {
+              reject(stderr || err.message);
+            } else {
+              resolve();
+            }
+          }
+        );
+      });
+      execCmd = outputExe;
+      cleanupFiles = [filepath, outputExe];
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "不支援的語言，目前僅支援 Python、JavaScript、C",
+      });
+    }
+
+    // 啟動互動式程序
+    const childProcess = spawn(execCmd, language === "c" ? [] : [filepath], {
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 30000, // 30秒超時
+    });
+
+    let initialOutput = "";
+    let hasReceivedOutput = false;
+
+    // 處理程序輸出
+    childProcess.stdout.on("data", (data) => {
+      const output = data.toString();
+      initialOutput += output;
+      hasReceivedOutput = true;
+    });
+
+    childProcess.stderr.on("data", (data) => {
+      const error = data.toString();
+      initialOutput += error;
+      hasReceivedOutput = true;
+    });
+
+    // 處理程序結束
+    childProcess.on("close", (code) => {
+      activeProcesses.delete(processId);
+      // 清理檔案
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+    });
+
+    childProcess.on("error", (error) => {
+      activeProcesses.delete(processId);
+      // 清理檔案
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+    });
+
+    // 存儲程序引用
+    activeProcesses.set(processId, {
+      process: childProcess,
+      cleanupFiles,
+      language,
+    });
+
+    // 等待一小段時間看是否有初始輸出，並判斷程式是否完成
+    setTimeout(() => {
+      // 檢查程序是否還在運行
+      const isProcessRunning =
+        !childProcess.killed && childProcess.exitCode === null;
+
+      // 如果程序已經結束，清理資源
+      if (!isProcessRunning) {
+        activeProcesses.delete(processId);
+        // 清理檔案
+        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      }
+
+      res.json({
+        success: true,
+        processId: isProcessRunning ? processId : null, // 如果程序已結束，返回null
+        initialOutput: hasReceivedOutput ? initialOutput : "",
+        needsInput: isProcessRunning, // 如果程序還在運行，表示需要輸入
+        finished: !isProcessRunning, // 如果程序已結束，表示不需要輸入
+      });
+    }, 500); // 增加等待時間以確保程序有足夠時間執行
+  } catch (err) {
+    // 清理檔案
+    if (cleanupFiles && cleanupFiles.length) {
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+    }
+    res.status(500).json({
+      success: false,
+      error: "執行程式時發生錯誤: " + err.message,
+    });
+  }
+});
+
+// === 發送輸入到互動式程序 ===
+app.post("/api/send-input", async (req, res) => {
+  const { processId, input } = req.body;
+
+  if (!processId || !input) {
+    return res.status(400).json({
+      success: false,
+      error: "缺少 processId 或 input 參數",
+    });
+  }
+
+  const processInfo = activeProcesses.get(processId);
+  if (!processInfo) {
+    return res.status(404).json({
+      success: false,
+      error: "找不到指定的程序",
+    });
+  }
+
+  const { process: childProcess } = processInfo;
+
+  try {
+    let output = "";
+    let finished = false;
+    let error = "";
+
+    // 設置輸出監聽器
+    const stdoutHandler = (data) => {
+      output += data.toString();
+    };
+
+    const stderrHandler = (data) => {
+      error += data.toString();
+    };
+
+    const closeHandler = (code) => {
+      finished = true;
+      activeProcesses.delete(processId);
+    };
+
+    childProcess.stdout.on("data", stdoutHandler);
+    childProcess.stderr.on("data", stderrHandler);
+    childProcess.on("close", closeHandler);
+
+    // 發送輸入
+    childProcess.stdin.write(input + "\n");
+
+    // 等待輸出或程序結束
+    setTimeout(() => {
+      childProcess.stdout.removeListener("data", stdoutHandler);
+      childProcess.stderr.removeListener("data", stderrHandler);
+      childProcess.removeListener("close", closeHandler);
+
+      res.json({
+        success: true,
+        output,
+        error: error || null,
+        finished,
+      });
+    }, 1000); // 等待1秒收集輸出
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: "發送輸入時發生錯誤: " + err.message,
+    });
+  }
+});
+
+// === 停止程序 ===
+app.post("/api/stop-process", async (req, res) => {
+  const { processId } = req.body;
+
+  if (!processId) {
+    return res.status(400).json({
+      success: false,
+      error: "缺少 processId 參數",
+    });
+  }
+
+  const processInfo = activeProcesses.get(processId);
+  if (!processInfo) {
+    return res.status(404).json({
+      success: false,
+      error: "找不到指定的程序",
+    });
+  }
+
+  try {
+    const { process: childProcess, cleanupFiles } = processInfo;
+
+    // 終止程序
+    childProcess.kill("SIGTERM");
+
+    // 清理檔案
+    if (cleanupFiles && cleanupFiles.length) {
+      const fs = await import("fs/promises");
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+    }
+
+    // 從活躍程序列表中移除
+    activeProcesses.delete(processId);
+
+    res.json({
+      success: true,
+      message: "程序已停止",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: "停止程序時發生錯誤: " + err.message,
     });
   }
 });

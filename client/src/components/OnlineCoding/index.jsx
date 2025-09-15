@@ -65,6 +65,10 @@ const OnlineCoding = ({
   const [runResult, setRunResult] = useState(null); // { stdout, stderr }
   const [runLoading, setRunLoading] = useState(false);
   const [language, setLanguage] = useState("python");
+  const [terminalOutput, setTerminalOutput] = useState([]); // 終端機輸出歷史
+  const [terminalInput, setTerminalInput] = useState(""); // 當前輸入
+  const [isTerminalActive, setIsTerminalActive] = useState(false); // 終端機是否活躍
+  const [processId, setProcessId] = useState(null); // 當前執行的程序ID
 
   // 語言對應 CodeMirror extension
   const getLanguageExtension = () => {
@@ -181,6 +185,13 @@ const OnlineCoding = ({
     // 第三階段：全部清空，包含執行結果與助教回饋
     setCode("");
     setRunResult(null);
+    setTerminalOutput([]);
+    setTerminalInput("");
+    setIsTerminalActive(false);
+    if (processId) {
+      handleStopExecution();
+    }
+    setProcessId(null);
     onChange && onChange("");
     onFeedback && onFeedback("");
   };
@@ -189,20 +200,42 @@ const OnlineCoding = ({
     setRunLoading(true);
     setRunResult(null);
     setApiError("");
+    setTerminalOutput([]);
+    setIsTerminalActive(false);
+    setProcessId(null);
+
     try {
-      const res = await fetch("http://localhost:3000/api/run-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, language }),
-      });
+      const res = await fetch(
+        "http://localhost:3000/api/run-code-interactive",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, language }),
+        }
+      );
       const data = await res.json();
-      setRunResult({
-        stdout: data.stdout,
-        stderr: data.stderr,
-        errorExplanation: data.errorExplanation,
-        errorType: data.errorType,
-      });
-      if (!data.success) {
+
+      if (data.success) {
+        setProcessId(data.processId);
+        setIsTerminalActive(data.needsInput); // 只有需要輸入時才設為活躍
+        setTerminalOutput([
+          { type: "output", content: data.initialOutput || "" },
+        ]);
+
+        if (data.needsInput) {
+          antdMessage.success("程式已開始執行，請在終端機中輸入資料");
+        } else if (data.finished) {
+          antdMessage.success("程式執行完成");
+          setProcessId(null); // 程式已完成，清除processId
+          setIsTerminalActive(false); // 確保終端機不活躍
+        }
+      } else {
+        setRunResult({
+          stdout: data.stdout || "",
+          stderr: data.stderr || "",
+          errorExplanation: data.errorExplanation,
+          errorType: data.errorType,
+        });
         antdMessage.error("執行失敗");
       }
     } catch (e) {
@@ -217,6 +250,78 @@ const OnlineCoding = ({
   const handleChange = (val) => {
     setCode(val);
     onChange && onChange(val);
+  };
+
+  // 處理終端機輸入
+  const handleTerminalInput = async (e) => {
+    if (e.key === "Enter" && isTerminalActive && processId) {
+      const input = terminalInput.trim();
+      setTerminalOutput((prev) => [
+        ...prev,
+        { type: "input", content: ` ${input}` },
+      ]);
+
+      try {
+        const res = await fetch("http://localhost:3000/api/send-input", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ processId, input }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (data.output) {
+            setTerminalOutput((prev) => [
+              ...prev,
+              { type: "output", content: data.output },
+            ]);
+          }
+          if (data.finished) {
+            setIsTerminalActive(false);
+            setProcessId(null);
+            if (data.error) {
+              setTerminalOutput((prev) => [
+                ...prev,
+                { type: "error", content: data.error },
+              ]);
+            }
+          }
+        } else {
+          setTerminalOutput((prev) => [
+            ...prev,
+            { type: "error", content: data.error || "輸入失敗" },
+          ]);
+        }
+      } catch (error) {
+        setTerminalOutput((prev) => [
+          ...prev,
+          { type: "error", content: "輸入失敗，請稍後再試" },
+        ]);
+      }
+
+      setTerminalInput("");
+    }
+  };
+
+  // 停止程式執行
+  const handleStopExecution = async () => {
+    if (processId) {
+      try {
+        await fetch("http://localhost:3000/api/stop-process", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ processId }),
+        });
+      } catch (error) {
+        console.error("停止程序失敗:", error);
+      }
+    }
+    setIsTerminalActive(false);
+    setProcessId(null);
+    setTerminalOutput((prev) => [
+      ...prev,
+      { type: "system", content: "程式執行已停止" },
+    ]);
   };
 
   return (
@@ -287,11 +392,11 @@ const OnlineCoding = ({
                 transition: "all 0.2s ease",
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = "#9BB8FF";
+                // e.target.style.backgroundColor = "#9BB8FF";
                 e.target.style.transform = "scale(1.02)";
               }}
               onMouseLeave={(e) => {
-                e.target.style.backgroundColor = "#B2C8FF";
+                // e.target.style.backgroundColor = "#B2C8FF";
                 e.target.style.transform = "scale(1)";
               }}
             >
@@ -306,37 +411,61 @@ const OnlineCoding = ({
                 transition: "all 0.2s ease",
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = "#7A6FD8";
+                // e.target.style.backgroundColor = "#7A6FD8";
                 e.target.style.transform = "scale(1.02)";
               }}
               onMouseLeave={(e) => {
-                e.target.style.backgroundColor = "#9287EE";
+                // e.target.style.backgroundColor = "#9287EE";
                 e.target.style.transform = "scale(1)";
               }}
             >
               清空
             </Button>
             {isStage3 && (
-              <Button
-                onClick={handleRun}
-                loading={runLoading}
-                style={{
-                  backgroundColor: "#C1E8EE",
-                  color: "#223687",
-                  border: "none",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = "#A8D8DE";
-                  e.target.style.transform = "scale(1.02)";
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = "#C1E8EE";
-                  e.target.style.transform = "scale(1)";
-                }}
-              >
-                Run
-              </Button>
+              <>
+                {!isTerminalActive ? (
+                  <Button
+                    onClick={handleRun}
+                    loading={runLoading}
+                    style={{
+                      backgroundColor: "rgb(193, 232, 238)",
+                      color: "#223687",
+                      border: "none",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      // e.target.style.backgroundColor = "rgb(161 224 234)";
+                      e.target.style.transform = "scale(1.02)";
+                    }}
+                    onMouseLeave={(e) => {
+                      // e.target.style.backgroundColor = "rgb(193, 232, 238)";
+                      e.target.style.transform = "scale(1)";
+                    }}
+                  >
+                    Run
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleStopExecution}
+                    style={{
+                      backgroundColor: "#ff6b6b",
+                      color: "#FFFFFF",
+                      border: "none",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      // e.target.style.backgroundColor = "#ff5252";
+                      e.target.style.transform = "scale(1.02)";
+                    }}
+                    onMouseLeave={(e) => {
+                      // e.target.style.backgroundColor = "#ff6b6b";
+                      e.target.style.transform = "scale(1)";
+                    }}
+                  >
+                    停止
+                  </Button>
+                )}
+              </>
             )}
             {/* 第二階段顯示放大/縮小按鈕 */}
             {!isStage3 && (
@@ -403,82 +532,180 @@ const OnlineCoding = ({
           {isStage3 && (
             <Splitter.Panel
               min={60}
-              defaultSize={120}
-              style={{ overflow: "auto" }}
+              defaultSize={200}
+              style={{
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
             >
               <div
                 style={{
-                  background: "#f6f6f6",
+                  background: "rgb(250 249 255)",
                   borderRadius: 6,
                   padding: 16,
-                  fontFamily: "monospace",
+                  fontFamily: "Consolas, Monaco, 'Courier New', monospace",
                   minHeight: "100%",
-                  // height: "100%",
+                  height: "100%",
                   boxSizing: "border-box",
+                  display: "flex",
+                  flexDirection: "column",
+                  color: "#ffffff",
                 }}
               >
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>執行結果</div>
-                {runResult && runResult.stdout && (
-                  <div>
-                    <div style={{ color: "#333", marginBottom: 4 }}>輸出：</div>
-                    <pre style={{ margin: 0, color: "#222" }}>
-                      {runResult.stdout}
-                    </pre>
-                  </div>
-                )}
-                {runResult && runResult.stderr && (
-                  <div>
-                    {runResult.errorExplanation && (
-                      <div style={{ marginTop: 12 }}>
-                        <div
-                          style={{
-                            color: "#d63384",
-                            fontWeight: 600,
-                            marginBottom: 8,
-                            fontSize: 14,
-                          }}
-                        >
-                          🤖 錯誤說明
-                        </div>
-                        <div
-                          style={{
-                            background: "#fff3cd",
-                            border: "1px solid #ffeaa7",
-                            borderRadius: 6,
-                            padding: 12,
-                            fontSize: 13,
-                            lineHeight: 1.5,
-                            whiteSpace: "pre-wrap",
-                            wordWrap: "break-word",
-                            overflowWrap: "break-word",
-                            maxWidth: "100%",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {runResult.errorExplanation}
-                        </div>
-                        <div style={{ color: "#c00", marginTop: 8 }}>
-                          錯誤：
-                        </div>
-                        <pre
-                          style={{
-                            margin: 0,
-                            color: "#c00",
-                            wordWrap: "break-word",
-                            overflowWrap: "break-word",
-                            whiteSpace: "pre-wrap",
-                            maxWidth: "100%",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {runResult.stderr}
-                        </pre>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    marginBottom: 12,
+                    color: "rgb(122, 111, 216)",
+                    fontSize: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span>🖥️</span>
+                  <span>執行結果</span>
+                  {isTerminalActive && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        background: "#4CAF50",
+                        color: "white",
+                        padding: "2px 6px",
+                        borderRadius: 3,
+                      }}
+                    >
+                      執行中
+                    </span>
+                  )}
+                </div>
+
+                {/* 終端機輸出區域 */}
+                <div
+                  style={{
+                    flex: 1,
+                    overflow: "auto",
+                    background: "#ffffff",
+                    borderRadius: 4,
+                    padding: 12,
+                    marginBottom: 12,
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    maxHeight: "calc(100% - 80px)",
+                  }}
+                >
+                  {terminalOutput.length > 0 ? (
+                    terminalOutput.map((item, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          marginBottom: 4,
+                          color:
+                            item.type === "error"
+                              ? "#ff6b6b"
+                              : item.type === "input"
+                              ? "#4CAF50"
+                              : item.type === "system"
+                              ? "#FFA726"
+                              : "rgb(0 0 0)",
+                          whiteSpace: "pre-wrap",
+                          wordWrap: "break-word",
+                        }}
+                      >
+                        {item.content}
                       </div>
-                    )}
+                    ))
+                  ) : runResult ? (
+                    <div>
+                      {runResult.stdout && (
+                        <div style={{ color: "#ffffff", marginBottom: 8 }}>
+                          <div style={{ color: "#4CAF50", marginBottom: 4 }}>
+                            輸出：
+                          </div>
+                          <pre style={{ margin: 0, color: "#ffffff" }}>
+                            {runResult.stdout}
+                          </pre>
+                        </div>
+                      )}
+                      {runResult.stderr && (
+                        <div>
+                          {runResult.errorExplanation && (
+                            <div style={{ marginTop: 12 }}>
+                              <div
+                                style={{
+                                  color: "#ff6b6b",
+                                  fontWeight: 600,
+                                  marginBottom: 8,
+                                  fontSize: 14,
+                                }}
+                              >
+                                🤖 錯誤說明
+                              </div>
+                              <div
+                                style={{
+                                  background: "#2d2d2d",
+                                  border: "1px solid #444",
+                                  borderRadius: 6,
+                                  padding: 12,
+                                  fontSize: 13,
+                                  lineHeight: 1.5,
+                                  whiteSpace: "pre-wrap",
+                                  wordWrap: "break-word",
+                                  color: "#ffffff",
+                                }}
+                              >
+                                {runResult.errorExplanation}
+                              </div>
+                              <div style={{ color: "#ff6b6b", marginTop: 8 }}>
+                                錯誤：
+                              </div>
+                              <pre
+                                style={{
+                                  margin: 0,
+                                  color: "#ff6b6b",
+                                  wordWrap: "break-word",
+                                  whiteSpace: "pre-wrap",
+                                }}
+                              >
+                                {runResult.stderr}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ color: "#888" }}>（尚未執行程式）</div>
+                  )}
+                </div>
+
+                {/* 終端機輸入區域 */}
+                {isTerminalActive && (
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <span style={{ color: "#4CAF50" }}>$</span>
+                    <input
+                      type="text"
+                      value={terminalInput}
+                      onChange={(e) => setTerminalInput(e.target.value)}
+                      onKeyPress={handleTerminalInput}
+                      placeholder="請輸入資料..."
+                      style={{
+                        flex: 1,
+                        background: "rgb(255 255 255)",
+                        border: "1px solid rgb(191 191 191)",
+                        borderRadius: 4,
+                        padding: "8px 12px",
+                        color: "rgb(5 5 5)",
+                        fontSize: 13,
+                        fontFamily: "inherit",
+                        outline: "none",
+                      }}
+                      autoFocus
+                    />
                   </div>
-                )}
-                {!runResult && (
-                  <div style={{ color: "#888" }}>（尚未執行程式）</div>
                 )}
               </div>
             </Splitter.Panel>
