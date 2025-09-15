@@ -23,6 +23,8 @@ dotenv.config();
 
 const port = process.env.PORT || 3000;
 const app = express();
+const fsSync = await import("fs");
+
 app.use(
   cors({
     origin: process.env.CLIENT_URL,
@@ -61,6 +63,45 @@ async function ensureStudent(userId) {
   if (Object.keys(toSet).length) update.$set = toSet;
 
   return Student.findOneAndUpdate({ userId }, update, { new: true, upsert: true });
+}
+
+// 小工具：Promise 版 exec + existsSync
+function execp(cmd, opts = {}) {
+  return new Promise((resolve, reject) => {
+    exec(cmd, opts, (err, stdout, stderr) => {
+      if (err) reject({ err, stdout, stderr });
+      else resolve({ stdout, stderr });
+    });
+  });
+}
+
+// 檢查.env是否存在CC環境變數（包 try/catch）
+function exists(p) { try { return fsSync.existsSync(p); } catch { return false; } }
+
+async function pickCCompiler() {
+  // 1) 優先吃 .env
+  if (process.env.CC && exists(process.env.CC)) return process.env.CC;
+  // 2) PATH 上
+  try { await execp("gcc --version"); return "gcc"; } catch { }
+  try { await execp("clang --version"); return "clang"; } catch { }
+  // 3) 常見安裝路徑（可命中就用）
+  const candidates = [
+    "C:\\msys64\\ucrt64\\bin\\gcc.exe",
+    "C:\\msys64\\mingw64\\bin\\gcc.exe",
+    "C:\\ProgramData\\chocolatey\\lib\\mingw\\tools\\install\\mingw64\\bin\\gcc.exe",
+    "C:\\Program Files\\LLVM\\bin\\clang.exe",
+    "/usr/bin/clang",
+  ];
+  for (const c of candidates) if (exists(c)) return c;
+
+  // 4) macOS：用 xcrun 找 clang
+  try {
+    const { stdout } = await execp("xcrun --find clang");
+    const p = stdout.trim();
+    if (p && exists(p)) return p;
+  } catch { }
+
+  return null;
 }
 
 // 取得當前登入學生基本資料（若無則自動建立）
@@ -313,18 +354,56 @@ app.post("/api/run-code", async (req, res) => {
     return res.status(400).json({ success: false, error: "缺少 code 或 language 參數" });
   }
 
-  // 動態匯入（你是 ESM）
+  // ==== helpers ====
   const fs = await import("fs/promises");
+  const fsSync = await import("fs");
   const path = await import("path");
-  const { exec } = await import("child_process");
+  const { execFile } = await import("child_process");
+
+  function execFilep(bin, args = [], opts = {}) {
+    return new Promise((resolve, reject) => {
+      execFile(bin, args, opts, (err, stdout, stderr) => {
+        if (err) reject({ err, stdout, stderr });
+        else resolve({ stdout, stderr });
+      });
+    });
+  }
+  function exists(p) { try { return fsSync.existsSync(p); } catch { return false; } }
+
+  async function pickPython() {
+    if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
+    try { await execFilep("python3", ["--version"]); return "python3"; } catch {}
+    try { await execFilep("python",  ["--version"]); return "python";  } catch {}
+    try { await execFilep("py",      ["-3", "--version"]); return "py"; } catch {}
+    return null;
+  }
+
+  async function pickCCompiler() {
+    if (process.env.CC && exists(process.env.CC)) return process.env.CC;
+    try { await execFilep("gcc",   ["--version"]); return "gcc";   } catch {}
+    try { await execFilep("clang", ["--version"]); return "clang"; } catch {}
+    const candidates = [
+      "C:\\msys64\\ucrt64\\bin\\gcc.exe",
+      "C:\\msys64\\mingw64\\bin\\gcc.exe",
+      "C:\\ProgramData\\chocolatey\\lib\\mingw\\tools\\install\\mingw64\\bin\\gcc.exe",
+      "C:\\Program Files\\LLVM\\bin\\clang.exe",
+      "/usr/bin/clang",
+    ];
+    for (const c of candidates) if (exists(c)) return c;
+    try {
+      const { stdout } = await execFilep("xcrun", ["--find", "clang"]);
+      const p = stdout.trim();
+      if (p && exists(p)) return p;
+    } catch {}
+    return null;
+  }
+  // ===============================================
 
   const tmpDir = path.resolve("./temp");
   const id = `run_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const isWin = process.platform === "win32";
 
-  // Windows 上通常是 python 或 py -3；非 Windows 多半是 python3
-  const PY = process.platform === "win32" ? "python" : "python3";
-
-  let filename, filepath, execCmd, cleanupFiles = [];
+  let filename, filepath, cleanupFiles = [];
 
   try {
     await fs.mkdir(tmpDir, { recursive: true });
@@ -333,59 +412,89 @@ app.post("/api/run-code", async (req, res) => {
       filename = `${id}.py`;
       filepath = path.join(tmpDir, filename);
       await fs.writeFile(filepath, code, "utf-8");
-      execCmd = `${PY} "${filepath}"`;            // ← 重點：Windows 用 python
-      cleanupFiles = [filepath];
+
+      const PY = await pickPython();
+      if (!PY) {
+        await fs.unlink(filepath).catch(()=>{});
+        return res.status(400).json({ success: false, error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）" });
+      }
+
+      const { stdout, stderr } = await execFilep(PY, PY === "py" ? ["-3", filepath] : [filepath], {
+        timeout: 3000, maxBuffer: 1024 * 200,
+      });
+      await fs.unlink(filepath).catch(()=>{});
+      return res.json({ success: true, stdout, stderr });
 
     } else if (language === "javascript") {
       filename = `${id}.js`;
       filepath = path.join(tmpDir, filename);
       await fs.writeFile(filepath, code, "utf-8");
-      execCmd = `"${process.execPath}" "${filepath}"`; // 直接用目前的 node 執行該檔
-      cleanupFiles = [filepath];
+
+      const { stdout, stderr } = await execFilep(process.execPath, [filepath], {
+        timeout: 3000, maxBuffer: 1024 * 200,
+      });
+      await fs.unlink(filepath).catch(()=>{});
+      return res.json({ success: true, stdout, stderr });
 
     } else if (language === "c") {
       filename = `${id}.c`;
       filepath = path.join(tmpDir, filename);
-      const outputExe = path.join(tmpDir, `${id}_out`);
       await fs.writeFile(filepath, code, "utf-8");
 
-      // 先嘗試編譯（Windows 若沒裝 gcc 會失敗）
-      await new Promise((resolve, reject) => {
-        exec(`gcc "${filepath}" -o "${outputExe}"`, { timeout: 4000 }, (err, stdout, stderr) => {
-          if (err) reject(stderr || err.message);
-          else resolve();
+      const CC = await pickCCompiler();
+      if (!CC) {
+        await fs.unlink(filepath).catch(()=>{});
+        return res.status(400).json({
+          success: false,
+          error: "後端沒有可用的 C 編譯器（請安裝 gcc 或 clang，或在 .env 設 CC=編譯器路徑）",
         });
-      });
+      }
 
-      execCmd = `"${outputExe}"`;
-      cleanupFiles = [filepath, outputExe];
+      const outBase = path.join(tmpDir, `${id}_out`);
+      const exePath = isWin ? `${outBase}.exe` : outBase;
+
+      // 編譯
+      try {
+        await execFilep(CC, [filepath, "-O0", "-o", exePath], { timeout: 8000, maxBuffer: 1024*200 });
+      } catch (e) {
+        await fs.unlink(filepath).catch(()=>{});
+        const stderrMsg = (e.stderr && e.stderr.toString()) || e.err?.message || "compile error";
+        // ← 這裡延用你原本的 explainError
+        const errorExplanation = await explainError(stderrMsg, language, code);
+        return res.json({
+          success: false,
+          stdout: e.stdout || "",
+          stderr: stderrMsg,
+          errorExplanation: errorExplanation.explanation,
+          errorType: errorExplanation.errorType,
+        });
+      }
+
+      // 執行
+      try {
+        const { stdout, stderr } = await execFilep(exePath, [], {
+          timeout: 3000, maxBuffer: 1024 * 200,
+        });
+        await Promise.all([fs.unlink(filepath).catch(()=>{}), fs.unlink(exePath).catch(()=>{})]);
+        console.log("CC =", process.env.CC || "auto");
+        return res.json({ success: true, stdout, stderr });
+      } catch (e) {
+        await Promise.all([fs.unlink(filepath).catch(()=>{}), fs.unlink(exePath).catch(()=>{})]);
+        return res.json({
+          success: false,
+          stdout: e.stdout || "",
+          stderr: (e.stderr && e.stderr.toString()) || e.err?.message || "runtime error",
+        });
+      }
 
     } else {
       return res.status(400).json({ success: false, error: "不支援的語言，目前僅支援 Python、JavaScript、C" });
     }
 
-    // 真正執行（3 秒 timeout）
-    exec(execCmd, { timeout: 3000, maxBuffer: 1024 * 200 }, async (error, stdout, stderr) => {
-      // 清理暫存
-      await Promise.all(cleanupFiles.map(f => fs.unlink(f).catch(() => {})));
-
-      if (error) {
-        // 補充更完整的錯誤訊息（例如「python3 不是內部或外部指令」）
-        return res.json({
-          success: false,
-          stdout: stdout || "",
-          stderr: (stderr && stderr.trim()) || error.message
-        });
-      }
-
-      res.json({ success: true, stdout, stderr });
-    });
-
   } catch (err) {
-    // 例外也嘗試清理
-    if (cleanupFiles?.length) {
-      await Promise.all(cleanupFiles.map(f => fs.unlink(f).catch(() => {})));
-    }
+    // 萬一哪裡 throw，盡量清掉暫存檔
+    const del = cleanupFiles.length ? cleanupFiles : (filepath ? [filepath] : []);
+    if (del.length) await Promise.all(del.map(f => fs.unlink(f).catch(()=>{})));
     res.status(500).json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
   }
 });
@@ -436,8 +545,12 @@ const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
 
 mongoose
   .connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+    // useNewUrlParser: true,
+    // useUnifiedTopology: true,
+
+    //讓 server 選擇逾時更快失敗，除錯友善
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 20000,
   })
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
@@ -529,7 +642,7 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
     const update = {
       $set: {
         "stages.stage1": stage1,
-        studentName:  student.name ?? null,               // ✅ 快照
+        studentName: student.name ?? null,               // ✅ 快照
         studentEmail: student.email?.toLowerCase() ?? null,
       },
       $setOnInsert: {
@@ -539,8 +652,8 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
     };
 
     const doc = await Submission.findOneAndUpdate(
-      { student: student._id, questionId },  // ✅ 只用這兩個當唯一條件
-      update,                                // ✅ 用我們組好的 update
+      { student: student._id, questionId },  // 只用這兩個當唯一條件
+      update,                                // 用我們組好的 update
       { new: true, upsert: true }
     );
 
