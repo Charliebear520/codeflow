@@ -12,7 +12,7 @@ import {
 } from "./services/geminiService.js";
 import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";
 import { exec } from "child_process";
-
+import submissionRouter from "./routes/SubmissionRoutes.js";
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
 import Student from "./models/Student.js";
@@ -35,6 +35,7 @@ app.use(
 app.use(express.json({ limit: "50mb" }));// 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(clerkMiddleware());// 解析前端帶來的 Authorization: Bearer <token>
+app.use("/api/submissions", submissionRouter);
 
 const imagekit = new ImageKit({
   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
