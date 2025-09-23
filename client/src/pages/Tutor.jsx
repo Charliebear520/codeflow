@@ -1,16 +1,32 @@
 import { Col, Row } from "antd";
 import React from "react";
-import Collapse from "../components/Collapse";
-import AI from "../components/AI";
 
 const Tutor = () => {
   return (
-    <Row>
+    <Row gutter={16}>
       <Col span={8} style={{ display: "flex", alignItems: "center" }}>
-        <Collapse />
+        <div
+          style={{
+            width: "100%",
+            padding: 16,
+            background: "#fff",
+            borderRadius: 8,
+          }}
+        >
+          助教工具（待實作）
+        </div>
       </Col>
       <Col span={16}>
-        <AI />
+        <div
+          style={{
+            width: "100%",
+            padding: 16,
+            background: "#fff",
+            borderRadius: 8,
+          }}
+        >
+          助教面板（待實作）
+        </div>
       </Col>
     </Row>
   );

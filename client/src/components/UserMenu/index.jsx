@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useClerk, useUser, useAuth } from "@clerk/clerk-react";
+import {
+  useClerk,
+  useUser,
+  useAuth,
+  useOrganization,
+} from "@clerk/clerk-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import "../../styles/Login.css";
@@ -33,6 +38,7 @@ const UserMenu = () => {
   const { user, isLoaded: isUserLoaded } = useUser();
   const { signOut } = useClerk();
   const navigate = useNavigate();
+  const { membership, isLoaded: isOrgLoaded } = useOrganization();
 
   // State 管理
   const [isOpen, setIsOpen] = useState(false);
@@ -104,9 +110,11 @@ const UserMenu = () => {
   }, [isOpen]);
 
   // 如果認證或用戶數據未載入完成，顯示載入狀態
-  if (!isAuthLoaded || !isUserLoaded) {
+  if (!isAuthLoaded || !isUserLoaded || !isOrgLoaded) {
     return <div className="user-menu-loading">載入中...</div>;
   }
+  const isTeacher =
+    membership?.role === "admin" || membership?.role === "org:admin";
 
   // 如果未登入或沒有用戶，不顯示菜單
   if (!isSignedIn || !user) {
@@ -168,6 +176,28 @@ const UserMenu = () => {
 
           {/* 管理選項 */}
           <div className="clerk-action-buttons">
+            {isTeacher && (
+              <Link
+                to="/dashboard"
+                className="clerk-action-button"
+                onClick={() => setIsOpen(false)}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M2 3.5C2 2.94772 2.44772 2.5 3 2.5H13C13.5523 2.5 14 2.94772 14 3.5V12.5C14 13.0523 13.5523 13.5 13 13.5H3C2.44772 13.5 2 13.0523 2 12.5V3.5Z"
+                    fill="currentColor"
+                  />
+                  <path d="M4 5.5H12V7H4V5.5Z" fill="white" />
+                </svg>
+                <span>學員作答紀錄</span>
+              </Link>
+            )}
             {/* 個人資料 */}
             <Link
               to="/profile"
@@ -250,7 +280,6 @@ const UserMenu = () => {
               </svg>
               <span>管理帳戶</span>
             </Link>
-
 
             <div
               className="clerk-dropdown-divider"
