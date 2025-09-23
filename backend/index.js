@@ -15,6 +15,7 @@ import { exec, spawn } from "child_process";
 
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
+import { clerkMiddleware, getAuth } from "@clerk/express";
 
 // 加載環境變量
 dotenv.config();
@@ -50,6 +51,8 @@ app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+app.use(clerkMiddleware());
+
 const imagekit = new ImageKit({
   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
   publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
@@ -67,6 +70,27 @@ app.get("/api/health", (req, res) => {
     dbName: mongoose.connection.name || null,
   });
 });
+
+// 教師角色
+function requireTeacher(req, res, next) {
+  try {
+    const auth = getAuth(req) || {};
+    const userId = auth.userId;
+    const orgRole = auth.orgRole;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    if (orgRole === "teacher" || orgRole === "org:admin") {
+      return next();
+    }
+
+    return res.status(403).json({ success: false, error: "Forbidden" });
+  } catch (e) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
+}
 
 app.get("/api/upload", (req, res) => {
   const result = imagekit.getAuthenticationParameters();
@@ -641,6 +665,17 @@ app.get("/test", (req, res) => {
     message: "Server is running",
     geminiKeyAvailable: !!process.env.GEMINI_API_KEY,
   });
+});
+
+// 教師後台資料：僅教師可訪問
+app.get("/api/admin/submissions", requireTeacher, async (req, res) => {
+  try {
+    // 範例：回傳最近題目（實際可換為作答紀錄）
+    const latest = await Question.find({}).sort({ createdAt: -1 }).limit(10);
+    res.json({ success: true, items: latest });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // AI錯誤解釋功能的API端点

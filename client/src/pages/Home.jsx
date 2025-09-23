@@ -1,5 +1,5 @@
-import { Col, Row } from "antd";
 import React, { useState } from "react";
+import { Col, Row } from "antd";
 import Topic from "../components/Topic";
 import Answer from "../components/Answer";
 import Check from "../components/Check";
@@ -8,6 +8,10 @@ import { useNavigate } from "react-router-dom";
 const Home = () => {
   const navigate = useNavigate();
   const [clicked, setClicked] = useState(false);
+
+  const handleTutorClick = () => {
+    navigate("/tutor");
+  };
 
   return (
     <div>
@@ -19,7 +23,7 @@ const Home = () => {
           <Answer />
         </Col>
         <Col span={6}>
-          <Check />
+          <Check onTutorClick={handleTutorClick} />
         </Col>
       </Row>
       {/* 原本的導頁功能先隱藏 */}
@@ -32,12 +36,19 @@ const Home = () => {
       </button>
       */}
 
-      <button
-        style={{ position: "fixed", bottom: 20, right: 20,backgroundColor: "#375BD3", color: "#FFFFFF", border: "none" }}
+      {/* <button
+        style={{
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          backgroundColor: "#375BD3",
+          color: "#FFFFFF",
+          border: "none",
+        }}
         onClick={() => navigate("/add-question")}
       >
         前往AddQuestion頁面（測試用）
-      </button>
+      </button> */}
     </div>
   );
 };
