@@ -8,6 +8,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import "./blankHighlight.css";
+import { useAuth } from "@clerk/clerk-react";//額外加入
 
 // 方案A：Highlight ___
 function blankDecorationExtension() {
@@ -70,6 +71,9 @@ const OnlineCoding = ({
   const [isTerminalActive, setIsTerminalActive] = useState(false); // 終端機是否活躍
   const [processId, setProcessId] = useState(null); // 當前執行的程序ID
 
+  const { getToken } = useAuth();//額外加入
+  const API_BASE = import.meta.env.VITE_API_BASE;//額外加入
+
   // 語言對應 CodeMirror extension
   const getLanguageExtension = () => {
     if (language === "python") return python();
@@ -78,8 +82,9 @@ const OnlineCoding = ({
     return python();
   };
 
-  // 判斷是否為第三階段
-  const isStage3 = !currentStage || currentStage === 2;
+  // 判斷是否為第二、三階段
+const isStage2 = currentStage === 2;//額外加入
+const isStage3 = currentStage === 3;
 
   // 自動請求後端生成 PseudoCode
   useEffect(() => {
@@ -132,7 +137,7 @@ const OnlineCoding = ({
     try {
       if (isStage3) {
         // 第三階段：檢查程式語法
-        const res = await fetch("http://localhost:3000/api/check-code", {
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/check-code`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, code, language }),
@@ -303,6 +308,41 @@ const OnlineCoding = ({
     }
   };
 
+const SaveStage2 = async () => {
+  console.log("API_BASE:", import.meta.env.VITE_API_BASE);
+  if (!code || !question) {
+    antdMessage.info("請先輸入程式碼與確認題目");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/submissions/stage2`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        questionId: "Q001",  // 之後可改成動態題目 ID
+        pseudocode: code,
+        completed: false,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    if (data.success) {
+      antdMessage.success("已儲存第二階段的作答");
+    } else {
+      antdMessage.error(data.error || "儲存失敗");
+    }
+  } catch (err) {
+    console.error("SaveStage2 Error:", err);
+    antdMessage.error("儲存失敗，請稍後再試。");
+  }
+};
+  
   // 停止程式執行
   const handleStopExecution = async () => {
     if (processId) {
@@ -421,6 +461,26 @@ const OnlineCoding = ({
             >
               清空
             </Button>
+            <Button //額外加入
+              onClick={SaveStage2}
+              style={{
+                backgroundColor: "#C2E8EE",
+                color: "#223687",
+                border: "none",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                // e.target.style.backgroundColor = "#7A6FD8";
+                e.target.style.transform = "scale(1.02)";
+              }}
+              onMouseLeave={(e) => {
+                // e.target.style.backgroundColor = "#9287EE";
+                e.target.style.transform = "scale(1)";
+              }}
+            >
+              Run
+            </Button>
+
             {isStage3 && (
               <>
                 {!isTerminalActive ? (
@@ -690,7 +750,7 @@ const OnlineCoding = ({
                       type="text"
                       value={terminalInput}
                       onChange={(e) => setTerminalInput(e.target.value)}
-                      onKeyPress={handleTerminalInput}
+                      onKeyDown={handleTerminalInput}
                       placeholder="請輸入資料..."
                       style={{
                         flex: 1,

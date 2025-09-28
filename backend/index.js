@@ -929,8 +929,8 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
 
     const doc = await Submission.findOneAndUpdate(
       { student: student._id, questionId },  // 只用這兩個當唯一條件
-      update,                                // 用我們組好的 update
-      { new: true, upsert: true }
+      update,                                // 組好的 update
+      { new: true, upsert: true }            // 找不到就新增
     );
 
     res.status(201).json({ success: true, submissionId: doc._id });
@@ -940,6 +940,39 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
 });
 
 app.get("/api/submissions/stage1", async (req, res) => {
+  try {
+    const submissions = await Submission.find({});
+    res.json(submissions);
+  } catch (err) {
+    res.status(500).json({ error: "伺服器錯誤" });
+  }
+});
+
+app.post("/api/submissions/stage2", async (req, res) => {
+  try {
+    const { questionId, pseudocode, completed } = req.body;
+
+    // 建立或更新 Submission
+    const newSubmission = await Submission.findOneAndUpdate(
+      { questionId }, // 依題目找
+      {
+        $set: {
+          "stages.stage2.pseudocode": pseudocode,
+          "stages.stage2.completed": completed,
+          "stages.stage2.updatedAt": new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json({ success: true, data: newSubmission });
+  } catch (err) {
+    console.error("Error saving stage2:", err);
+    res.status(500).json({ success: false, error: "伺服器錯誤" });
+  }
+});
+
+app.get("/api/submissions/stage2", async (req, res) => {
   try {
     const submissions = await Submission.find({});
     res.json(submissions);
