@@ -1,6 +1,7 @@
 import styles from "./StudentsRecordsCard.module.css";
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button } from 'antd'; 
+import StudentAnswerModal from "../StudentAnswerModal";
 
 const StudentsRecordsCard = () => {
     return (
@@ -10,17 +11,17 @@ const StudentsRecordsCard = () => {
         <div className={styles.checkbox}>
           <div className={styles.homeworkText}>階段一</div>
           <CheckOutlined className={styles.CheckOutlined} />
-          <Button className={styles.checkButton}>查看</Button>
+          <StudentAnswerModal className={styles.checkButton}/>
         </div>
         <div className={styles.checkbox}>
           <div className={styles.homeworkText}>階段二</div>
           <CloseOutlined className={styles.CloseOutlined} />
-          <Button className={styles.checkButton}>查看</Button>
+          <StudentAnswerModal className={styles.checkButton}/>
         </div>
         <div className={styles.checkbox}>
           <div className={styles.homeworkText}>階段三</div>
           <CheckOutlined className={styles.CheckOutlined} />
-          <Button className={styles.checkButton}>查看</Button>
+          <StudentAnswerModal className={styles.checkButton}/>
         </div>
         <Button className={styles.aiButton}>AI總結</Button>
       </div>
