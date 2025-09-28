@@ -47,6 +47,7 @@ function Stage1List() {
           ))}
         </tbody>
       </table>
+      <div style={{ margin: "40px 0", borderTop: "2px solid #000" }}></div>
       <h2>第二階段資料</h2>
       <table>
         <thead>
@@ -64,10 +65,10 @@ function Stage1List() {
             <tr key={item._id}>
               <td>{item.studentName}</td>
               <td>{item.studentEmail}</td>
-              <td>{item.stages.stage1.pseudocode}</td>
-              <td>{item.stages.stage1.score}</td>
-              <td>{item.stages.stage1.feedback}</td>
-              <td>{item.stages.stage1.completed ? "已完成" : "未完成"}</td>
+              <td>{item.stages.stage2.pseudocode}</td>
+              <td>{item.stages.stage2.score}</td>
+              <td>{item.stages.stage2.feedback}</td>
+              <td>{item.stages.stage2.completed ? "已完成" : "未完成"}</td>
             </tr>
           ))}
         </tbody>
