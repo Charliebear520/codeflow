@@ -14,13 +14,13 @@ const Check = ({ feedback, isChecking, onTutorClick }) => {
         style={{
           display: "flex",
           flexDirection: "column",
-          justifyContent: "flex-end",
+          justifyContent: "flex-start",
         }}
       >
         {onTutorClick && (
           <div className={styles.tutorbox}>
             <Button
-              style={{ backgroundColor: "#375BD3", color: "#FFFFFF" }}
+              style={{ height: "36px", fontSize: "16px", backgroundColor: "#375BD3", color: "#FFFFFF" }}
               onClick={onTutorClick}
             >
               詢問沐芙助教
@@ -28,7 +28,7 @@ const Check = ({ feedback, isChecking, onTutorClick }) => {
           </div>
         )}
       </div>
-      <div style={{ height: "80%" }}>
+      <div style={{ height: "83%" }}>
         <div className={styles.topicbox}>
           {isChecking ? (
             <div

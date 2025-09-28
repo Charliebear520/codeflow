@@ -186,10 +186,10 @@ const TopicStage2 = ({
     <div className={styles.container}>
       <div
         style={{
-          height: "20%",
+          height: "5%",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "flex-end",
+          justifyContent: "flex-start",
         }}
       >
         {/* <div className={styles.parsebox}>
@@ -211,7 +211,7 @@ const TopicStage2 = ({
           <StageSwitcher current={currentStage} onChange={setCurrentStage} />
         </div>
       </div>
-      <div style={{ height: "100%", overflowY: "hidden" }}>
+      <div style={{ height: "83%" }}>
         <div className={styles.topicbox}>
           <div
             style={{
@@ -222,7 +222,7 @@ const TopicStage2 = ({
               overflowY: "hidden",
             }}
           >
-            <div>
+            <div style={{ paddingBottom: "2rem" }}>
               <h3>Ch2,製作pseudocode</h3>
             </div>
             <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>

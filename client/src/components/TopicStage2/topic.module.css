@@ -1,7 +1,8 @@
 .container {
-  padding: 1rem 1rem 2rem 0rem;
+  padding: 0 1rem 2rem 0rem;
   display: flex;
   flex-direction: column; /* 讓子元素垂直排列 */
+  height: 100%;
   max-height: 100vh; /* 設定高度為視窗高度 */
   overflow: hidden; /* 防止滾動條出現 */
   /* gap:1rem; */
@@ -11,6 +12,10 @@
   display: flex;
   align-items: center;
   gap: 1em;
+}
+
+h3{
+  font-size: 22px;
 }
 
 .h4 {
