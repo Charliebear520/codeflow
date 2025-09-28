@@ -29,7 +29,42 @@ function Stage1List() {
             <tr key={item._id}>
               <td>{item.studentName}</td>
               <td>{item.studentEmail}</td>
-              <td>{JSON.stringify(item.stages.stage1.graph)}</td>
+              <td>
+                {item.stages.stage1.imageBase64 ? (
+                  <img
+                    src={item.stages.stage1.imageBase64}
+                    alt="流程圖"
+                    style={{ maxWidth: "120px", maxHeight: "80px", border: "1px solid #ccc" }}
+                  />
+                ) : (
+                  "無圖片"
+                )}
+              </td>
+              <td>{item.stages.stage1.score}</td>
+              <td>{item.stages.stage1.feedback}</td>
+              <td>{item.stages.stage1.completed ? "已完成" : "未完成"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h2>第二階段資料</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>學生姓名</th>
+            <th>學生Email</th>
+            <th>pseudocode</th>
+            <th>分數</th>
+            <th>回饋</th>
+            <th>完成狀態</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((item) => (
+            <tr key={item._id}>
+              <td>{item.studentName}</td>
+              <td>{item.studentEmail}</td>
+              <td>{item.stages.stage1.pseudocode}</td>
               <td>{item.stages.stage1.score}</td>
               <td>{item.stages.stage1.feedback}</td>
               <td>{item.stages.stage1.completed ? "已完成" : "未完成"}</td>
