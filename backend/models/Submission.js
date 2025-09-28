@@ -52,26 +52,21 @@ const stageSchema_3 = new Schema(
 
 const submissionSchema = new Schema(
   {
-    studentName: { type: String, default: null },
-    studentEmail: { type: String, default: null, lowercase: true, index: true },
-    student: {
-      type: Schema.Types.ObjectId,
-      ref: "Student",
-      required: true,
-      index: true,
-    },
+    studentName: { type: String, required: true }, // 改 required
+    studentEmail: { type: String, required: true, lowercase: true, index: true }, // 改 required
+    student: { type: Schema.Types.ObjectId, ref: "Student", required: true, index: true },
     questionId: { type: String, required: true, index: true },
 
     stages: {
       stage1: stageSchema_1,
-      stage2: stageSchema_2, // 先不用也沒關係
-      stage3: stageSchema_3, // 先不用也沒關係
+      stage2: stageSchema_2,
+      stage3: stageSchema_3,
     },
   },
   { timestamps: true, minimize: false }
 );
 
 // 一個學生對同一題只會有一筆作答紀錄
-submissionSchema.index({ student: 1, questionId: 1 }, { unique: true });
+submissionSchema.index({ student: 1, questionId: 1, "stages.stage2": 1, "stages.stage3": 1 }, { unique: true });
 
 export default mongoose.model("Submission", submissionSchema);
