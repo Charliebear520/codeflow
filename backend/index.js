@@ -12,7 +12,6 @@ import {
 } from "./services/geminiService.js";
 import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";
 import { exec } from "child_process";
-import submissionRouter from "./routes/SubmissionRoutes.js";
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
 import Student from "./models/Student.js";
@@ -35,7 +34,6 @@ app.use(
 app.use(express.json({ limit: "50mb" }));// 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(clerkMiddleware());// 解析前端帶來的 Authorization: Bearer <token>
-app.use("/api/submissions", submissionRouter);
 
 const imagekit = new ImageKit({
   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
@@ -941,21 +939,12 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
   }
 });
 
-app.get("/api/get_answer/stage1", requireAuth(), async (req, res) => {
+app.get("/api/submissions/stage1", async (req, res) => {
   try {
-    const { userId } = req.auth;
-    const { questionId } = req.query;
-    if (!questionId) return res.status(400).json({ success: false, error: "questionId 必填" });
-
-    const student = await Student.findOne({ userId });
-    if (!student) return res.status(404).json({ success: false, error: "學生不存在" });
-
-    const sub = await Submission.findOne({ student: student._id, questionId });
-    if (!sub?.stages?.stage1) return res.status(404).json({ success: false, error: "尚無作答" });
-
-    res.json({ success: true, stage1: sub.stages.stage1 });
+    const submissions = await Submission.find({});
+    res.json(submissions);
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ error: "伺服器錯誤" });
   }
 });
 // app.post("/api/add-question", async (req, res) => {
