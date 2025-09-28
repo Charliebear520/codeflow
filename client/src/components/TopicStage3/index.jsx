@@ -7,10 +7,10 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
     <div className={styles.container}>
       <div
         style={{
-          height: "20%",
+          height: "5%",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "flex-end",
+          justifyContent: "flex-start",
         }}
       >
           {/* <div className={styles.parsebox}>
@@ -27,7 +27,7 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
         </div>
 
       </div>
-      <div style={{ height: "100%", overflowY: "hidden" }}>
+      <div style={{ height: "83%"}}>
         <div className={styles.topicbox}>
           <div
             style={{
@@ -36,20 +36,20 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
               overflowY: "hidden",
             }}
           >
-            <div>
+            <div style={{ paddingBottom: "2rem" }}>
               <h3>Ch3,撰寫程式碼</h3>
             </div>
             <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
           </div>
           <div className={styles.infobox}>
             <div className={styles.examplebox}>
-              <img src={"/Book.png"} height={14} width={14} />
+              <img src={"/Book.png"} height={15} width={16} />
               <h5 className={styles.example}>
                 可自由選擇程式語言（Python/JavaScript/C）完成題目
               </h5>
             </div>
             <div className={styles.examplebox}>
-              <img src={"/Graduation.png"} height={14} width={14} />
+              <img src={"/Graduation.png"} height={15} width={16} />
               <h5 className={styles.example}>可使用右方編譯器測試程式碼</h5>
             </div>
           </div>

@@ -2,15 +2,16 @@
   padding: 0rem 1rem 2rem 2rem;
   display: flex;
   flex-direction: column; /* 讓子元素垂直排列 */
-  height: 90vh; /* 設定高度為視窗高度 */
+  height: 100vh; /* 設定高度為視窗高度 */
   overflow: hidden; /* 防止滾動條出現 */
   /* gap:1rem; */
+ 
 }
 
 .tutorbox {
   display: flex;
   justify-content: flex-end;
-  margin: 1rem;
+  margin: 0 0 0.6rem 0;
 }
 
 .topicbox {
@@ -22,7 +23,8 @@
   flex-grow: 1; 
   margin-bottom: 1rem; 
   padding: 1.5rem; 
-  overflow-y: scroll; 
+  /* overflow-y: scroll;  */
+  overflow-y: hidden;/*只在垂直方向允许滚动*/
   box-sizing: border-box;
   height: 100%;
 }

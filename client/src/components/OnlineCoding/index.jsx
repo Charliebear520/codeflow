@@ -325,7 +325,7 @@ const OnlineCoding = ({
   };
 
   return (
-    <App>
+    <App style={{ height: "100vh"}}>
       <div
         style={{
           width: "100%",
@@ -336,6 +336,7 @@ const OnlineCoding = ({
           height: "85vh",
           display: "flex",
           flexDirection: "column",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)"
         }}
       >
         <div
