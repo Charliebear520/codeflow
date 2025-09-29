@@ -460,8 +460,8 @@ const OnlineCoding = ({
                   <Button
                     onClick={handleStopExecution}
                     style={{
-                      backgroundColor: "#ff6b6b",
-                      color: "#FFFFFF",
+                      backgroundColor: "#DFDFDF",
+                      color: "#223687",
                       border: "none",
                       transition: "all 0.2s ease",
                     }}
@@ -474,7 +474,7 @@ const OnlineCoding = ({
                       e.target.style.transform = "scale(1)";
                     }}
                   >
-                    停止
+                    STOP
                   </Button>
                 )}
               </>
