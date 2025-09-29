@@ -34,7 +34,7 @@ const initialEdges = [
       color: "#007bff", // 標記顏色
     },
   },
-]; 
+];
 
 const Answer = () => {
   const [activeKey, setActiveKey] = useState("1");

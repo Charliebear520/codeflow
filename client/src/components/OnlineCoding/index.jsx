@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Button, App, Spin, Splitter } from "antd";
-import { ArrowsAltOutlined, ShrinkOutlined } from "@ant-design/icons";
+import { Button, App, Spin, Splitter, Popover } from "antd";
+import {
+  ArrowsAltOutlined,
+  ShrinkOutlined,
+  QuestionCircleOutlined,
+} from "@ant-design/icons";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
@@ -80,6 +84,13 @@ const OnlineCoding = ({
 
   // 判斷是否為第三階段
   const isStage3 = !currentStage || currentStage === 2;
+
+  // 執行結果的 Popover 內容
+  const runResultContent = (
+    <div>
+      <p>你所輸入的結果會決定題目的走向，進而造成程式碼的差異。</p>
+    </div>
+  );
 
   // 自動請求後端生成 PseudoCode
   useEffect(() => {
@@ -325,25 +336,25 @@ const OnlineCoding = ({
   };
 
   return (
-    <App style={{ height: "100vh"}}>
+    <App style={{ height: "100vh" }}>
       <div
         style={{
           width: "100%",
           background: "#fff",
           borderRadius: 8,
-          padding: 24,
+          // padding: 24,
           boxSizing: "border-box",
           height: "85vh",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)"
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
         }}
       >
         <div
           style={{
             background: "#E4EBFF",
             padding: "12px 16px",
-            borderRadius: "8px",
+            // borderRadius: "8px",
             marginBottom: "16px",
             display: "flex",
             justifyContent: "space-between",
@@ -542,7 +553,7 @@ const OnlineCoding = ({
             >
               <div
                 style={{
-                  background: "rgb(250 249 255)",
+                  // background: "rgb(250 249 255)",
                   borderRadius: 6,
                   padding: 16,
                   fontFamily: "Consolas, Monaco, 'Courier New', monospace",
@@ -565,19 +576,21 @@ const OnlineCoding = ({
                     gap: 8,
                   }}
                 >
-                  <span>🖥️</span>
-                  <span>執行結果</span>
+                  {/* <span>🖥️</span> */}
+                  <span style={{ color: "#375BD3" }}>執行結果</span>
                   {isTerminalActive && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        background: "#4CAF50",
-                        color: "white",
-                        padding: "2px 6px",
-                        borderRadius: 3,
-                      }}
-                    >
-                      執行中
+                    <span>
+                      <Popover
+                        placement="rightBottom"
+                        content={runResultContent}
+                        trigger="hover"
+                        color="#E4EBFF"
+                        style={{ width: "50%" }}
+                      >
+                        <QuestionCircleOutlined
+                          style={{ fontSize: "16px", color: "#375BD3" }}
+                        />
+                      </Popover>
                     </span>
                   )}
                 </div>
@@ -589,7 +602,7 @@ const OnlineCoding = ({
                     overflow: "auto",
                     background: "#ffffff",
                     borderRadius: 4,
-                    padding: 12,
+                    padding: "12px 12px 12px 0",
                     marginBottom: 12,
                     fontSize: 13,
                     lineHeight: 1.4,
@@ -684,9 +697,9 @@ const OnlineCoding = ({
                 {/* 終端機輸入區域 */}
                 {isTerminalActive && (
                   <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    style={{ display: "flex", alignItems: "center"}}
                   >
-                    <span style={{ color: "#4CAF50" }}>$</span>
+                    <span style={{ color: "#4CAF50" }}></span>
                     <input
                       type="text"
                       value={terminalInput}
