@@ -242,11 +242,11 @@ app.post("/api/check", async (req, res) => {
 app.post("/api/generate-pseudocode", async (req, res) => {
   try {
     const { question } = req.body;
-    
+
     if (!question) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "缺少題目參數" 
+      return res.status(400).json({
+        success: false,
+        error: "缺少題目參數",
       });
     }
 
@@ -292,14 +292,14 @@ ${question}
     console.log("Calling Gemini API for pseudocode generation...");
     const result = await generatePseudoCode(prompt);
     console.log("Pseudocode generation successful:", result);
-    
+
     res.json(result);
   } catch (err) {
     console.error("Pseudocode generation error:", err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: err.message,
-      details: "Pseudocode generation failed"
+      details: "Pseudocode generation failed",
     });
   }
 });
@@ -779,11 +779,28 @@ console.log("MongoDB URI available:", !!process.env.MONGO_URI);
 // 新增：測試Gemini API的端點
 app.get("/api/test-gemini", async (req, res) => {
   try {
+    // 使用從geminiService導入的getGenAI函數
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ 
+        success: false, 
+        error: "GEMINI_API_KEY environment variable is not set" 
+      });
+    }
+    
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent("Hello, this is a test. Please respond with 'API is working'.");
+    const result = await model.generateContent(
+      "Hello, this is a test. Please respond with 'API is working'."
+    );
     const response = await result.response;
     const text = response.text();
-    res.json({ success: true, message: "Gemini API is working", response: text });
+    res.json({
+      success: true,
+      message: "Gemini API is working",
+      response: text,
+    });
   } catch (error) {
     console.error("Gemini API test error:", error);
     res.status(500).json({ success: false, error: error.message });
