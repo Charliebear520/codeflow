@@ -1,7 +1,11 @@
 .stage2Container {
   transition: all 0.3s ease-in-out;
 }
-
+.centerbackground{
+  height: 100vh;
+  width: 100%;
+  /* background-color: #E4EBFF; */
+}
 .expandButton {
   transition: all 0.2s ease;
 }

@@ -183,7 +183,7 @@ const TopicStage2 = ({
   );
 
   return (
-    <div className={styles.container}>
+    <div className={styles.mainspace}>
       <div
         style={{
           height: "5%",
@@ -211,7 +211,10 @@ const TopicStage2 = ({
           <StageSwitcher current={currentStage} onChange={setCurrentStage} />
         </div>
       </div>
-      <div style={{ height: "83%" }}>
+
+      <div className={styles.container}>
+      
+      <div style={{ height: "85%" }}>
         <div className={styles.topicbox}>
           <div
             style={{
@@ -251,6 +254,9 @@ const TopicStage2 = ({
         </div>
       </div>
     </div>
+
+    </div>
+    
   );
 };
 
