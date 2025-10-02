@@ -1,0 +1,31 @@
+{
+  "name": "codeflow-fullstack",
+  "version": "1.0.0",
+  "description": "Full-stack application with React frontend, Express backend, and Gemini AI integration",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run start",
+    "dev:frontend": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "build:backend": "cd backend && npm install --production",
+    "build:frontend": "cd client && npm run build",
+    "install:all": "npm install && cd backend && npm install && cd ../client && npm install",
+    "vercel:deploy": "vercel",
+    "vercel:prod": "vercel --prod"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "react",
+    "express",
+    "gemini-ai",
+    "vercel",
+    "fullstack"
+  ],
+  "author": "",
+  "license": "ISC"
+}
