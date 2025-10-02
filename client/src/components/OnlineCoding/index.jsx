@@ -216,14 +216,11 @@ const OnlineCoding = ({
     setProcessId(null);
 
     try {
-      const res = await fetch(
-        "/api/run-code-interactive",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, language }),
-        }
-      );
+      const res = await fetch("/api/run-code-interactive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language }),
+      });
       const data = await res.json();
 
       if (data.success) {
@@ -696,9 +693,7 @@ const OnlineCoding = ({
 
                 {/* 終端機輸入區域 */}
                 {isTerminalActive && (
-                  <div
-                    style={{ display: "flex", alignItems: "center"}}
-                  >
+                  <div style={{ display: "flex", alignItems: "center" }}>
                     <span style={{ color: "#4CAF50" }}></span>
                     <input
                       type="text"

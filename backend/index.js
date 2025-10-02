@@ -240,8 +240,19 @@ app.post("/api/check", async (req, res) => {
 
 // 新增：生成 PseudoCode 的 API 端點
 app.post("/api/generate-pseudocode", async (req, res) => {
-  const { question } = req.body;
-  const prompt = `你是一位專業的 Python 程式設計助教。請根據下方題目，產生一份 Python PseudoCode，並依據以下規則進行策略性挖空（用 ___ 代表每個空格）：
+  try {
+    const { question } = req.body;
+    
+    if (!question) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "缺少題目參數" 
+      });
+    }
+
+    console.log("Generating pseudocode for question:", question);
+
+    const prompt = `你是一位專業的 Python 程式設計助教。請根據下方題目，產生一份 Python PseudoCode，並依據以下規則進行策略性挖空（用 ___ 代表每個空格）：
 
 【挖空規則】
 1. 針對流程圖的主要符號內容進行挖空，包括：
@@ -277,11 +288,19 @@ app.post("/api/generate-pseudocode", async (req, res) => {
 題目如下：
 ${question}
 `;
-  try {
+
+    console.log("Calling Gemini API for pseudocode generation...");
     const result = await generatePseudoCode(prompt);
+    console.log("Pseudocode generation successful:", result);
+    
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Pseudocode generation error:", err);
+    res.status(500).json({ 
+      success: false, 
+      error: err.message,
+      details: "Pseudocode generation failed"
+    });
   }
 });
 
@@ -755,6 +774,21 @@ app.post("/api/test-error-explanation", async (req, res) => {
 
 // 檢查環境變量
 console.log("API Key available:", !!process.env.GEMINI_API_KEY);
+console.log("MongoDB URI available:", !!process.env.MONGO_URI);
+
+// 新增：測試Gemini API的端點
+app.get("/api/test-gemini", async (req, res) => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent("Hello, this is a test. Please respond with 'API is working'.");
+    const response = await result.response;
+    const text = response.text();
+    res.json({ success: true, message: "Gemini API is working", response: text });
+  } catch (error) {
+    console.error("Gemini API test error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // 啟動服務器 - 適配Vercel無服務器函數
 if (process.env.NODE_ENV !== "production") {
