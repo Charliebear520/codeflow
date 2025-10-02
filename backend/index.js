@@ -65,10 +65,10 @@ async function getPythonCommand() {
 
 // CORS 設定：允許本地前端與環境變數指定的 URL，並處理預檢請求
 const allowedOrigins = [
-  process.env.CLIENT_URL, 
+  process.env.CLIENT_URL,
   "http://localhost:5173",
   "https://codeflow-teal.vercel.app",
-  "https://codeflow-charliebear520s-projects.vercel.app"
+  "https://codeflow-charliebear520s-projects.vercel.app",
 ].filter(Boolean);
 const corsOptions = {
   origin: function (origin, callback) {
@@ -522,6 +522,23 @@ app.post("/api/run-code-interactive", async (req, res) => {
     });
   }
 
+  // 暫時返回模擬響應，避免Vercel環境的文件系統限制
+  console.log("Code execution requested:", { language, codeLength: code.length });
+  
+  // 模擬程式執行響應
+  const mockResponse = {
+    success: true,
+    processId: `mock_${Date.now()}`,
+    initialOutput: "程式已開始執行（模擬模式）\n請輸入資料：",
+    needsInput: true,
+    finished: false
+  };
+  
+  console.log("Returning mock response:", mockResponse);
+  return res.json(mockResponse);
+
+  // 以下代碼暫時註解掉，因為在Vercel環境中可能會有文件系統權限問題
+  /*
   const fs = await import("fs/promises");
   const path = await import("path");
   const tmpDir = path.resolve("./temp");
@@ -665,6 +682,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
       details: process.env.NODE_ENV === "development" ? err.stack : undefined,
     });
   }
+  */
 });
 
 // === 發送輸入到互動式程序 ===
@@ -880,6 +898,23 @@ app.post("/api/test-simple", async (req, res) => {
       message: "Simple test endpoint working",
       timestamp: new Date().toISOString(),
       body: req.body,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 新增：簡化版的程式執行測試端點
+app.post("/api/test-code-execution", async (req, res) => {
+  try {
+    const { code, language } = req.body;
+    
+    res.json({
+      success: true,
+      message: "Code execution test endpoint working",
+      received: { code: code ? code.substring(0, 100) + "..." : "no code", language },
+      timestamp: new Date().toISOString(),
+      note: "This is a test endpoint - no actual code execution"
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
