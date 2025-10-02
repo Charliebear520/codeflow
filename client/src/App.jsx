@@ -39,7 +39,7 @@ const TeacherRoute = ({ children }) => {
 const ProtectedRoute = ({ children }) => {
   // 暫時直接返回children，不進行認證檢查
   return children;
-  
+
   // 原始認證邏輯（暫時註解）
   // return (
   //   <>
