@@ -35,20 +35,16 @@ const TeacherRoute = ({ children }) => {
   );
 };
 
-// 建立一個需要認證的路由元件（暫時禁用認證檢查）
+// 建立一個需要認證的路由元件
 const ProtectedRoute = ({ children }) => {
-  // 暫時直接返回children，不進行認證檢查
-  return children;
-
-  // 原始認證邏輯（暫時註解）
-  // return (
-  //   <>
-  //     <SignedIn>{children}</SignedIn>
-  //     <SignedOut>
-  //       <Navigate to="/login" replace />
-  //     </SignedOut>
-  //   </>
-  // );
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <Navigate to="/login" replace />
+      </SignedOut>
+    </>
+  );
 };
 
 // 建立一個只允許未登入用戶訪問的路由
