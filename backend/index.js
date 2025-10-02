@@ -64,9 +64,12 @@ async function getPythonCommand() {
 }
 
 // CORS 設定：允許本地前端與環境變數指定的 URL，並處理預檢請求
-const allowedOrigins = [process.env.CLIENT_URL, "http://localhost:5173"].filter(
-  Boolean
-);
+const allowedOrigins = [
+  process.env.CLIENT_URL, 
+  "http://localhost:5173",
+  "https://codeflow-teal.vercel.app",
+  "https://codeflow-charliebear520s-projects.vercel.app"
+].filter(Boolean);
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true); // 例如 Postman 或同源
@@ -267,6 +270,41 @@ app.post("/api/check", async (req, res) => {
   }
 });
 
+// 新增：簡化版的生成 PseudoCode 的 API 端點
+app.post("/api/generate-pseudocode-simple", async (req, res) => {
+  try {
+    const { question } = req.body;
+
+    if (!question) {
+      return res.status(400).json({
+        success: false,
+        error: "缺少題目參數",
+      });
+    }
+
+    // 直接返回一個固定的響應，不依賴Gemini
+    const result = {
+      pseudoCode: [
+        "___ weather == '下雨':",
+        "    ___('帶傘')",
+        "___:",
+        "    ___('不帶傘')",
+      ],
+      answers: ["if", "print", "else", "print"],
+    };
+
+    console.log("Simple pseudocode generation successful");
+    res.json(result);
+  } catch (err) {
+    console.error("Simple pseudocode generation error:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      details: "Simple pseudocode generation failed",
+    });
+  }
+});
+
 // 新增：生成 PseudoCode 的 API 端點
 app.post("/api/generate-pseudocode", async (req, res) => {
   try {
@@ -303,10 +341,10 @@ app.post("/api/generate-pseudocode", async (req, res) => {
 
     console.log("Calling Gemini API for pseudocode generation...");
     console.log("Prompt:", prompt);
-    
+
     const geminiServices = await loadGeminiServices();
     console.log("Gemini services loaded successfully");
-    
+
     try {
       const result = await geminiServices.generatePseudoCode(prompt);
       console.log("Pseudocode generation successful:", result);
@@ -319,9 +357,9 @@ app.post("/api/generate-pseudocode", async (req, res) => {
           "___ weather == '下雨':",
           "    ___('帶傘')",
           "___:",
-          "    ___('不帶傘')"
+          "    ___('不帶傘')",
         ],
-        answers: ["if", "print", "else", "print"]
+        answers: ["if", "print", "else", "print"],
       };
       console.log("Using fallback result:", fallbackResult);
       res.json(fallbackResult);
@@ -832,6 +870,20 @@ app.get("/api/test-env", (req, res) => {
       ? process.env.GEMINI_API_KEY.substring(0, 10)
       : "N/A",
   });
+});
+
+// 新增：簡單的測試端點
+app.post("/api/test-simple", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "Simple test endpoint working",
+      timestamp: new Date().toISOString(),
+      body: req.body,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // 新增：測試Gemini API的端點
