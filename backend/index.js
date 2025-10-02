@@ -2,14 +2,15 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import ImageKit from "imagekit";
-import {
-  checkFlowchart,
-  generateFlowchartQuestion,
-  generateFlowchartHint,
-  generatePseudoCode,
-  checkPseudoCode,
-  checkCode,
-} from "./services/geminiService.js";
+// 移除靜態導入，改為動態導入以避免初始化問題
+// import {
+//   checkFlowchart,
+//   generateFlowchartQuestion,
+//   generateFlowchartHint,
+//   generatePseudoCode,
+//   checkPseudoCode,
+//   checkCode,
+// } from "./services/geminiService.js";
 import { explainError } from "./services/errorExplainer.js";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
@@ -20,8 +21,23 @@ import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
 import { clerkMiddleware, getAuth } from "@clerk/express";
 
-// 加載環境變量
-dotenv.config();
+// 動態導入Gemini服務的輔助函數
+const loadGeminiServices = async () => {
+  const geminiService = await import("./services/geminiService.js");
+  return {
+    checkFlowchart: geminiService.checkFlowchart,
+    generateFlowchartQuestion: geminiService.generateFlowchartQuestion,
+    generateFlowchartHint: geminiService.generateFlowchartHint,
+    generatePseudoCode: geminiService.generatePseudoCode,
+    checkPseudoCode: geminiService.checkPseudoCode,
+    checkCode: geminiService.checkCode,
+  };
+};
+
+// 加載環境變量（僅在非生產環境）
+if (process.env.NODE_ENV !== "production") {
+  dotenv.config();
+}
 
 const port = process.env.PORT || 5000;
 const app = express();
@@ -122,7 +138,8 @@ app.get("/api/upload", (req, res) => {
 app.get("/api/generate-question", async (req, res) => {
   try {
     console.log("Generating flowchart question...");
-    const question = await generateFlowchartQuestion();
+    const geminiServices = await loadGeminiServices();
+    const question = await geminiServices.generateFlowchartQuestion();
     res.json({ success: true, question });
   } catch (error) {
     console.error("Error generating question:", error);
@@ -153,7 +170,8 @@ app.post("/api/generate-hint", async (req, res) => {
     }
 
     console.log(`Generating hint for level ${hintLevel}...`);
-    const hint = await generateFlowchartHint(question, hintLevel);
+    const geminiServices = await loadGeminiServices();
+    const hint = await geminiServices.generateFlowchartHint(question, hintLevel);
 
     res.json({
       success: true,
@@ -175,7 +193,8 @@ app.post("/api/check-flowchart", async (req, res) => {
     // 如果沒有提供題目，使用默認題目
     const defaultQuestion =
       "請根據下方敘述繪製流程圖。你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。";
-    const result = await checkFlowchart(imageData, question || defaultQuestion);
+    const geminiServices = await loadGeminiServices();
+    const result = await geminiServices.checkFlowchart(imageData, question || defaultQuestion);
     res.json({ result });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -217,7 +236,8 @@ app.post("/api/check", async (req, res) => {
 
     console.log("Calling Gemini API...");
     console.log("Using question:", question || defaultQuestion);
-    const result = await checkFlowchart(imageData, question || defaultQuestion);
+    const geminiServices = await loadGeminiServices();
+    const result = await geminiServices.checkFlowchart(imageData, question || defaultQuestion);
 
     console.log("API call successful, sending response");
     res.json({
@@ -290,7 +310,8 @@ ${question}
 `;
 
     console.log("Calling Gemini API for pseudocode generation...");
-    const result = await generatePseudoCode(prompt);
+    const geminiServices = await loadGeminiServices();
+    const result = await geminiServices.generatePseudoCode(prompt);
     console.log("Pseudocode generation successful:", result);
 
     res.json(result);
@@ -314,7 +335,8 @@ app.post("/api/check-pseudocode", async (req, res) => {
         error: "缺少題目或學生虛擬碼內容",
       });
     }
-    const feedback = await checkPseudoCode(question, userPseudoCode);
+    const geminiServices = await loadGeminiServices();
+    const feedback = await geminiServices.checkPseudoCode(question, userPseudoCode);
     res.json({ success: true, feedback });
   } catch (error) {
     res.status(500).json({
@@ -717,7 +739,8 @@ app.post("/api/check-code", async (req, res) => {
         error: "缺少題目、程式碼或語言參數",
       });
     }
-    const feedback = await checkCode(question, code, language);
+    const geminiServices = await loadGeminiServices();
+    const feedback = await geminiServices.checkCode(question, code, language);
     res.json({ success: true, feedback });
   } catch (error) {
     res.status(500).json({

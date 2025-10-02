@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 const app = express();
 
 // 加載環境變數（僅在非生產環境）
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   dotenv.config();
 }
 
@@ -32,29 +32,29 @@ app.get("/api/test-env", (req, res) => {
 app.get("/api/test-gemini", async (req, res) => {
   try {
     if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ 
-        success: false, 
-        error: "GEMINI_API_KEY not set" 
+      return res.status(500).json({
+        success: false,
+        error: "GEMINI_API_KEY not set",
       });
     }
-    
+
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    
+
     const result = await model.generateContent("Say 'Hello World'");
     const response = await result.response;
     const text = response.text();
-    
+
     res.json({
       success: true,
       message: "Gemini API is working",
       response: text,
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });
@@ -63,18 +63,18 @@ app.get("/api/test-gemini", async (req, res) => {
 app.post("/api/generate-pseudocode", async (req, res) => {
   try {
     const { question } = req.body;
-    
+
     if (!question) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "缺少題目參數" 
+      return res.status(400).json({
+        success: false,
+        error: "缺少題目參數",
       });
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ 
-        success: false, 
-        error: "GEMINI_API_KEY not set" 
+      return res.status(500).json({
+        success: false,
+        error: "GEMINI_API_KEY not set",
       });
     }
 
@@ -118,16 +118,16 @@ ${question}`;
       res.json(parsedResult);
     } catch (e) {
       console.error("JSON parsing error:", text);
-      res.status(500).json({ 
-        success: false, 
-        error: "Gemini 回傳內容不是合法 JSON" 
+      res.status(500).json({
+        success: false,
+        error: "Gemini 回傳內容不是合法 JSON",
       });
     }
   } catch (error) {
     console.error("Pseudocode generation error:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });
