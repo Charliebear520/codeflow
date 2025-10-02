@@ -29,7 +29,7 @@ export default function AddQuestion() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:3000/api/add-question", {
+      const res = await fetch("/api/add-question", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
