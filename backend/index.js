@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import ImageKit from "imagekit";
+// import ImageKit from "imagekit"; // 暫時註解掉以避免導入問題
 // 移除靜態導入，改為動態導入以避免初始化問題
 // import {
 //   checkFlowchart,
@@ -19,7 +19,7 @@ const execAsync = promisify(exec);
 
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
-import { clerkMiddleware, getAuth } from "@clerk/express";
+// import { clerkMiddleware, getAuth } from "@clerk/express"; // 暫時註解掉以避免導入問題
 
 // 動態導入Gemini服務的輔助函數
 const loadGeminiServices = async () => {
@@ -88,13 +88,13 @@ app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-app.use(clerkMiddleware());
+// app.use(clerkMiddleware()); // 暫時註解掉
 
-const imagekit = new ImageKit({
-  urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
-  publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
-  privateKey: process.env.IMAGE_KIT_PRIVATE_KEY,
-});
+// const imagekit = new ImageKit({ // 暫時註解掉
+//   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
+//   publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
+//   privateKey: process.env.IMAGE_KIT_PRIVATE_KEY,
+// });
 
 app.get("/api/health", (req, res) => {
   const state = mongoose.connection.readyState; // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
@@ -171,7 +171,10 @@ app.post("/api/generate-hint", async (req, res) => {
 
     console.log(`Generating hint for level ${hintLevel}...`);
     const geminiServices = await loadGeminiServices();
-    const hint = await geminiServices.generateFlowchartHint(question, hintLevel);
+    const hint = await geminiServices.generateFlowchartHint(
+      question,
+      hintLevel
+    );
 
     res.json({
       success: true,
@@ -194,7 +197,10 @@ app.post("/api/check-flowchart", async (req, res) => {
     const defaultQuestion =
       "請根據下方敘述繪製流程圖。你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。";
     const geminiServices = await loadGeminiServices();
-    const result = await geminiServices.checkFlowchart(imageData, question || defaultQuestion);
+    const result = await geminiServices.checkFlowchart(
+      imageData,
+      question || defaultQuestion
+    );
     res.json({ result });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -237,7 +243,10 @@ app.post("/api/check", async (req, res) => {
     console.log("Calling Gemini API...");
     console.log("Using question:", question || defaultQuestion);
     const geminiServices = await loadGeminiServices();
-    const result = await geminiServices.checkFlowchart(imageData, question || defaultQuestion);
+    const result = await geminiServices.checkFlowchart(
+      imageData,
+      question || defaultQuestion
+    );
 
     console.log("API call successful, sending response");
     res.json({
@@ -336,7 +345,10 @@ app.post("/api/check-pseudocode", async (req, res) => {
       });
     }
     const geminiServices = await loadGeminiServices();
-    const feedback = await geminiServices.checkPseudoCode(question, userPseudoCode);
+    const feedback = await geminiServices.checkPseudoCode(
+      question,
+      userPseudoCode
+    );
     res.json({ success: true, feedback });
   } catch (error) {
     res.status(500).json({
