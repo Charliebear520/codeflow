@@ -56,7 +56,7 @@ export default function Stage2Page() {
             setCurrentStage={setCurrentStage}
           />
         </Col>
-        <Col span={spans.center}>
+        <Col span={spans.center} className={styles.centerbackground}>
           <OnlineCoding
             question={question}
             currentStage={currentStage}

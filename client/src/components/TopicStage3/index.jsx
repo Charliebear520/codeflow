@@ -4,8 +4,8 @@ import StageSwitcher from "../StageSwitcher";
 
 const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
   return (
-    <div className={styles.container}>
-      <div
+    <div className={styles.mainspace}>
+       <div
         style={{
           height: "5%",
           display: "flex",
@@ -27,7 +27,9 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
         </div>
 
       </div>
-      <div style={{ height: "83%"}}>
+      <div className={styles.container}>
+     
+      <div style={{ height: "85%"}}>
         <div className={styles.topicbox}>
           <div
             style={{
@@ -56,6 +58,9 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
         </div>
       </div>
     </div>
+
+    </div>
+    
   );
 };
 
