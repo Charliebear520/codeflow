@@ -128,7 +128,28 @@ app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-app.use(clerkMiddleware());
+// 配置Clerk中間件，允許主要API端點不需要認證
+// 因為前端已經有頁面級別的認證保護
+app.use(clerkMiddleware({
+  // 允許不需要認證的路由
+  publicRoutes: [
+    '/api/test-basic',
+    '/api/test-env', 
+    '/api/test-gemini',
+    '/api/test-simple',
+    '/api/test-code-execution',
+    '/api/generate-pseudocode',
+    '/api/generate-question',
+    '/api/generate-hint',
+    '/api/check',
+    '/api/check-flowchart',
+    '/api/check-pseudocode',
+    '/api/check-code',
+    '/api/run-code-interactive',
+    '/api/send-input',
+    '/api/stop-process'
+  ]
+}));
 
 // const imagekit = new ImageKit({ // 暫時註解掉
 //   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
