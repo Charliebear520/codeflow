@@ -108,7 +108,10 @@ const OnlineCoding = ({
     setApiError("");
     fetch("/api/generate-pseudocode", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache"
+      },
       body: JSON.stringify({ question }),
     })
       .then((res) => res.json())
