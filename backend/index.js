@@ -756,13 +756,19 @@ app.post("/api/test-error-explanation", async (req, res) => {
 // 檢查環境變量
 console.log("API Key available:", !!process.env.GEMINI_API_KEY);
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Server is running on http://localhost:${port}`);
-  console.log("Environment check:");
-  console.log("- PORT:", port);
-  console.log("- GEMINI_API_KEY available:", !!process.env.GEMINI_API_KEY);
-  console.log("- NODE_ENV:", process.env.NODE_ENV);
-});
+// 啟動服務器 - 適配Vercel無服務器函數
+if (process.env.NODE_ENV !== "production") {
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`Server is running on http://localhost:${port}`);
+    console.log("Environment check:");
+    console.log("- PORT:", port);
+    console.log("- GEMINI_API_KEY available:", !!process.env.GEMINI_API_KEY);
+    console.log("- NODE_ENV:", process.env.NODE_ENV);
+  });
+}
+
+// 導出app供Vercel使用
+export default app;
 
 // 資料表連接
 // const mongoose = require("mongoose");
