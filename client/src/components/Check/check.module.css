@@ -30,8 +30,8 @@
   flex-grow: 1; 
   margin-bottom: 1rem; 
   padding: 1.5rem; 
-  /* overflow-y: scroll;  */
-  overflow-y: hidden;/*只在垂直方向允许滚动*/
+  overflow-y: scroll; 
+  /* overflow-y: hidden; */
   box-sizing: border-box;
   height: 100%;
 }
