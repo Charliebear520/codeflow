@@ -59,4 +59,77 @@ app.get("/api/test-gemini", async (req, res) => {
   }
 });
 
+// 生成PseudoCode端點
+app.post("/api/generate-pseudocode", async (req, res) => {
+  try {
+    const { question } = req.body;
+    
+    if (!question) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "缺少題目參數" 
+      });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ 
+        success: false, 
+        error: "GEMINI_API_KEY not set" 
+      });
+    }
+
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    const prompt = `你是一位專業的 Python 程式設計助教。請根據下方題目，產生一份 Python PseudoCode，並依據以下規則進行策略性挖空（用 ___ 代表每個空格）：
+
+【挖空規則】
+1. 針對流程圖的主要符號內容進行挖空，包括：
+   - "開始/結束"（如程式進入點、結束語句）
+   - "輸入/輸出"（如 input、print、讀取/顯示資料）
+   - "處理"（如變數運算、邏輯處理步驟）
+   - "判斷"（如 if/else/elif/while/for 等語法結構本身）
+
+【回傳格式】
+請用 JSON 格式回覆，例如：
+{
+  "pseudoCode": [
+    "___ weather == '下雨':",
+    "    ___('準備雨具')",
+    "___ temperature < 15:",
+    "    ___('穿長袖和外套')"
+  ],
+  "answers": ["if", "print", "elif", "print"]
+}
+
+題目如下：
+${question}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let text = response.text();
+
+    // 去除 markdown code block
+    text = text.replace(/^```json\s*|^```\s*|```$/gm, "").trim();
+
+    try {
+      const parsedResult = JSON.parse(text);
+      res.json(parsedResult);
+    } catch (e) {
+      console.error("JSON parsing error:", text);
+      res.status(500).json({ 
+        success: false, 
+        error: "Gemini 回傳內容不是合法 JSON" 
+      });
+    }
+  } catch (error) {
+    console.error("Pseudocode generation error:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 export default app;
