@@ -9,7 +9,7 @@
       }
     },
     {
-      "src": "backend/simple.js",
+      "src": "backend/index.js",
       "use": "@vercel/node",
       "config": {
         "maxDuration": 30
@@ -19,7 +19,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/backend/simple.js"
+      "dest": "/backend/index.js"
     },
     {
       "src": "/(.*)",
