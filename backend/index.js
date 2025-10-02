@@ -529,7 +529,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
 
   const fs = await import("fs/promises");
   const path = await import("path");
-  const tmpDir = path.resolve("./temp");
+  const tmpDir = "/tmp";
   const processId = `proc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
   let filename,
