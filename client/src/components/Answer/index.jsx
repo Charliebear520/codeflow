@@ -134,12 +134,18 @@ const Answer = () => {
 
   const extraButtons = (
     <div style={{ display: "flex", gap: "8px" }}>
-      <Button type="primary" onClick={handleCheck}>
+      <Button type="primary" onClick={handleCheck} className={styles.checkButton}>
         檢查
       </Button>
-      <Button danger onClick={handleReset}>
-        清空
+      <Button type="primary" className={styles.uploadButton}>
+        上傳
       </Button>
+      <Button type="primary" className={styles.saveButton}>
+        儲存
+      </Button>
+      {/* <Button danger onClick={handleReset}>
+        清空
+      </Button> */}
     </div>
   );
 

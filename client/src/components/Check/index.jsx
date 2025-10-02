@@ -9,7 +9,8 @@ const Check = ({ feedback, isChecking, onTutorClick }) => {
   const { result } = useSelector((state) => state.check);
 
   return (
-    <div className={styles.container}>
+    <div className={styles.mainspace}>
+       <div className={styles.container}>
       <div
         style={{
           display: "flex",
@@ -28,7 +29,7 @@ const Check = ({ feedback, isChecking, onTutorClick }) => {
           </div>
         )}
       </div>
-      <div style={{ height: "83%" }}>
+      <div style={{ height: "80%" }}>
         <div className={styles.topicbox}>
           {isChecking ? (
             <div
@@ -55,6 +56,9 @@ const Check = ({ feedback, isChecking, onTutorClick }) => {
         </div>
       </div>
     </div>
+
+    </div>
+   
   );
 };
 

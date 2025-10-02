@@ -1,11 +1,18 @@
+.mainspace{
+  height: 100vh; 
+  padding: 0rem 1rem 2rem 2rem;
+  display: flex;             /* 啟用 Flexbox */
+  flex-direction: column;    /* 設定主軸為垂直方向 */
+  
+}
 .container {
-  padding: 0 1rem 2rem 0rem;
   display: flex;
   flex-direction: column; /* 讓子元素垂直排列 */
-  height: 100%;
+  height: 95%;
   max-height: 100vh; /* 設定高度為視窗高度 */
   overflow: hidden; /* 防止滾動條出現 */
   /* gap:1rem; */
+   margin-top: auto; 
 }
 
 .parsebox {
