@@ -30,7 +30,7 @@ const Topic = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        "http://localhost:3000/api/generate-question"
+        "/api/generate-question"
       );
       if (response.data.success) {
         setQuestion(response.data.question);
@@ -64,7 +64,7 @@ const Topic = () => {
     setHintLoading(true);
     try {
       const response = await axios.post(
-        "http://localhost:3000/api/generate-hint",
+        "/api/generate-hint",
         {
           question,
           hintLevel,
