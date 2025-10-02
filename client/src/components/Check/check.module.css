@@ -1,10 +1,17 @@
-.container {
+.mainspace{
+  height: 100vh; 
   padding: 0rem 1rem 2rem 2rem;
+  display: flex;             /* 啟用 Flexbox */
+  flex-direction: column;    /* 設定主軸為垂直方向 */
+  justify-content: flex-end; /* 將子元素對齊到主軸的結尾 (底部) */
+}
+.container {
   display: flex;
   flex-direction: column; /* 讓子元素垂直排列 */
-  height: 100vh; /* 設定高度為視窗高度 */
+  height: 95%; /* 設定高度為視窗高度 */
   overflow: hidden; /* 防止滾動條出現 */
   /* gap:1rem; */
+  
  
 }
 

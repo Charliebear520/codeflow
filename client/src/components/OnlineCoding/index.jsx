@@ -12,6 +12,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import "./blankHighlight.css";
+import styles from "./answer.module.css"
 
 // 方案A：Highlight ___
 function blankDecorationExtension() {
@@ -336,7 +337,8 @@ const OnlineCoding = ({
   };
 
   return (
-    <App style={{ height: "100vh" }}>
+    <div className={styles.mainspace}>
+      <App style={{ height: "95%" }}>
       <div
         style={{
           width: "100%",
@@ -344,16 +346,17 @@ const OnlineCoding = ({
           borderRadius: 8,
           // padding: 24,
           boxSizing: "border-box",
-          height: "85vh",
+          height: "85%",
           display: "flex",
           flexDirection: "column",
           boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+          
         }}
       >
         <div
           style={{
             background: "#E4EBFF",
-            padding: "12px 16px",
+            padding: "6px 8px",
             // borderRadius: "8px",
             marginBottom: "16px",
             display: "flex",
@@ -725,6 +728,9 @@ const OnlineCoding = ({
         </Splitter>
       </div>
     </App>
+
+    </div>
+   
   );
 };
 
