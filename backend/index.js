@@ -368,7 +368,17 @@ app.post("/api/run-code", async (req, res) => {
     // 執行程式，3 秒 timeout
     exec(
       language === "javascript" ? `${execCmd} < "${filepath}"` : execCmd,
-      { timeout: 3000, maxBuffer: 1024 * 100 },
+      {
+        timeout: 3000,
+        maxBuffer: 1024 * 100,
+        encoding: "utf8", // 強制使用UTF-8編碼
+        env: {
+          ...process.env,
+          PYTHONIOENCODING: "utf-8", // 設定Python的I/O編碼
+          LANG: "en_US.UTF-8", // 設定語言環境
+          LC_ALL: "en_US.UTF-8", // 設定所有本地化設定
+        },
+      },
       async (error, stdout, stderr) => {
         // 刪除暫存檔案
         await Promise.all(
@@ -479,6 +489,13 @@ app.post("/api/run-code-interactive", async (req, res) => {
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 30000, // 30秒超時
       shell: process.platform === "win32", // Windows需要shell模式
+      encoding: "utf8", // 強制使用UTF-8編碼
+      env: {
+        ...process.env,
+        PYTHONIOENCODING: "utf-8", // 設定Python的I/O編碼
+        LANG: "en_US.UTF-8", // 設定語言環境
+        LC_ALL: "en_US.UTF-8", // 設定所有本地化設定
+      },
     });
 
     let initialOutput = "";
