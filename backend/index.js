@@ -522,26 +522,11 @@ app.post("/api/run-code-interactive", async (req, res) => {
     });
   }
 
-  // 暫時返回模擬響應，避免Vercel環境的文件系統限制
   console.log("Code execution requested:", {
     language,
     codeLength: code.length,
   });
 
-  // 模擬程式執行響應
-  const mockResponse = {
-    success: true,
-    processId: `mock_${Date.now()}`,
-    initialOutput: "程式已開始執行（模擬模式）\n請輸入資料：",
-    needsInput: true,
-    finished: false,
-  };
-
-  console.log("Returning mock response:", mockResponse);
-  return res.json(mockResponse);
-
-  // 以下代碼暫時註解掉，因為在Vercel環境中可能會有文件系統權限問題
-  /*
   const fs = await import("fs/promises");
   const path = await import("path");
   const tmpDir = path.resolve("./temp");
@@ -685,7 +670,6 @@ app.post("/api/run-code-interactive", async (req, res) => {
       details: process.env.NODE_ENV === "development" ? err.stack : undefined,
     });
   }
-  */
 });
 
 // === 發送輸入到互動式程序 ===
@@ -700,20 +684,6 @@ app.post("/api/send-input", async (req, res) => {
   }
 
   console.log("Send input requested:", { processId, input });
-
-  // 暫時返回模擬響應，避免Vercel環境的程序管理問題
-  const mockResponse = {
-    success: true,
-    output: `收到輸入: "${input}"\n程式執行完成（模擬模式）`,
-    finished: true,
-    processId: processId
-  };
-
-  console.log("Returning mock send-input response:", mockResponse);
-  return res.json(mockResponse);
-
-  // 以下代碼暫時註解掉
-  /*
   const processInfo = activeProcesses.get(processId);
   if (!processInfo) {
     return res.status(404).json({
@@ -769,7 +739,6 @@ app.post("/api/send-input", async (req, res) => {
       error: "發送輸入時發生錯誤: " + err.message,
     });
   }
-  */
 });
 
 // === 停止程序 ===
