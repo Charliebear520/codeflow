@@ -281,42 +281,25 @@ app.post("/api/generate-pseudocode", async (req, res) => {
 
     console.log("Generating pseudocode for question:", question);
 
-    const prompt = `你是一位專業的 Python 程式設計助教。請根據下方題目，產生一份 Python PseudoCode，並依據以下規則進行策略性挖空（用 ___ 代表每個空格）：
+    const prompt = `請根據題目生成Python虛擬碼，用 ___ 代表空白讓學生填寫。
 
-【挖空規則】
-1. 針對流程圖的主要符號內容進行挖空，包括：
-   - "開始/結束"（如程式進入點、結束語句）
-   - "輸入/輸出"（如 input、print、讀取/顯示資料）
-   - "處理"（如變數運算、邏輯處理步驟）
-   - "判斷"（如 if/else/elif/while/for 等語法結構本身，必須挖空這些語法關鍵字，而不只是條件內容，讓學生練習流程圖符號與程式語法的對應）
-2. 必須讓學生練習組合條件判斷與分支結構（如 if-elif-else、巢狀判斷、複合條件），而不只是填寫 >、<、== 等簡單符號。
-3. 優先挖空流程圖中對應的符號內容與邏輯組合，讓學生能練習如何將流程圖的結構轉換為 pseudocode。
-4. 挖空內容需能幫助學生理解程式邏輯、流程控制與符號意義，並為第三階段的完整程式撰寫做準備。
-5. 不要挖空無意義的細節（如縮排、括號、無關變數名等）。
+要求：
+1. 挖空 if、elif、else、input、print 等關鍵字
+2. 保持簡單的邏輯結構
+3. 返回標準JSON格式
 
-【特別說明】
-- 請務必將 if、elif、else、while、for、input、print 等語法結構本身設為挖空重點，讓學生必須自己寫出這些流程控制語法。
-- 例如：
-  "___ weather == '下雨':" 讓學生填入 if
-  "    ___('準備雨具')" 讓學生填入 print
-  "___ temperature < 15:" 讓學生填入 if 或 elif
-  "    ___ = ___('請輸入天氣')" 讓學生填入 weather = input
-
-【回傳格式】
-請用 JSON 格式回覆，例如：
+格式範例：
 {
   "pseudoCode": [
     "___ weather == '下雨':",
-    "    ___('準備雨具')",
-    "___ temperature < 15:",
-    "    ___('穿長袖和外套')"
+    "    ___('帶傘')",
+    "___:",
+    "    ___('不用帶傘')"
   ],
-  "answers": ["if", "print", "elif", "print"]
+  "answers": ["if", "print", "else", "print"]
 }
 
-題目如下：
-${question}
-`;
+題目：${question}`;
 
     console.log("Calling Gemini API for pseudocode generation...");
     const geminiServices = await loadGeminiServices();
