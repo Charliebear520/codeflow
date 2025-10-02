@@ -19,7 +19,7 @@ const execAsync = promisify(exec);
 
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
-import { clerkMiddleware, getAuth } from "@clerk/express";
+// import { clerkMiddleware, getAuth } from "@clerk/express"; // 暫時禁用以避免導入問題
 
 // 動態導入Gemini服務的輔助函數
 const loadGeminiServices = async () => {
@@ -128,28 +128,8 @@ app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// 配置Clerk中間件，允許主要API端點不需要認證
-// 因為前端已經有頁面級別的認證保護
-app.use(clerkMiddleware({
-  // 允許不需要認證的路由
-  publicRoutes: [
-    '/api/test-basic',
-    '/api/test-env', 
-    '/api/test-gemini',
-    '/api/test-simple',
-    '/api/test-code-execution',
-    '/api/generate-pseudocode',
-    '/api/generate-question',
-    '/api/generate-hint',
-    '/api/check',
-    '/api/check-flowchart',
-    '/api/check-pseudocode',
-    '/api/check-code',
-    '/api/run-code-interactive',
-    '/api/send-input',
-    '/api/stop-process'
-  ]
-}));
+// 暫時禁用後端Clerk中間件，只保留前端認證保護
+// app.use(clerkMiddleware());
 
 // const imagekit = new ImageKit({ // 暫時註解掉
 //   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
