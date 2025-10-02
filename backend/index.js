@@ -776,19 +776,31 @@ app.post("/api/test-error-explanation", async (req, res) => {
 console.log("API Key available:", !!process.env.GEMINI_API_KEY);
 console.log("MongoDB URI available:", !!process.env.MONGO_URI);
 
+// 新增：測試環境變數的端點
+app.get("/api/test-env", (req, res) => {
+  res.json({
+    success: true,
+    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+    hasMongoUri: !!process.env.MONGO_URI,
+    nodeEnv: process.env.NODE_ENV,
+    geminiKeyLength: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.length : 0,
+    geminiKeyPrefix: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) : "N/A"
+  });
+});
+
 // 新增：測試Gemini API的端點
 app.get("/api/test-gemini", async (req, res) => {
   try {
     // 使用從geminiService導入的getGenAI函數
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    
+
     if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ 
-        success: false, 
-        error: "GEMINI_API_KEY environment variable is not set" 
+      return res.status(500).json({
+        success: false,
+        error: "GEMINI_API_KEY environment variable is not set",
       });
     }
-    
+
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent(

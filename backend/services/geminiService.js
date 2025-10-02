@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import axios from "axios";
 
 // 確保環境變量被加載（僅在本地開發環境）
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   dotenv.config();
 }
 
