@@ -45,21 +45,40 @@ const app = express();
 // 存儲活躍的程序
 const activeProcesses = new Map();
 
-// Python代碼轉JavaScript的簡單轉換函數
+// Python代碼轉JavaScript的互動式轉換函數
 function convertPythonToJS(pythonCode) {
   let jsCode = pythonCode;
-  
+
   // 基本的Python到JavaScript轉換
-  jsCode = jsCode.replace(/print\s*\(\s*([^)]+)\s*\)/g, 'console.log($1)');
-  jsCode = jsCode.replace(/input\s*\(\s*([^)]*)\s*\)/g, 'prompt($1)');
-  jsCode = jsCode.replace(/if\s+/g, 'if (');
-  jsCode = jsCode.replace(/:\s*$/gm, ' {');
-  jsCode = jsCode.replace(/elif\s+/g, '} else if (');
-  jsCode = jsCode.replace(/else\s*:\s*$/gm, '} else {');
-  
-  // 添加prompt函數
-  jsCode = 'function prompt(msg) { return "模擬輸入"; }\n' + jsCode;
-  
+  jsCode = jsCode.replace(/print\s*\(\s*([^)]+)\s*\)/g, "console.log($1)");
+  jsCode = jsCode.replace(/input\s*\(\s*([^)]*)\s*\)/g, "await prompt($1)");
+  jsCode = jsCode.replace(/if\s+/g, "if (");
+  jsCode = jsCode.replace(/:\s*$/gm, " {");
+  jsCode = jsCode.replace(/elif\s+/g, "} else if (");
+  jsCode = jsCode.replace(/else\s*:\s*$/gm, "} else {");
+
+  // 將整個代碼包裝在async函數中
+  jsCode = `
+const readline = require('readline');
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+function prompt(msg) {
+  return new Promise((resolve) => {
+    rl.question(msg || '', (answer) => {
+      resolve(answer);
+    });
+  });
+}
+
+(async () => {
+${jsCode}
+  rl.close();
+})();
+`;
+
   return jsCode;
 }
 
@@ -562,7 +581,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
       // Vercel環境中沒有Python，使用JavaScript執行
       filename = `${processId}.js`;
       filepath = path.join(tmpDir, filename);
-      
+
       // 將Python代碼轉換為JavaScript
       const jsCode = convertPythonToJS(code);
       await fs.writeFile(filepath, jsCode, "utf-8");
