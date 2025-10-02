@@ -12,6 +12,9 @@ import {
 } from "./services/geminiService.js";
 import { explainError } from "./services/errorExplainer.js";
 import { exec, spawn } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
@@ -25,6 +28,24 @@ const app = express();
 
 // 存儲活躍的程序
 const activeProcesses = new Map();
+
+// Python命令檢測函數
+async function getPythonCommand() {
+  const commands =
+    process.platform === "win32"
+      ? ["python", "python3", "py"]
+      : ["python3", "python"];
+
+  for (const cmd of commands) {
+    try {
+      await execAsync(`${cmd} --version`);
+      return cmd;
+    } catch (error) {
+      // 繼續嘗試下一個命令
+    }
+  }
+  throw new Error("找不到可用的Python命令");
+}
 
 // CORS 設定：允許本地前端與環境變數指定的 URL，並處理預檢請求
 const allowedOrigins = [process.env.CLIENT_URL, "http://localhost:5173"].filter(
@@ -307,7 +328,9 @@ app.post("/api/run-code", async (req, res) => {
       filename = `${id}.py`;
       filepath = path.join(tmpDir, filename);
       await fs.writeFile(filepath, code, "utf-8");
-      execCmd = `python3 "${filepath}"`;
+      // 跨平台Python命令檢測
+      const pythonCmd = await getPythonCommand();
+      execCmd = `${pythonCmd} "${filepath}"`;
       cleanupFiles = [filepath];
     } else if (language === "javascript") {
       filename = `${id}.js`;
@@ -413,7 +436,8 @@ app.post("/api/run-code-interactive", async (req, res) => {
       filename = `${processId}.py`;
       filepath = path.join(tmpDir, filename);
       await fs.writeFile(filepath, code, "utf-8");
-      execCmd = "python3";
+      // 跨平台Python命令檢測
+      execCmd = await getPythonCommand();
       cleanupFiles = [filepath];
     } else if (language === "javascript") {
       filename = `${processId}.js`;
@@ -454,6 +478,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
     const childProcess = spawn(execCmd, language === "c" ? [] : [filepath], {
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 30000, // 30秒超時
+      shell: process.platform === "win32", // Windows需要shell模式
     });
 
     let initialOutput = "";
@@ -480,6 +505,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
     });
 
     childProcess.on("error", (error) => {
+      console.error(`Process error for ${processId}:`, error);
       activeProcesses.delete(processId);
       // 清理檔案
       Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
@@ -514,6 +540,11 @@ app.post("/api/run-code-interactive", async (req, res) => {
       });
     }, 500); // 增加等待時間以確保程序有足夠時間執行
   } catch (err) {
+    console.error("Error in run-code-interactive:", err);
+    console.error("Platform:", process.platform);
+    console.error("Language:", language);
+    console.error("ExecCmd:", execCmd);
+
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
       await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
@@ -521,6 +552,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "執行程式時發生錯誤: " + err.message,
+      details: process.env.NODE_ENV === "development" ? err.stack : undefined,
     });
   }
 });
