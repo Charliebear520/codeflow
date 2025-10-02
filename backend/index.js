@@ -776,6 +776,11 @@ app.post("/api/test-error-explanation", async (req, res) => {
 console.log("API Key available:", !!process.env.GEMINI_API_KEY);
 console.log("MongoDB URI available:", !!process.env.MONGO_URI);
 
+// 新增：基本測試端點
+app.get("/api/test-basic", (req, res) => {
+  res.json({ success: true, message: "Basic API is working" });
+});
+
 // 新增：測試環境變數的端點
 app.get("/api/test-env", (req, res) => {
   res.json({
@@ -783,8 +788,12 @@ app.get("/api/test-env", (req, res) => {
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
     hasMongoUri: !!process.env.MONGO_URI,
     nodeEnv: process.env.NODE_ENV,
-    geminiKeyLength: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.length : 0,
-    geminiKeyPrefix: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) : "N/A"
+    geminiKeyLength: process.env.GEMINI_API_KEY
+      ? process.env.GEMINI_API_KEY.length
+      : 0,
+    geminiKeyPrefix: process.env.GEMINI_API_KEY
+      ? process.env.GEMINI_API_KEY.substring(0, 10)
+      : "N/A",
   });
 });
 
