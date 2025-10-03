@@ -100,7 +100,7 @@ const isStage3 = currentStage === 3;
     }
     setLoading(true);
     setApiError("");
-    fetch("http://localhost:3000/api/generate-pseudocode", {
+    fetch("http://localhost:5000/api/generate-pseudocode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
@@ -152,7 +152,7 @@ const isStage3 = currentStage === 3;
         }
       } else {
         // 第二階段：檢查 pseudocode
-        const res = await fetch("http://localhost:3000/api/check-pseudocode", {
+        const res = await fetch("http://localhost:5000/api/check-pseudocode", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, userPseudoCode: code }),
@@ -211,7 +211,7 @@ const isStage3 = currentStage === 3;
 
     try {
       const res = await fetch(
-        "http://localhost:3000/api/run-code-interactive",
+        "http://localhost:5000/api/run-code-interactive",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -267,7 +267,7 @@ const isStage3 = currentStage === 3;
       ]);
 
       try {
-        const res = await fetch("http://localhost:3000/api/send-input", {
+        const res = await fetch("http://localhost:5000/api/send-input", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ processId, input }),
