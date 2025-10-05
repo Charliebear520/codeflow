@@ -310,6 +310,11 @@ const isStage3 = currentStage === 3;
 
 const SaveStage2 = async () => {
   console.log("API_BASE:", import.meta.env.VITE_API_BASE);
+  console.log("SaveStage2 body:", {
+    questionId: "Q001",
+    pseudocode: code,
+    completed: false,
+  });
   if (!code || !question) {
     antdMessage.info("請先輸入程式碼與確認題目");
     return;
@@ -320,17 +325,22 @@ const SaveStage2 = async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        questionId: "Q001",  // 之後可改成動態題目 ID
+        questionId: "Q001",
         pseudocode: code,
         completed: false,
       }),
     });
 
+    console.log("SaveStage2 response status:", res.status);
+
     if (!res.ok) {
+      const errText = await res.text();
+      console.error("SaveStage2 response error:", errText);
       throw new Error(`HTTP error! status: ${res.status}`);
     }
 
     const data = await res.json();
+    console.log("SaveStage2 response data:", data);
 
     if (data.success) {
       antdMessage.success("已儲存第二階段的作答");
@@ -347,7 +357,7 @@ const SaveStage2 = async () => {
   const handleStopExecution = async () => {
     if (processId) {
       try {
-        await fetch("http://localhost:3000/api/stop-process", {
+        await fetch("http://localhost:5000/api/stop-process", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ processId }),
@@ -478,7 +488,7 @@ const SaveStage2 = async () => {
                 e.target.style.transform = "scale(1)";
               }}
             >
-              Run
+              儲存
             </Button>
 
             {isStage3 && (

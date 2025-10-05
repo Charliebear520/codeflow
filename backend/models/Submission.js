@@ -4,12 +4,12 @@ const { Schema } = mongoose;
 
 const stageSchema_1 = new Schema(
   {
-    // 先做 stage1 的流程圖；日後 stage2/stage3 可直接沿用此子結構
     graph: {
       nodes: [Schema.Types.Mixed],
       edges: [Schema.Types.Mixed],
     },
-    imageBase64: { type: String, default: null }, // 若有「上傳圖片」模式
+    imageBase64: { type: String, default: null },
+    mode: { type: String, enum: ["upload", "editor"]},
     completed: { type: Boolean, default: false },
     score: { type: Number, default: null },
     feedback: { type: String, default: "" },
