@@ -13,7 +13,7 @@ export default function Stage3Page() {
   );
   const [feedback, setFeedback] = useState("");
   const [isChecking, setIsChecking] = useState(false);
-  const [currentStage, setCurrentStage] = useState(2); // 預設第三階段
+  const [currentStage, setCurrentStage] = useState(3); // 預設第三階段
   // 控制全螢幕狀態
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -30,6 +30,7 @@ export default function Stage3Page() {
         <Col span={12}>
           <OnlineCoding
             question={question}
+            currentStage={currentStage}
             onFeedback={setFeedback}
             onChecking={setIsChecking}
             isExpanded={false}
