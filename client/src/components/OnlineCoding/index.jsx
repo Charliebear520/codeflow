@@ -353,6 +353,53 @@ const SaveStage2 = async () => {
   }
 };
   
+const SaveStage3 = async () => {
+  console.log("API_BASE:", API_BASE);
+  console.log("SaveStage3 body:", {
+    questionId: "Q001",
+    code,
+    language,
+    completed: false,
+  });
+  if (!code || !question) {
+    antdMessage.info("請先輸入程式碼與確認題目");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/submissions/stage3`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        questionId: "Q001",
+        code,
+        language,
+        completed: false,
+      }),
+    });
+
+    console.log("SaveStage3 response status:", res.status);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("SaveStage3 response error:", errText);
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+
+    const data = await res.json();
+    console.log("SaveStage3 response data:", data);
+
+    if (data.success) {
+      antdMessage.success("已儲存第三階段的作答");
+    } else {
+      antdMessage.error(data.error || "儲存失敗");
+    }
+  } catch (err) {
+    console.error("SaveStage3 Error:", err);
+    antdMessage.error("儲存失敗，請稍後再試。");
+  }
+};
+
   // 停止程式執行
   const handleStopExecution = async () => {
     if (processId) {
@@ -471,26 +518,29 @@ const SaveStage2 = async () => {
             >
               清空
             </Button>
-            <Button //額外加入
-              onClick={SaveStage2}
-              style={{
-                backgroundColor: "#C2E8EE",
-                color: "#223687",
-                border: "none",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                // e.target.style.backgroundColor = "#7A6FD8";
-                e.target.style.transform = "scale(1.02)";
-              }}
-              onMouseLeave={(e) => {
-                // e.target.style.backgroundColor = "#9287EE";
-                e.target.style.transform = "scale(1)";
-              }}
-            >
-              儲存
-            </Button>
-
+            {!isStage3 ? (
+              <Button
+                onClick={SaveStage2}
+                style={{
+                  backgroundColor: "rgb(193, 232, 238)",
+                  color: "#333",
+                  border: "none",
+                }}
+              >
+                儲存 Stage2
+              </Button>
+            ) : (
+              <Button
+                onClick={SaveStage3}
+                style={{
+                  backgroundColor: "rgb(193, 232, 238)",
+                  color: "#333",
+                  border: "none",
+                }}
+              >
+                儲存 Stage3
+              </Button>
+            )}
             {isStage3 && (
               <>
                 {!isTerminalActive ? (
@@ -533,7 +583,7 @@ const SaveStage2 = async () => {
                     }}
                   >
                     停止
-                  </Button>
+                  </Button>                  
                 )}
               </>
             )}
