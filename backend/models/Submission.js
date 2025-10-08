@@ -31,12 +31,8 @@ const stageSchema_2 = new Schema(
 
 const stageSchema_3 = new Schema(
   {
-    // 先做 stage1 的流程圖；日後 stage2/stage3 可直接沿用此子結構
-    graph: {
-      nodes: [Schema.Types.Mixed],
-      edges: [Schema.Types.Mixed],
-    },
-    imageBase64: { type: String, default: null }, // 若有「上傳圖片」模式
+    code: { type: String, default: null },
+    language: { type: String, enum: ["python", "javascript", "c", null], default: null },
     completed: { type: Boolean, default: false },
     score: { type: Number, default: null },
     feedback: { type: String, default: "" },
@@ -44,11 +40,10 @@ const stageSchema_3 = new Schema(
   },
   { _id: false }
 );
-
 const submissionSchema = new Schema(
   {
-    studentName: { type: String, required: true }, // 改 required
-    studentEmail: { type: String, required: true, lowercase: true, index: true }, // 改 required
+    studentName: { type: String, required: true },
+    studentEmail: { type: String, required: true, lowercase: true, index: true },
     student: { type: Schema.Types.ObjectId, ref: "Student", required: true, index: true },
     questionId: { type: String, required: true, index: true },
 
