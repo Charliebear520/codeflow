@@ -3,6 +3,7 @@ import OnlineCoding from "../components/OnlineCoding";
 import Check from "../components/Check";
 import TopicStage3 from "../components/TopicStage3";
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Stage3Page() {
   // 題目從 localStorage 取得，若無則用預設
@@ -13,9 +14,14 @@ export default function Stage3Page() {
   );
   const [feedback, setFeedback] = useState("");
   const [isChecking, setIsChecking] = useState(false);
-  const [currentStage, setCurrentStage] = useState(3); // 預設第三階段
+  const [currentStage, setCurrentStage] = useState(2); // 預設第三階段
   // 控制全螢幕狀態
   const [fullscreen, setFullscreen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleTutorClick = () => {
+    navigate("/tutor");
+  };
 
   return (
     <div>
@@ -30,16 +36,19 @@ export default function Stage3Page() {
         <Col span={12}>
           <OnlineCoding
             question={question}
-            currentStage={currentStage}
             onFeedback={setFeedback}
             onChecking={setIsChecking}
             isExpanded={false}
             onToggleExpand={() => {}}
-            onTutorClick={() => {}}
+            onTutorClick={handleTutorClick}
           />
         </Col>
         <Col span={6}>
-          <Check feedback={feedback} isChecking={isChecking} />
+          <Check
+            feedback={feedback}
+            isChecking={isChecking}
+            onTutorClick={handleTutorClick}
+          />
         </Col>
       </Row>
     </div>
