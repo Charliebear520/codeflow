@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Button, App, Spin, Splitter } from "antd";
-import { ArrowsAltOutlined, ShrinkOutlined } from "@ant-design/icons";
+import { Button, App, Spin, Splitter, Popover } from "antd";
+import {
+  ArrowsAltOutlined,
+  ShrinkOutlined,
+  QuestionCircleOutlined,
+} from "@ant-design/icons";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { javascript } from "@codemirror/lang-javascript";
@@ -8,7 +12,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import "./blankHighlight.css";
-import { useAuth } from "@clerk/clerk-react";//額外加入
+import styles from "./answer.module.css"
 
 // 方案A：Highlight ___
 function blankDecorationExtension() {
@@ -66,13 +70,11 @@ const OnlineCoding = ({
   const [runResult, setRunResult] = useState(null); // { stdout, stderr }
   const [runLoading, setRunLoading] = useState(false);
   const [language, setLanguage] = useState("python");
+  const [saving, setSaving] = useState(false); // 新增：檢查/儲存中的狀態，避免多次點擊與 ReferenceError
   const [terminalOutput, setTerminalOutput] = useState([]); // 終端機輸出歷史
   const [terminalInput, setTerminalInput] = useState(""); // 當前輸入
   const [isTerminalActive, setIsTerminalActive] = useState(false); // 終端機是否活躍
   const [processId, setProcessId] = useState(null); // 當前執行的程序ID
-
-  const { getToken } = useAuth();//額外加入
-  const API_BASE = import.meta.env.VITE_API_BASE;//額外加入
 
   // 語言對應 CodeMirror extension
   const getLanguageExtension = () => {
@@ -82,9 +84,15 @@ const OnlineCoding = ({
     return python();
   };
 
-  // 判斷是否為第二、三階段
-const isStage2 = currentStage === 2;//額外加入
-const isStage3 = currentStage === 3;
+  // 判斷是否為第三階段
+  const isStage3 = !currentStage || currentStage === 2;
+
+  // 執行結果的 Popover 內容
+  const runResultContent = (
+    <div>
+      <p>你所輸入的結果會決定題目的走向，進而造成程式碼的差異。</p>
+    </div>
+  );
 
   // 自動請求後端生成 PseudoCode
   useEffect(() => {
@@ -100,9 +108,12 @@ const isStage3 = currentStage === 3;
     }
     setLoading(true);
     setApiError("");
-    fetch("http://localhost:5000/api/generate-pseudocode", {
+    fetch("/api/generate-pseudocode", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+      },
       body: JSON.stringify({ question }),
     })
       .then((res) => res.json())
@@ -130,14 +141,14 @@ const isStage3 = currentStage === 3;
   const handleCheck = async () => {
     if (!code || !question) {
       antdMessage.info("請先輸入程式碼與確認題目");
-      return;
+      return false;
     }
     if (onChecking) onChecking(true);
     setApiError("");
     try {
       if (isStage3) {
         // 第三階段：檢查程式語法
-        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/check-code`, {
+        const res = await fetch("/api/check-code", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, code, language }),
@@ -152,7 +163,7 @@ const isStage3 = currentStage === 3;
         }
       } else {
         // 第二階段：檢查 pseudocode
-        const res = await fetch("http://localhost:5000/api/check-pseudocode", {
+        const res = await fetch("/api/check-pseudocode", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, userPseudoCode: code }),
@@ -210,14 +221,11 @@ const isStage3 = currentStage === 3;
     setProcessId(null);
 
     try {
-      const res = await fetch(
-        "http://localhost:5000/api/run-code-interactive",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, language }),
-        }
-      );
+      const res = await fetch("/api/run-code-interactive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language }),
+      });
       const data = await res.json();
 
       if (data.success) {
@@ -267,7 +275,7 @@ const isStage3 = currentStage === 3;
       ]);
 
       try {
-        const res = await fetch("http://localhost:5000/api/send-input", {
+        const res = await fetch("/api/send-input", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ processId, input }),
@@ -308,103 +316,11 @@ const isStage3 = currentStage === 3;
     }
   };
 
-const SaveStage2 = async () => {
-  console.log("API_BASE:", import.meta.env.VITE_API_BASE);
-  console.log("SaveStage2 body:", {
-    questionId: "Q001",
-    pseudocode: code,
-    completed: false,
-  });
-  if (!code || !question) {
-    antdMessage.info("請先輸入程式碼與確認題目");
-    return;
-  }
-
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE}/api/submissions/stage2`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        questionId: "Q001",
-        pseudocode: code,
-        completed: false,
-      }),
-    });
-
-    console.log("SaveStage2 response status:", res.status);
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("SaveStage2 response error:", errText);
-      throw new Error(`HTTP error! status: ${res.status}`);
-    }
-
-    const data = await res.json();
-    console.log("SaveStage2 response data:", data);
-
-    if (data.success) {
-      antdMessage.success("已儲存第二階段的作答");
-    } else {
-      antdMessage.error(data.error || "儲存失敗");
-    }
-  } catch (err) {
-    console.error("SaveStage2 Error:", err);
-    antdMessage.error("儲存失敗，請稍後再試。");
-  }
-};
-  
-const SaveStage3 = async () => {
-  console.log("API_BASE:", API_BASE);
-  console.log("SaveStage3 body:", {
-    questionId: "Q001",
-    code,
-    language,
-    completed: false,
-  });
-  if (!code || !question) {
-    antdMessage.info("請先輸入程式碼與確認題目");
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}/api/submissions/stage3`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        questionId: "Q001",
-        code,
-        language,
-        completed: false,
-      }),
-    });
-
-    console.log("SaveStage3 response status:", res.status);
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("SaveStage3 response error:", errText);
-      throw new Error(`HTTP error! status: ${res.status}`);
-    }
-
-    const data = await res.json();
-    console.log("SaveStage3 response data:", data);
-
-    if (data.success) {
-      antdMessage.success("已儲存第三階段的作答");
-    } else {
-      antdMessage.error(data.error || "儲存失敗");
-    }
-  } catch (err) {
-    console.error("SaveStage3 Error:", err);
-    antdMessage.error("儲存失敗，請稍後再試。");
-  }
-};
-
   // 停止程式執行
   const handleStopExecution = async () => {
     if (processId) {
       try {
-        await fetch("http://localhost:5000/api/stop-process", {
+        await fetch("/api/stop-process", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ processId }),
@@ -421,25 +337,137 @@ const SaveStage3 = async () => {
     ]);
   };
 
+const HandleSave = async () => {
+  if (saving) return; // 防止重複點擊
+  setSaving(true);
+  setApiError("");
+
+  try {
+    // ---------- 第 1 步：進行檢查 ----------
+    if (!code || !question) {
+      antdMessage.info("請先輸入程式碼與確認題目");
+      return;
+    }
+
+    if (onChecking) onChecking(true);
+
+    let checkRes;
+    let checkData;
+    try {
+      if (isStage3) {
+        // 第三階段：檢查程式語法
+        checkRes = await fetch("/api/check-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, code, language }),
+        });
+      } else {
+        // 第二階段：檢查 pseudocode
+        checkRes = await fetch("/api/check-pseudocode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, userPseudoCode: code }),
+        });
+      }
+
+      checkData = await checkRes.json();
+    } catch (err) {
+      console.error("檢查階段錯誤:", err);
+      antdMessage.error("檢查失敗，請稍後再試。");
+      return;
+    } finally {
+      if (onChecking) onChecking(false);
+    }
+
+    // ---------- 第 2 步：檢查回傳結果 ----------
+    if (!checkData?.success) {
+      antdMessage.error(checkData?.error || "檢查未通過，請修改後再試。");
+      if (onFeedback) onFeedback(checkData?.feedback || "");
+      return;
+    }
+
+    // 檢查成功
+    antdMessage.success("語法檢查回饋已顯示於右側助教區");
+    if (onFeedback) onFeedback(checkData.feedback);
+
+    // ---------- 第 3 步：進行儲存 ----------
+    const questionId = localStorage.getItem("currentFlowchartQuestionId") || "Q001";
+    const API_BASE = import.meta.env.VITE_API_BASE;
+
+    let saveRes, saveData;
+
+    if (isStage3) {
+      console.log("🧾 [HandleSave] 儲存第三階段資料...");
+      saveRes = await fetch(`${API_BASE}/api/submissions/stage3`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId,
+          code,
+          language,
+          completed: false,
+        }),
+      });
+    } else {
+      console.log("🧾 [HandleSave] 儲存第二階段資料...");
+      saveRes = await fetch(`${API_BASE}/api/submissions/stage2`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId,
+          pseudocode: code,
+          completed: false,
+        }),
+      });
+    }
+
+    if (!saveRes.ok) {
+      const errText = await saveRes.text();
+      console.error("儲存階段 HTTP 錯誤:", errText);
+      throw new Error(`HTTP error! status: ${saveRes.status}`);
+    }
+
+    saveData = await saveRes.json();
+    console.log("💾 儲存回傳資料:", saveData);
+
+    if (saveData.success) {
+      antdMessage.success(isStage3 ? "已儲存第三階段的作答" : "已儲存第二階段的作答");
+      console.log("保存成功", { questionId, stage: isStage3 ? 3 : 2 });
+    } else {
+      antdMessage.error(saveData.error || "儲存失敗");
+    }
+
+  } catch (err) {
+    console.error("HandleSave 發生錯誤:", err);
+    setApiError("操作失敗，請稍後再試。");
+    antdMessage.error("操作失敗，請稍後再試。");
+  } finally {
+    setSaving(false);
+  }
+};
+
   return (
-    <App>
+    <div className={styles.mainspace}>
+      <App style={{ height: "95%" }}>
       <div
         style={{
           width: "100%",
           background: "#fff",
           borderRadius: 8,
-          padding: 24,
+          // padding: 24,
           boxSizing: "border-box",
-          height: "85vh",
+          height: "85%",
           display: "flex",
           flexDirection: "column",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.25)",
+          
         }}
       >
         <div
           style={{
             background: "#E4EBFF",
-            padding: "12px 16px",
-            borderRadius: "8px",
+            padding: "6px 8px",
+            // borderRadius: "8px",
             marginBottom: "16px",
             display: "flex",
             justifyContent: "space-between",
@@ -481,7 +509,7 @@ const SaveStage3 = async () => {
             }}
           >
             <Button
-              onClick={handleCheck}
+              onClick={HandleSave}
               style={{
                 backgroundColor: "#B2C8FF",
                 color: "#223687",
@@ -518,29 +546,6 @@ const SaveStage3 = async () => {
             >
               清空
             </Button>
-            {!isStage3 ? (
-              <Button
-                onClick={SaveStage2}
-                style={{
-                  backgroundColor: "rgb(193, 232, 238)",
-                  color: "#333",
-                  border: "none",
-                }}
-              >
-                儲存 Stage2
-              </Button>
-            ) : (
-              <Button
-                onClick={SaveStage3}
-                style={{
-                  backgroundColor: "rgb(193, 232, 238)",
-                  color: "#333",
-                  border: "none",
-                }}
-              >
-                儲存 Stage3
-              </Button>
-            )}
             {isStage3 && (
               <>
                 {!isTerminalActive ? (
@@ -568,8 +573,8 @@ const SaveStage3 = async () => {
                   <Button
                     onClick={handleStopExecution}
                     style={{
-                      backgroundColor: "#ff6b6b",
-                      color: "#FFFFFF",
+                      backgroundColor: "#DFDFDF",
+                      color: "#223687",
                       border: "none",
                       transition: "all 0.2s ease",
                     }}
@@ -582,8 +587,8 @@ const SaveStage3 = async () => {
                       e.target.style.transform = "scale(1)";
                     }}
                   >
-                    停止
-                  </Button>                  
+                    STOP
+                  </Button>
                 )}
               </>
             )}
@@ -661,7 +666,7 @@ const SaveStage3 = async () => {
             >
               <div
                 style={{
-                  background: "rgb(250 249 255)",
+                  // background: "rgb(250 249 255)",
                   borderRadius: 6,
                   padding: 16,
                   fontFamily: "Consolas, Monaco, 'Courier New', monospace",
@@ -684,19 +689,21 @@ const SaveStage3 = async () => {
                     gap: 8,
                   }}
                 >
-                  <span>🖥️</span>
-                  <span>執行結果</span>
+                  {/* <span>🖥️</span> */}
+                  <span style={{ color: "#375BD3" }}>執行結果</span>
                   {isTerminalActive && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        background: "#4CAF50",
-                        color: "white",
-                        padding: "2px 6px",
-                        borderRadius: 3,
-                      }}
-                    >
-                      執行中
+                    <span>
+                      <Popover
+                        placement="rightBottom"
+                        content={runResultContent}
+                        trigger="hover"
+                        color="#E4EBFF"
+                        style={{ width: "50%" }}
+                      >
+                        <QuestionCircleOutlined
+                          style={{ fontSize: "16px", color: "#375BD3" }}
+                        />
+                      </Popover>
                     </span>
                   )}
                 </div>
@@ -708,7 +715,7 @@ const SaveStage3 = async () => {
                     overflow: "auto",
                     background: "#ffffff",
                     borderRadius: 4,
-                    padding: 12,
+                    padding: "12px 12px 12px 0",
                     marginBottom: 12,
                     fontSize: 13,
                     lineHeight: 1.4,
@@ -802,15 +809,13 @@ const SaveStage3 = async () => {
 
                 {/* 終端機輸入區域 */}
                 {isTerminalActive && (
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <span style={{ color: "#4CAF50" }}>$</span>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <span style={{ color: "#4CAF50" }}></span>
                     <input
                       type="text"
                       value={terminalInput}
                       onChange={(e) => setTerminalInput(e.target.value)}
-                      onKeyDown={handleTerminalInput}
+                      onKeyPress={handleTerminalInput}
                       placeholder="請輸入資料..."
                       style={{
                         flex: 1,
@@ -833,6 +838,9 @@ const SaveStage3 = async () => {
         </Splitter>
       </div>
     </App>
+
+    </div>
+   
   );
 };
 
