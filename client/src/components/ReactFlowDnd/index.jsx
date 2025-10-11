@@ -58,6 +58,22 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
       setNodes(initialNodes);
       setEdges(initialEdges);
     },
+    // 新增：匯出目前的作答（JSON）
+    exportGraph: () => ({
+      nodes: nodes.map(n => ({
+        id: n.id,
+        type: n.type,
+        position: n.position,
+        data: { label: n.data?.label ?? "" },
+      })),
+      edges: edges.map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        label: e.label ?? "",
+        type: e.type ?? "smoothstep",
+      })),
+    }),
   }));
 
   // 這裡我們使用 onEdgeDoubleClick，僅在雙擊時觸發編輯邊文字
