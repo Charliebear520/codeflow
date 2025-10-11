@@ -11,8 +11,8 @@ import dotenv from "dotenv";
 //   checkPseudoCode,
 //   checkCode,
 // } from "./services/geminiService.js";
-import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";
-import { exec } from "child_process";
+import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";// 暫時禁用以避免導入問題
+import { exec,spawn } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
@@ -20,7 +20,8 @@ import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
 import Student from "./models/Student.js";
 import Submission from "./models/Submission.js";
-// import { clerkMiddleware, getAuth } from "@clerk/express"; // 暫時禁用以避免導入問題
+import os from "os";
+import path from "path";
 
 // 動態導入Gemini服務的輔助函數
 const loadGeminiServices = async () => {
@@ -706,8 +707,8 @@ app.post("/api/run-code-interactive", async (req, res) => {
   });
 
   const fs = await import("fs/promises");
-  const path = await import("path");
-  const tmpDir = "/tmp";
+  // 使用系統暫存資料夾以避免 nodemon 被觸發或路徑問題（跨平台）
+  const tmpDir = path.join(os.tmpdir(), "codeflow-backend-temp");
   const processId = `proc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
   let filename,
@@ -1273,20 +1274,31 @@ app.get("/api/submissions/stage1", async (req, res) => {
 
 app.post("/api/submissions/stage2", async (req, res) => {
   try {
+    console.log("stage2 req.body:", req.body);
+
     const { questionId, pseudocode, completed } = req.body;
 
-    // 建立或更新 Submission
-    const newSubmission = await Submission.findOneAndUpdate(
-      { questionId }, // 依題目找
-      {
-        $set: {
-          "stages.stage2.pseudocode": pseudocode,
-          "stages.stage2.completed": completed,
-          "stages.stage2.updatedAt": new Date(),
-        },
+    // log 查詢條件
+    console.log("stage2 findOneAndUpdate filter:", { questionId });
+
+    // log 更新內容
+    const updateObj = {
+      $set: {
+        "stages.stage2.pseudocode": pseudocode,
+        "stages.stage2.completed": completed,
+        "stages.stage2.updatedAt": new Date(),
       },
+    };
+    console.log("stage2 updateObj:", updateObj);
+
+    // 執行更新
+    const newSubmission = await Submission.findOneAndUpdate(
+      { questionId },
+      updateObj,
       { upsert: true, new: true }
     );
+
+    console.log("stage2 newSubmission:", newSubmission);
 
     res.json({ success: true, data: newSubmission });
   } catch (err) {
@@ -1294,8 +1306,69 @@ app.post("/api/submissions/stage2", async (req, res) => {
     res.status(500).json({ success: false, error: "伺服器錯誤" });
   }
 });
-
 app.get("/api/submissions/stage2", async (req, res) => {
+  try {
+    const submissions = await Submission.find({});
+    res.json(submissions);
+  } catch (err) {
+    res.status(500).json({ error: "伺服器錯誤" });
+  }
+});
+
+app.post("/api/submissions/stage3", async (req, res) => {
+  try {
+    console.log("stage3 req.body:", JSON.stringify(req.body));
+    // 取 student 優先順序：clerk middleware -> body -> undefined
+    const userId = req.auth?.userId ?? null;
+    let studentId = req.body?.student ?? null;
+
+    if (userId && !studentId) {
+      // ensureStudent 回傳 mongoose doc
+      const studentDoc = await ensureStudent(userId);
+      studentId = studentDoc?._id?.toString();
+      console.log("stage3 resolved studentId from clerk:", studentId);
+    }
+
+    if (!req.body?.questionId) {
+      return res.status(400).json({ success: false, error: "questionId 必填" });
+    }
+
+    // 用 questionId + studentId 作為 filter（若沒有 studentId 則只用 questionId）
+    const filter = { questionId: req.body.questionId };
+    if (studentId) filter.student = studentId;
+
+    const update = {
+      $set: {
+        "stages.stage3.code": req.body.code ?? null,
+        "stages.stage3.language": req.body.language ?? null,
+        "stages.stage3.completed": !!req.body.completed,
+        "stages.stage3.updatedAt": new Date(),
+      },
+      $setOnInsert: {
+        questionId: req.body.questionId,
+        ...(studentId ? { student: studentId } : {}),
+        createdAt: new Date(),
+      },
+    };
+
+    console.log("stage3 filter:", JSON.stringify(filter));
+    console.log("stage3 update:", JSON.stringify(update, null, 2));
+
+    const newSubmission = await Submission.findOneAndUpdate(filter, update, {
+      upsert: true,
+      new: true,
+    });
+
+    console.log("stage3 upsert result _id:", newSubmission?._id?.toString());
+    console.log("stage3 upsert result stages.stage3:", JSON.stringify(newSubmission?.stages?.stage3));
+
+    return res.json({ success: true, data: newSubmission });
+  } catch (err) {
+    console.error("Error saving stage3:", err);
+    return res.status(500).json({ success: false, error: "伺服器錯誤" });
+  }
+});
+app.get("/api/submissions/stage3", async (req, res) => {
   try {
     const submissions = await Submission.find({});
     res.json(submissions);
