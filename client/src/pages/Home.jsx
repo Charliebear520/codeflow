@@ -48,6 +48,12 @@ const Home = () => {
         onClick={() => navigate("/add-question")}
       >
         前往AddQuestion頁面（測試用）
+      </button> }
+      <button
+        style={{ position: "fixed", bottom: 20, right: 300,backgroundColor: "#375BD3", color: "#FFFFFF", border: "none" }}
+        onClick={() => navigate("/stage-list")}
+      >
+        前往StageList頁面（測試用）
       </button> */}
     </div>
   );
