@@ -7,7 +7,7 @@ const TopicStage3 = ({ question, currentStage, setCurrentStage }) => {
     <div className={styles.mainspace}>
        <div
         style={{
-          height: "5%",
+          height: "50px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-start",
