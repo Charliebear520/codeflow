@@ -41,8 +41,9 @@ if (process.env.NODE_ENV !== "production") {
   dotenv.config();
 }
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 const app = express();
+app.get("/health", (req, res) => res.send("ok")); // 小健康檢查
 
 // 存儲活躍的程序
 const activeProcesses = new Map();
@@ -106,22 +107,20 @@ async function getPythonCommand() {
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "https://codeflow-teal.vercel.app",
   "https://codeflow-charliebear520s-projects.vercel.app",
 ].filter(Boolean);
+const isProd = process.env.NODE_ENV === "production";
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // 例如 Postman 或同源
+  origin(origin, callback) {
+    if (!origin) return callback(null, true); // 同源 / Postman
+    if (!isProd) return callback(null, true); // 開發：全放行，最少踩雷
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error("Not allowed by CORS"));
   },
   methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-  ],
+  // allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
   credentials: true,
   optionsSuccessStatus: 204,
 };
@@ -1242,7 +1241,7 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
     const update = {
       $set: {
         "stages.stage1": stage1,
-        studentName: student.name ?? null,               // ✅ 快照
+        studentName: student.name ?? null,               // 儲存當下學生名稱、Email
         studentEmail: student.email?.toLowerCase() ?? null,
       },
       $setOnInsert: {
