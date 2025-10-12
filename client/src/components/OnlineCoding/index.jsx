@@ -107,9 +107,12 @@ const OnlineCoding = ({
     }
     setLoading(true);
     setApiError("");
-    fetch("http://localhost:3000/api/generate-pseudocode", {
+    fetch("/api/generate-pseudocode", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+      },
       body: JSON.stringify({ question }),
     })
       .then((res) => res.json())
@@ -144,7 +147,7 @@ const OnlineCoding = ({
     try {
       if (isStage3) {
         // 第三階段：檢查程式語法
-        const res = await fetch("http://localhost:3000/api/check-code", {
+        const res = await fetch("/api/check-code", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, code, language }),
@@ -159,7 +162,7 @@ const OnlineCoding = ({
         }
       } else {
         // 第二階段：檢查 pseudocode
-        const res = await fetch("http://localhost:3000/api/check-pseudocode", {
+        const res = await fetch("/api/check-pseudocode", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question, userPseudoCode: code }),
@@ -217,14 +220,11 @@ const OnlineCoding = ({
     setProcessId(null);
 
     try {
-      const res = await fetch(
-        "http://localhost:3000/api/run-code-interactive",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, language }),
-        }
-      );
+      const res = await fetch("/api/run-code-interactive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, language }),
+      });
       const data = await res.json();
 
       if (data.success) {
@@ -274,7 +274,7 @@ const OnlineCoding = ({
       ]);
 
       try {
-        const res = await fetch("http://localhost:3000/api/send-input", {
+        const res = await fetch("/api/send-input", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ processId, input }),
@@ -319,7 +319,7 @@ const OnlineCoding = ({
   const handleStopExecution = async () => {
     if (processId) {
       try {
-        await fetch("http://localhost:3000/api/stop-process", {
+        await fetch("/api/stop-process", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ processId }),
@@ -699,9 +699,7 @@ const OnlineCoding = ({
 
                 {/* 終端機輸入區域 */}
                 {isTerminalActive && (
-                  <div
-                    style={{ display: "flex", alignItems: "center"}}
-                  >
+                  <div style={{ display: "flex", alignItems: "center" }}>
                     <span style={{ color: "#4CAF50" }}></span>
                     <input
                       type="text"
