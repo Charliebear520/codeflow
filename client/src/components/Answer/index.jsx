@@ -198,7 +198,7 @@ const Answer = () => {
       <Button type="primary" className={styles.uploadButton}>
         上傳
       </Button>
-      <Button type="primary" className={styles.saveButton}>
+      <Button type="primary" className={styles.saveButton} onClick={handleSave}>
         儲存
       </Button>
       {/* <Button danger onClick={handleReset}>

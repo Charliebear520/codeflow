@@ -113,7 +113,7 @@ const OnlineCoding = ({
     }
     setLoading(true);
     setApiError("");
-    fetch("/api/generate-pseudocode", {
+    fetch("http://127.0.0.1:5000/api/generate-pseudocode", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -396,13 +396,13 @@ const OnlineCoding = ({
 
     // ---------- 第 3 步：進行儲存 ----------
     const questionId = localStorage.getItem("currentFlowchartQuestionId") || "Q001";
-    const API_BASE = import.meta.env.VITE_API_BASE;
+    // const API_BASE = import.meta.env.VITE_API_BASE;
 
     let saveRes, saveData;
 
     if (isStage3) {
-      console.log("🧾 [HandleSave] 儲存第三階段資料...");
-      saveRes = await fetch(`${API_BASE}/api/submissions/stage3`, {
+      console.log("[HandleSave] 儲存第三階段資料...");
+      saveRes = await fetch(`/api/submissions/stage3`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -413,8 +413,8 @@ const OnlineCoding = ({
         }),
       });
     } else {
-      console.log("🧾 [HandleSave] 儲存第二階段資料...");
-      saveRes = await fetch(`${API_BASE}/api/submissions/stage2`, {
+      console.log("[HandleSave] 儲存第二階段資料...");
+      saveRes = await fetch(`/api/submissions/stage2`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
