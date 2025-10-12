@@ -1222,26 +1222,31 @@ app.get("/api/questions/:id", async (req, res) => {
 //儲存 stage1 的流程圖
 app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
   try {
-    const { userId } = req.auth; // Clerk 的 user_xxx
-    const { questionId, graph, imageBase64, completed = false } = req.body || {};
+    const { userId } = req.auth;
+    const { questionId, graph, imageBase64, completed = false, mode } = req.body || {};
+    console.log("收到 req.body：", req.body);
 
     if (!questionId) return res.status(400).json({ success: false, error: "questionId 必填" });
     if (!graph && !imageBase64)
       return res.status(400).json({ success: false, error: "需提供 graph 或 imageBase64 其一" });
 
     const student = await ensureStudent(userId);
-    console.log("Student:", student);
 
+    // 只在有值時才帶入
     const stage1 = {
       ...(graph ? { graph } : {}),
       ...(imageBase64 ? { imageBase64 } : {}),
+      mode: mode || null,
       completed,
       updatedAt: new Date(),
     };
+
+    console.log("儲存前 stage1：", stage1);
+
     const update = {
       $set: {
         "stages.stage1": stage1,
-        studentName: student.name ?? null,               // 儲存當下學生名稱、Email
+        studentName: student.name ?? null,
         studentEmail: student.email?.toLowerCase() ?? null,
       },
       $setOnInsert: {
@@ -1250,17 +1255,20 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       },
     };
 
-    const doc = await Submission.findOneAndUpdate(
-      { student: student._id, questionId },  // 只用這兩個當唯一條件
-      update,                                // 組好的 update
-      { new: true, upsert: true }            // 找不到就新增
-    );
+    console.log("儲存前 update：", JSON.stringify(update, null, 2));
 
+
+    const doc = await Submission.findOneAndUpdate(
+      { student: student._id, questionId },
+      update,
+      { new: true, upsert: true }
+    );
     res.status(201).json({ success: true, submissionId: doc._id });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 app.get("/api/submissions/stage1", async (req, res) => {
   try {

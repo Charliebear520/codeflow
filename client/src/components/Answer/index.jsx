@@ -136,19 +136,49 @@ const Answer = () => {
   const handleSave = async () => {
     try {
       if (!isSignedIn) { message.error("請先登入"); return; }
-      if (!flowRef.current?.exportGraph) { message.error("流程圖元件尚未載入"); return; }
-
-      const { nodes, edges } = flowRef.current.exportGraph();
-      const hasData = (nodes?.length || 0) + (edges?.length || 0) > 0;
-      if (!hasData) { message.error("還沒有流程圖可以儲存"); return; }
-
+  
+      let payload = { questionId: "Q001", completed: false };
+  
+      if (activeKey === "1") {
+        // 上傳流程圖
+        if (fileList.length === 0 || !fileList[0].base64) {
+          message.error("請先上傳流程圖圖片");
+          return;
+        }
+        payload.imageBase64 = fileList[0].base64.startsWith("data:")
+          ? fileList[0].base64
+          : "data:image/png;base64," + fileList[0].base64;
+        payload.mode = "upload";
+        // 不檢查 flowRef
+      } else if (activeKey === "2") {
+        // 線上製作
+        if (!flowRef.current?.exportGraph) {
+          message.error("流程圖元件尚未載入");
+          return;
+        }
+        const { nodes, edges } = flowRef.current.exportGraph();
+        const hasData = (nodes?.length || 0) + (edges?.length || 0) > 0;
+        if (!hasData) { message.error("還沒有流程圖可以儲存"); return; }
+  
+        const flowElement = document.querySelector(".react-flow");
+        if (!flowElement) {
+          message.error("找不到流程圖元素");
+          return;
+        }
+        const dataUrl = await toPng(flowElement, { backgroundColor: "#fff", pixelRatio: 2 });
+        payload.graph = { nodes, edges };
+        payload.imageBase64 = dataUrl;
+        payload.mode = "editor";
+        // ...existing code...
+  console.log("送出前 payload：", payload);
+  console.log("imageBase64 長度：", payload.imageBase64 ? payload.imageBase64.length : "null");
+  // ...existing code...
+      } else {
+        message.error("未知的分頁");
+        return;
+      }
+  
       const token = await getToken();
-      const payload = {
-        questionId: "Q001",            // ← 換成實際題號來源（URL/Redux/props）
-        graph: { nodes, edges },
-        completed: false,
-      };
-
       const res = await fetch(`http://localhost:5000/api/submissions/stage1`, {
         method: "POST",
         headers: {
@@ -159,34 +189,12 @@ const Answer = () => {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
-
+  
       message.success("已儲存第一階段的作答");
     } catch (err) {
       console.error(err);
       message.error(`儲存失敗：${err.message}`);
     }
-
-    // console.log("Exported Nodes:", nodes);
-    // console.log("Exported Edges:", edges);
-    // const payload = {
-    //   questionId: "Q001",        // 你實際的題號來源
-    //   userId: "student-123",     // 可選：登入的使用者ID
-    //   mode: "editor",            // 你也有「上傳圖片」模式，這裡標示來源
-    //   graph: { nodes, edges },   // ★ 關鍵：把 React Flow 的 JSON 送出去
-    // };
-
-    // const res = await fetch(`${API_BASE}/api/answers`, {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(payload),
-    // });
-
-    // const data = await res.json();
-    // if (res.ok && data.success) {
-    //   message.success("已儲存作答");
-    // } else {
-    //   message.error(`儲存失敗：${data.error || res.statusText}`);
-    // }
   }
 
 
