@@ -20,7 +20,7 @@ const getGenAI = () => {
   return genAI;
 };
 
-// 新增：生成流程圖題目的函數
+// 第一階段：生成流程圖題目
 export const generateFlowchartQuestion = async () => {
   try {
     console.log("Generating flowchart question...");
@@ -51,7 +51,7 @@ export const generateFlowchartQuestion = async () => {
   }
 };
 
-// 新增：生成流程圖提示的函數
+// 第一階段：生成流程圖提示
 export const generateFlowchartHint = async (question, hintLevel) => {
   try {
     console.log(`Generating flowchart hint... Level: ${hintLevel}`);
@@ -129,6 +129,7 @@ export const generateFlowchartHint = async (question, hintLevel) => {
   }
 };
 
+// 第一階段：檢查流程圖
 export const checkFlowchart = async (imageData, question) => {
   try {
     console.log("Starting flowchart check...");
@@ -179,6 +180,7 @@ export const checkFlowchart = async (imageData, question) => {
   }
 };
 
+// 第二階段：生成PseudoCode
 export const generatePseudoCode = async (prompt) => {
   const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
   const result = await model.generateContent(prompt);
@@ -198,6 +200,7 @@ export const generatePseudoCode = async (prompt) => {
   }
 };
 
+// 第二階段：檢查PseudoCode
 export const checkPseudoCode = async (question, userPseudoCode) => {
   try {
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -223,6 +226,7 @@ ${userPseudoCode}
   }
 };
 
+// 第三階段：檢查Code
 export const checkCode = async (question, code, language) => {
   try {
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
