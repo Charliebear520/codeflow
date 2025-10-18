@@ -3,7 +3,6 @@
   padding: 0rem 1rem 2rem 2rem;
   display: flex;             /* 啟用 Flexbox */
   flex-direction: column;    /* 設定主軸為垂直方向 */
-  
 }
 .container {
   display: flex;

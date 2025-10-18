@@ -191,11 +191,10 @@ const Topic = () => {
     <div className={styles.mainspace}>
       <div
         style={{
-          height: "5%",
+          height: "50px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-start",
-          
         }}
       >
         {/* <div className={styles.parsebox}>
@@ -213,6 +212,7 @@ const Topic = () => {
             overflow: "hidden",
             display: "flex",
             justifyContent: "center",
+           
           }}
         >
           <StageSwitcher current={currentStage} onChange={setCurrentStage} />

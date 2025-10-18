@@ -186,7 +186,7 @@ const TopicStage2 = ({
     <div className={styles.mainspace}>
       <div
         style={{
-          height: "5%",
+          height: "50px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-start",
