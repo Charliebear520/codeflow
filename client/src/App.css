@@ -38,7 +38,17 @@ body,
   width: 100%;
   max-height: 100vh;
   position: relative;
-  background-color: #f2f0ff;
+  background-color: transparent;
+  background: linear-gradient(
+    to right,
+    #f2f0ff 0%,      /* 左側淺紫色 */
+    #f2f0ff 31%,  /* 左1/3結束 */
+    #edf2ff 31%,  /* 中間淺藍色開始 */
+    #edf2ff 70%,  /* 中間淺藍色結束 */
+    #f2f0ff 70%,  /* 右側淺紫色開始 */
+    #f2f0ff 100%     /* 右1/3結束 */
+  );
+  
   overflow-y: hidden;
 }
 

@@ -48,11 +48,15 @@ export default () => {
 
         <div className={styles.node_box}>
           <div className={styles.dndnode_process_box}>
-            <div
-              className={styles.dndnode_process}
-              onDragStart={(event) => onDragStart(event, "process")}
-              draggable
-            ></div>
+            <div className={styles.dndnode_process_outer}>
+              <div
+               className={styles.dndnode_process}
+               onDragStart={(event) => onDragStart(event, "process")}
+               draggable
+              ></div>
+
+            </div>
+          
           </div>
           <p style={{ margin: 0 }}>輸入/輸出符號</p>
         </div>
