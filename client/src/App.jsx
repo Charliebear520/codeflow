@@ -34,6 +34,7 @@ const TeacherRoute = ({ children }) => {
     <Navigate to="/no-access" replace />
   );
 };
+import Stage1List from "./pages/StageList.jsx";
 
 // 建立一個需要認證的路由元件
 const ProtectedRoute = ({ children }) => {
@@ -271,6 +272,16 @@ function App() {
                 <ProtectedRoute>
                   <PageLayout>
                     <Tutor />
+                  </PageLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="stage-list"
+              element={
+                <ProtectedRoute>
+                  <PageLayout>
+                    <Stage1List />
                   </PageLayout>
                 </ProtectedRoute>
               }

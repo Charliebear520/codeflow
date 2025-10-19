@@ -13,6 +13,7 @@ import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import "./blankHighlight.css";
 import styles from "./answer.module.css"
+import { useAuth } from "@clerk/clerk-react";//額外加入
 
 // 方案A：Highlight ___
 function blankDecorationExtension() {
@@ -75,6 +76,11 @@ const OnlineCoding = ({
   const [isTerminalActive, setIsTerminalActive] = useState(false); // 終端機是否活躍
   const [processId, setProcessId] = useState(null); // 當前執行的程序ID
 
+  // 新增：儲存中 flag，避免重複點擊 (修正 saving 未定義錯誤)
+  const [saving, setSaving] = useState(false);
+  const { getToken } = useAuth();//額外加入
+  const API_BASE = import.meta.env.VITE_API_BASE;//額外加入
+
   // 語言對應 CodeMirror extension
   const getLanguageExtension = () => {
     if (language === "python") return python();
@@ -107,7 +113,7 @@ const OnlineCoding = ({
     }
     setLoading(true);
     setApiError("");
-    fetch("/api/generate-pseudocode", {
+    fetch("http://127.0.0.1:5000/api/generate-pseudocode", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -314,7 +320,7 @@ const OnlineCoding = ({
       setTerminalInput("");
     }
   };
-
+  
   // 停止程式執行
   const handleStopExecution = async () => {
     if (processId) {
@@ -335,6 +341,115 @@ const OnlineCoding = ({
       { type: "system", content: "程式執行已停止" },
     ]);
   };
+  const HandleSave = async () => {
+  if (saving) return; // 防止重複點擊
+  setSaving(true);
+  setApiError("");
+
+  try {
+    // ---------- 第 1 步：進行檢查 ----------
+    if (!code || !question) {
+      antdMessage.info("請先輸入程式碼與確認題目");
+      return;
+    }
+
+    if (onChecking) onChecking(true);
+
+    let checkRes;
+    let checkData;
+    try {
+      if (isStage3) {
+        // 第三階段：檢查程式語法
+        checkRes = await fetch("/api/check-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, code, language }),
+        });
+      } else {
+        // 第二階段：檢查 pseudocode
+        checkRes = await fetch("/api/check-pseudocode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, userPseudoCode: code }),
+        });
+      }
+
+      checkData = await checkRes.json();
+    } catch (err) {
+      console.error("檢查階段錯誤:", err);
+      antdMessage.error("檢查失敗，請稍後再試。");
+      return;
+    } finally {
+      if (onChecking) onChecking(false);
+    }
+
+    // ---------- 第 2 步：檢查回傳結果 ----------
+    if (!checkData?.success) {
+      antdMessage.error(checkData?.error || "檢查未通過，請修改後再試。");
+      if (onFeedback) onFeedback(checkData?.feedback || "");
+      return;
+    }
+
+    // 檢查成功
+    antdMessage.success("語法檢查回饋已顯示於右側助教區");
+    if (onFeedback) onFeedback(checkData.feedback);
+
+    // ---------- 第 3 步：進行儲存 ----------
+    const questionId = localStorage.getItem("currentFlowchartQuestionId") || "Q001";
+    // const API_BASE = import.meta.env.VITE_API_BASE;
+
+    let saveRes, saveData;
+
+    if (isStage3) {
+      console.log("[HandleSave] 儲存第三階段資料...");
+      saveRes = await fetch(`/api/submissions/stage3`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId,
+          code,
+          language,
+          completed: false,
+        }),
+      });
+    } else {
+      console.log("[HandleSave] 儲存第二階段資料...");
+      saveRes = await fetch(`/api/submissions/stage2`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionId,
+          pseudocode: code,
+          completed: false,
+        }),
+      });
+    }
+
+    if (!saveRes.ok) {
+      const errText = await saveRes.text();
+      console.error("儲存階段 HTTP 錯誤:", errText);
+      throw new Error(`HTTP error! status: ${saveRes.status}`);
+    }
+
+    saveData = await saveRes.json();
+    console.log("💾 儲存回傳資料:", saveData);
+
+    if (saveData.success) {
+      antdMessage.success(isStage3 ? "已儲存第三階段的作答" : "已儲存第二階段的作答");
+      console.log("保存成功", { questionId, stage: isStage3 ? 3 : 2 });
+    } else {
+      antdMessage.error(saveData.error || "儲存失敗");
+    }
+
+  } catch (err) {
+    console.error("HandleSave 發生錯誤:", err);
+    setApiError("操作失敗，請稍後再試。");
+    antdMessage.error("操作失敗，請稍後再試。");
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   return (
     <div className={styles.mainspace}>
@@ -399,7 +514,7 @@ const OnlineCoding = ({
             }}
           >
             <Button
-              onClick={handleCheck}
+              onClick={HandleSave}
               style={{
                 backgroundColor: "#B2C8FF",
                 color: "#223687",
@@ -436,6 +551,7 @@ const OnlineCoding = ({
             >
               清空
             </Button>
+
             {isStage3 && (
               <>
                 {!isTerminalActive ? (
@@ -705,7 +821,7 @@ const OnlineCoding = ({
                       type="text"
                       value={terminalInput}
                       onChange={(e) => setTerminalInput(e.target.value)}
-                      onKeyPress={handleTerminalInput}
+                      onKeyDown={handleTerminalInput}
                       placeholder="請輸入資料..."
                       style={{
                         flex: 1,
