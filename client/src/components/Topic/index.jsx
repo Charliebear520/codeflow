@@ -161,7 +161,7 @@ const Topic = () => {
   const content = (
     <div>
       <Image
-        src="/image4.png"
+        src="/studentsAnswer02.png"
         alt="流程圖範例"
         style={{ width: "200px" }}
         preview={false}
