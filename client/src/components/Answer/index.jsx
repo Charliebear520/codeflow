@@ -133,7 +133,7 @@ const Answer = () => {
       ),
     },
   ];
-  /*const handleSave = async () => {
+  const handleSave = async () => {
     try {
       if (!isSignedIn) { message.error("請先登入"); return; }
   
@@ -209,11 +209,11 @@ const Answer = () => {
       <Button type="primary" className={styles.saveButton} onClick={handleSave}>
         儲存
       </Button>
-      {/* <Button danger onClick={handleReset}>
+      {<Button danger onClick={handleReset}>
         清空
       </Button> }
     </div>
-  );*/
+  );
 
   return (
     <ConfigProvider
