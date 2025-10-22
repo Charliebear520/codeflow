@@ -30,7 +30,7 @@ const Topic = () => {
     setLoading(true);
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/generate-question"
+        "/api/generate-question"
       );
       if (response.data.success) {
         setQuestion(response.data.question);
@@ -64,7 +64,7 @@ const Topic = () => {
     setHintLoading(true);
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/generate-hint",
+        "/api/generate-hint",
         {
           question,
           hintLevel,
@@ -161,7 +161,7 @@ const Topic = () => {
   const content = (
     <div>
       <Image
-        src="/image4.png"
+        src="/studentsAnswer02.png"
         alt="流程圖範例"
         style={{ width: "200px" }}
         preview={false}
@@ -188,13 +188,13 @@ const Topic = () => {
   );
 
   return (
-    <div className={styles.container}>
+    <div className={styles.mainspace}>
       <div
         style={{
-          height: "20%",
+          height: "50px",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "flex-end",
+          justifyContent: "flex-start",
         }}
       >
         {/* <div className={styles.parsebox}>
@@ -212,12 +212,16 @@ const Topic = () => {
             overflow: "hidden",
             display: "flex",
             justifyContent: "center",
+           
           }}
         >
           <StageSwitcher current={currentStage} onChange={setCurrentStage} />
         </div>
       </div>
-      <div style={{ height: "100%", overflowY: "hidden" }}>
+
+      <div className={styles.container}>
+      
+      <div style={{ height: "85%"}}>
         <div className={styles.topicbox}>
           <div
             style={{
@@ -228,19 +232,26 @@ const Topic = () => {
               overflowY: "hidden",
             }}
           >
-            <div>
+            <div style={{ paddingBottom: "2rem" }}>
               <h3>Ch1,繪製流程圖</h3>
             </div>
-            <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
-            <div
+            <p style={{ flex: 1, padding: "0 1rem 1rem 0" }}>{question}</p>
+            <br />
+          </div>
+          <div
               style={{
+                width:"50%",
                 display: "flex",
+                flexDirection: "column",
                 gap: "10px",
                 marginTop: "10px",
                 overflowY: "hidden",
+                justifyContent: "flex-end",
+                
               }}
             >
               <Button
+                className={styles.buttonStyle01}
                 icon={loading ? <SyncOutlined spin /> : <SyncOutlined />}
                 onClick={fetchNewQuestion}
                 disabled={loading}
@@ -248,6 +259,7 @@ const Topic = () => {
                 生成新題目
               </Button>
               <Button
+                className={styles.buttonStyle02}
                 type="primary"
                 icon={<BulbOutlined />}
                 onClick={showHint}
@@ -255,25 +267,23 @@ const Topic = () => {
               >
                 {`提示 (${hintLevel}/7)`}
               </Button>
-            </div>
-
-            <br />
           </div>
+
           <div className={styles.infobox}>
             <div className={styles.examplebox}>
-              <img src={"/Camera.png"} height={14} width={14} />
+              <img src={"/Camera.png"} height={15} width={16} />
               <Popover placement="right" content={content} trigger="hover">
                 <h5 className={styles.example}>流程圖範例</h5>
               </Popover>
             </div>
             <div className={styles.examplebox}>
-              <img src={"/Graduation.png"} height={14} width={14} />
+              <img src={"/Graduation.png"} height={15} width={16} />
               <Popover placement="right" content={example} trigger="hover">
                 <h5 className={styles.example}>流程圖的概念</h5>
               </Popover>
             </div>
             <div className={styles.examplebox}>
-              <img src={"/Book.png"} height={14} width={14} />
+              <img src={"/Book.png"} height={15} width={16} />
               <Popover placement="right" content={content} trigger="hover">
                 <h5 className={styles.example}>流程圖大揭秘</h5>
               </Popover>
@@ -354,6 +364,9 @@ const Topic = () => {
         )}
       </Modal>
     </div>
+
+    </div>
+   
   );
 };
 

@@ -10,6 +10,7 @@ import {
 import "./App.css";
 import Home from "./pages/Home";
 import Tutor from "./pages/Tutor";
+import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import SignUpPage from "./pages/SignUp";
 import Profile from "./pages/Profile";
@@ -20,6 +21,19 @@ import Stage3Page from "./pages/Stage3Page.jsx";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AddQuestion from "./pages/AddQuestion";
+import { OrganizationSwitcher, useOrganization } from "@clerk/clerk-react";
+
+// 教師Route：依據 Active Organization 的 membership role 判斷
+const TeacherRoute = ({ children }) => {
+  const { membership, isLoaded } = useOrganization();
+  if (!isLoaded) return null;
+  const role = membership?.role;
+  return role === "teacher" || role === "org:admin" ? (
+    children
+  ) : (
+    <Navigate to="/no-access" replace />
+  );
+};
 import Stage1List from "./pages/StageList.jsx";
 
 // 建立一個需要認證的路由元件
@@ -109,6 +123,9 @@ const Header = () => {
         </a>
       </div>
       <div className="header-right">
+        {/* <div style={{ marginRight: 12 }}>
+          <OrganizationSwitcher />
+        </div> */}
         <SignedIn>
           <UserMenu />
         </SignedIn>
@@ -165,14 +182,20 @@ function App() {
               }
             />
             <Route
-              path={"/tutor"}
+              path={"/dashboard"}
               element={
                 <ProtectedRoute>
-                  <PageLayout>
-                    <Tutor />
-                  </PageLayout>
+                  <TeacherRoute>
+                    <PageLayout>
+                      <Dashboard />
+                    </PageLayout>
+                  </TeacherRoute>
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/no-access"
+              element={<div style={{ padding: 24 }}>沒有權限</div>}
             />
             {/* 個人資料相關路由 */}
             <Route
@@ -239,6 +262,16 @@ function App() {
                 <ProtectedRoute>
                   <PageLayout>
                     <AddQuestion />
+                  </PageLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={"/tutor"}
+              element={
+                <ProtectedRoute>
+                  <PageLayout>
+                    <Tutor />
                   </PageLayout>
                 </ProtectedRoute>
               }
