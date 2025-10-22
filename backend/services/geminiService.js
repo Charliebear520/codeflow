@@ -28,18 +28,24 @@ export const generateFlowchartQuestion = async () => {
     // 使用 gemini模型
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `生成一個流程圖練習題目，使用繁體中文。
-    題目應該要求學生為簡單的日常決策過程創建一個流程圖。
-    格式：「請根據下方敘述繪製流程圖。[情境描述]」
-    要求：
+ const prompt = `你是一位專業的中文教育題目生成器，請**嚴格遵守**以下要求。
+
+    **核心任務：**生成一個流程圖練習題目。
+    **語言要求：**必須且只能使用**繁體中文**。
+    
+    題目內容：應該要求學生為簡單的日常決策過程創建一個流程圖。
+    格式：**只返回題目文本**，格式為：「請根據下方敘述繪製流程圖。[情境描述]」
+    
+    **重要要求清單 (必須全部滿足)：**
     1. 適合初學者學習流程圖
     2. 包含3-5個決策點
     3. 情境要生活化且具體
-    4. 確保需要用到判斷符號
-    5. 長度控制在50-100字之間
+    4. 確保需要用到菱形判斷符號
+    5. 內容長度必須控制在50-100字之間
+    6. **再次強調：所有輸出文字必須是繁體中文。**
     
-    只返回題目文本，不要包含任何其他說明或格式。`;
-
+    只返回題目文本，不包含任何額外的說明、註解或標題。`;
+    
     console.log("Sending question generation request to Gemini API...");
 
     const result = await model.generateContent(prompt);
