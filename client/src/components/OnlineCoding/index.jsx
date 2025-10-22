@@ -78,7 +78,6 @@ const OnlineCoding = ({
   const [processId, setProcessId] = useState(null); // 當前執行的程序ID
 
   // 新增：儲存中 flag，避免重複點擊 (修正 saving 未定義錯誤)
-  const [saving, setSaving] = useState(false);
   const { getToken } = useAuth();//額外加入
   const API_BASE = import.meta.env.VITE_API_BASE;//額外加入
 
