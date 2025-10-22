@@ -13,6 +13,7 @@ import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import "./blankHighlight.css";
 import styles from "./answer.module.css"
+import { useAuth } from "@clerk/clerk-react";//額外加入
 
 // 方案A：Highlight ___
 function blankDecorationExtension() {
@@ -76,6 +77,11 @@ const OnlineCoding = ({
   const [isTerminalActive, setIsTerminalActive] = useState(false); // 終端機是否活躍
   const [processId, setProcessId] = useState(null); // 當前執行的程序ID
 
+  // 新增：儲存中 flag，避免重複點擊 (修正 saving 未定義錯誤)
+  const [saving, setSaving] = useState(false);
+  const { getToken } = useAuth();//額外加入
+  const API_BASE = import.meta.env.VITE_API_BASE;//額外加入
+
   // 語言對應 CodeMirror extension
   const getLanguageExtension = () => {
     if (language === "python") return python();
@@ -108,7 +114,7 @@ const OnlineCoding = ({
     }
     setLoading(true);
     setApiError("");
-    fetch("/api/generate-pseudocode", {
+    fetch("http://127.0.0.1:5000/api/generate-pseudocode", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -315,7 +321,7 @@ const OnlineCoding = ({
       setTerminalInput("");
     }
   };
-
+  
   // 停止程式執行
   const handleStopExecution = async () => {
     if (processId) {
@@ -336,8 +342,7 @@ const OnlineCoding = ({
       { type: "system", content: "程式執行已停止" },
     ]);
   };
-
-const HandleSave = async () => {
+  const HandleSave = async () => {
   if (saving) return; // 防止重複點擊
   setSaving(true);
   setApiError("");
@@ -392,13 +397,13 @@ const HandleSave = async () => {
 
     // ---------- 第 3 步：進行儲存 ----------
     const questionId = localStorage.getItem("currentFlowchartQuestionId") || "Q001";
-    const API_BASE = import.meta.env.VITE_API_BASE;
+    // const API_BASE = import.meta.env.VITE_API_BASE;
 
     let saveRes, saveData;
 
     if (isStage3) {
-      console.log("🧾 [HandleSave] 儲存第三階段資料...");
-      saveRes = await fetch(`${API_BASE}/api/submissions/stage3`, {
+      console.log("[HandleSave] 儲存第三階段資料...");
+      saveRes = await fetch(`/api/submissions/stage3`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -409,8 +414,8 @@ const HandleSave = async () => {
         }),
       });
     } else {
-      console.log("🧾 [HandleSave] 儲存第二階段資料...");
-      saveRes = await fetch(`${API_BASE}/api/submissions/stage2`, {
+      console.log("[HandleSave] 儲存第二階段資料...");
+      saveRes = await fetch(`/api/submissions/stage2`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -445,6 +450,7 @@ const HandleSave = async () => {
     setSaving(false);
   }
 };
+
 
   return (
     <div className={styles.mainspace}>
@@ -546,6 +552,7 @@ const HandleSave = async () => {
             >
               清空
             </Button>
+
             {isStage3 && (
               <>
                 {!isTerminalActive ? (

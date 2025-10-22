@@ -9,18 +9,19 @@ const Check = ({ feedback, isChecking, onTutorClick }) => {
   const { result } = useSelector((state) => state.check);
 
   return (
-    <div className={styles.container}>
+    <div className={styles.mainspace}>
+       <div className={styles.container}>
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          justifyContent: "flex-end",
+          justifyContent: "flex-start",
         }}
       >
         {onTutorClick && (
           <div className={styles.tutorbox}>
             <Button
-              style={{ backgroundColor: "#375BD3", color: "#FFFFFF" }}
+              style={{ height: "36px", fontSize: "16px", backgroundColor: "#375BD3", color: "#FFFFFF" }}
               onClick={onTutorClick}
             >
               詢問沐芙助教
@@ -55,6 +56,9 @@ const Check = ({ feedback, isChecking, onTutorClick }) => {
         </div>
       </div>
     </div>
+
+    </div>
+   
   );
 };
 

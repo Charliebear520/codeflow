@@ -6,7 +6,21 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api": "http://localhost:5000",
+      "/api": { target: "http://127.0.0.1:5000", changeOrigin: true }
+    }
+  },
+  build: {
+    outDir: "dist",
+    assetsDir: "assets",
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          ui: ["antd", "@ant-design/icons"],
+        },
+      },
     },
   },
+  base: process.env.NODE_ENV === "production" ? "/" : "/",
 });

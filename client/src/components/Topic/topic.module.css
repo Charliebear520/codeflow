@@ -1,10 +1,17 @@
+.mainspace{
+  height: 100vh; 
+  padding: 0rem 1rem 2rem 2rem;
+  display: flex;             /* 啟用 Flexbox */
+  flex-direction: column;    /* 設定主軸為垂直方向 */
+}
 .container {
-  padding: 0 1rem 2rem 0rem;
   display: flex;
   flex-direction: column; /* 讓子元素垂直排列 */
+  height: 95%;
   max-height: 100vh; /* 設定高度為視窗高度 */
   overflow: hidden; /* 防止滾動條出現 */
   /* gap:1rem; */
+
 }
 
 .parsebox {
@@ -12,7 +19,10 @@
   align-items: center;
   gap: 1em;
 }
-
+h5{
+  font-size: 15px;
+  font-weight: 350;
+}
 .h4 {
   font-family: "Noto Sans";
   font-style: bold;
@@ -31,10 +41,11 @@
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
   flex-grow: 1; /* 占據剩餘空間 */
   margin-bottom: 1rem; /* 底部留白 */
-  padding: 1rem; /* 增加內邊距 */
-  overflow-y: hidden; /* 只在垂直方向允许滚动 */
+  padding: 1.5rem; /* 增加內邊距 */
+  overflow-y: hidden; 
   box-sizing: border-box; /* 確保 padding 不會影響元素大小 */
   height: 100%;
+  
 }
 
 .examplebox {
@@ -43,6 +54,7 @@
   justify-content: flex-start;
   align-items: center;
   overflow-y: hidden;
+  
 }
 
 .example {
@@ -59,4 +71,14 @@
   width: 100%;
   display: flex;
   justify-content: flex-end;
+}
+.buttonStyle01{
+  color: #9287ee;
+  cursor: pointer;
+  border: 1px solid #9287ee;
+}
+.buttonStyle02 {
+  background-color: #9287ee;
+  border: none;
+  cursor: pointer;
 }

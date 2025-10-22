@@ -5,6 +5,7 @@ import Check from "../components/Check";
 import { Row, Col } from "antd";
 import OnlineCoding from "../components/OnlineCoding";
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import styles from "./Stage2Page.module.css";
 
@@ -13,6 +14,7 @@ export default function Stage2Page() {
   const [currentStage, setCurrentStage] = useState(1); // 預設第二階段
   // 新增放大模式狀態
   const [isExpanded, setIsExpanded] = useState(false);
+  const navigate = useNavigate();
 
   // 題目從 localStorage 取得，若無則用預設
   const defaultQuestion =
@@ -30,7 +32,7 @@ export default function Stage2Page() {
 
   // 處理芙蓉助教按鈕點擊
   const handleTutorClick = () => {
-    setIsExpanded(false); // 縮回原本大小
+    navigate("/tutor");
   };
 
   // 動態計算列寬
@@ -54,7 +56,7 @@ export default function Stage2Page() {
             setCurrentStage={setCurrentStage}
           />
         </Col>
-        <Col span={spans.center}>
+        <Col span={spans.center} className={styles.centerbackground}>
           <OnlineCoding
             question={question}
             currentStage={currentStage}

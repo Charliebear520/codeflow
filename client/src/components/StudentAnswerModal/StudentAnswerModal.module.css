@@ -1,0 +1,11 @@
+.checkButton{
+   width: 20%;
+   height: 27px;
+   color: whitesmoke;
+   background-color: #007bff;
+}
+
+.modalstyle{
+    width: 500px;
+    height: 500px;
+}

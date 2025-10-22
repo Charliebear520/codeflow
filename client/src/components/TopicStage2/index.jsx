@@ -30,7 +30,7 @@ const TopicStage2 = ({
     setLoading(true);
     try {
       const response = await axios.get(
-        "http://localhost:5000/api/generate-question"
+        "/api/generate-question"
       );
       if (response.data.success) {
         setQuestion(response.data.question);
@@ -62,7 +62,7 @@ const TopicStage2 = ({
     setHintLoading(true);
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/generate-hint",
+        "/api/generate-hint",
         {
           question,
           hintLevel,
@@ -183,13 +183,13 @@ const TopicStage2 = ({
   );
 
   return (
-    <div className={styles.container}>
+    <div className={styles.mainspace}>
       <div
         style={{
-          height: "20%",
+          height: "50px",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "flex-end",
+          justifyContent: "flex-start",
         }}
       >
         {/* <div className={styles.parsebox}>
@@ -211,7 +211,10 @@ const TopicStage2 = ({
           <StageSwitcher current={currentStage} onChange={setCurrentStage} />
         </div>
       </div>
-      <div style={{ height: "100%", overflowY: "hidden" }}>
+
+      <div className={styles.container}>
+      
+      <div style={{ height: "85%" }}>
         <div className={styles.topicbox}>
           <div
             style={{
@@ -222,7 +225,7 @@ const TopicStage2 = ({
               overflowY: "hidden",
             }}
           >
-            <div>
+            <div style={{ paddingBottom: "2rem" }}>
               <h3>Ch2,製作pseudocode</h3>
             </div>
             <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
@@ -251,6 +254,9 @@ const TopicStage2 = ({
         </div>
       </div>
     </div>
+
+    </div>
+    
   );
 };
 
