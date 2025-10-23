@@ -692,11 +692,12 @@ app.post("/api/run-code", async (req, res) => {
 
 // === 新增：互動式程式執行 API ===
 app.post("/api/run-code-interactive", async (req, res) => {
-  const { code, language } = req.body || {};
-  console.log("[run-code-interactive] incoming", { language, codeLength: code?.length ?? 0 });
-
+  const { code, language } = req.body;
   if (!code || !language) {
-    return res.status(400).json({ success: false, error: "缺少 code 或 language 參數" });
+    return res.status(400).json({
+      success: false,
+      error: "缺少 code 或 language 參數",
+    });
   }
 
   console.log("Code execution requested:", {
@@ -709,63 +710,13 @@ app.post("/api/run-code-interactive", async (req, res) => {
   const tmpDir = path.join(os.tmpdir(), "codeflow-backend-temp");
   const processId = `proc_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-  function existsSync(p) {
-    try {
-      return fsSyncLocal.existsSync(p);
-    } catch {
-      return false;
-    }
-  }
+  let filename,
+    filepath,
+    execCmd,
+    cleanupFiles = [];
 
-  // 使用現有 execp（在檔案上方定義），若不存在則 fallback
-  const checkCmd = async (cmd, args = ["--version"]) => {
-    try {
-      if (typeof execp === "function") {
-        await execp(`${cmd} ${args.join(" ")}`);
-        return true;
-      }
-      // fallback
-      await new Promise((resolve, reject) => {
-        execFile(cmd, args, { timeout: 2000 }, (err) => (err ? reject(err) : resolve()));
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const pickNode = async () => {
-    if (process.execPath) return process.execPath;
-    if (await checkCmd("node")) return "node";
-    return null;
-  };
-  const pickPython = async () => {
-    if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
-    if (await checkCmd("python3")) return "python3";
-    if (await checkCmd("python")) return "python";
-    if (await checkCmd("py", ["-3", "--version"])) return "py";
-    return null;
-  };
-  // pickCCompiler() 已在檔案頂端定義，可直接呼叫
-
-  // safe respond 防止重覆回應
-  let responded = false;
-  const safeRespond = (status, payload) => {
-    if (responded) return;
-    responded = true;
-    try {
-      res.status(status).json(payload);
-    } catch (e) {
-      console.error("[run-code-interactive] safeRespond error:", e);
-    }
-  };
-
-  let cleanupFiles = [];
   try {
     await fs.mkdir(tmpDir, { recursive: true });
-
-    // prepare file / command
-    let filename, filepath, execCmd, spawnArgs = [];
 
     if (language === "python") {
       // Vercel環境中沒有Python，使用JavaScript執行
@@ -779,65 +730,37 @@ app.post("/api/run-code-interactive", async (req, res) => {
       cleanupFiles = [filepath];
     } else if (language === "javascript") {
       filename = `${processId}.js`;
-      filepath = pathLocal.join(tmpDir, filename);
+      filepath = path.join(tmpDir, filename);
       await fs.writeFile(filepath, code, "utf-8");
-      cleanupFiles.push(filepath);
-
-      const NODE = await pickNode();
-      if (!NODE) {
-        await fs.unlink(filepath).catch(() => {});
-        return safeRespond(400, { success: false, error: "後端未安裝 Node.js（請安裝 node）" });
-      }
-      execCmd = NODE;
-      spawnArgs = [filepath];
-
+      execCmd = "node";
+      cleanupFiles = [filepath];
     } else if (language === "c") {
       filename = `${processId}.c`;
-      filepath = pathLocal.join(tmpDir, filename);
+      filepath = path.join(tmpDir, filename);
+      const outputExe = path.join(tmpDir, `${processId}_out`);
       await fs.writeFile(filepath, code, "utf-8");
-      cleanupFiles.push(filepath);
 
-      const outBase = pathLocal.join(tmpDir, `${processId}_out`);
-      const exeWin = `${outBase}.exe`;
-      const exeUnix = outBase;
-
-      const CC = await pickCCompiler();
-      if (!CC) {
-        await fs.unlink(filepath).catch(() => {});
-        return safeRespond(400, { success: false, error: "後端沒有可用的 C 編譯器（請安裝 gcc 或 clang）" });
-      }
-
-      // compile
-      try {
-        await new Promise((resolve, reject) => {
-          execFile(
-            CC,
-            [filepath, "-O0", "-o", outBase],
-            { timeout: 8000, maxBuffer: 1024 * 200 },
-            (err, stdout, stderr) => {
-              if (err) reject({ err, stdout, stderr });
-              else resolve({ stdout, stderr });
+      // 編譯 C 程式
+      await new Promise((resolve, reject) => {
+        exec(
+          `gcc "${filepath}" -o "${outputExe}"`,
+          { timeout: 2000 },
+          (err, stdout, stderr) => {
+            if (err) {
+              reject(stderr || err.message);
+            } else {
+              resolve();
             }
-          );
-        });
-      } catch (e) {
-        await fs.unlink(filepath).catch(() => {});
-        const stderrMsg = (e.stderr && String(e.stderr)) || (e.err && e.err.message) || "compile error";
-        return safeRespond(200, {
-          success: false,
-          stdout: e.stdout || "",
-          stderr: stderrMsg,
-          errorType: "compile",
-        });
-      }
-
-      // determine exe path
-      const exePath = existsSync(exeWin) ? exeWin : exeUnix;
-      cleanupFiles.push(exePath);
-      execCmd = exePath;
-      spawnArgs = [];
+          }
+        );
+      });
+      execCmd = outputExe;
+      cleanupFiles = [filepath, outputExe];
     } else {
-      return safeRespond(400, { success: false, error: "不支援的語言，目前僅支援 Python、JavaScript、C" });
+      return res.status(400).json({
+        success: false,
+        error: "不支援的語言，目前僅支援 Python、JavaScript、C",
+      });
     }
 
     // 啟動互動式程序
@@ -880,27 +803,38 @@ app.post("/api/run-code-interactive", async (req, res) => {
     childProcess.on("error", (error) => {
       console.error(`Process error for ${processId}:`, error);
       activeProcesses.delete(processId);
+      // 清理檔案
       Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     });
 
-    activeProcesses.set(processId, { process: child, cleanupFiles, language });
+    // 存儲程序引用
+    activeProcesses.set(processId, {
+      process: childProcess,
+      cleanupFiles,
+      language,
+    });
 
-    // 等候初始輸出，再回應 client（500ms）
+    // 等待一小段時間看是否有初始輸出，並判斷程式是否完成
     setTimeout(() => {
-      if (responded) return;
-      const isRunning = !child.killed && child.exitCode === null;
-      if (!isRunning) {
+      // 檢查程序是否還在運行
+      const isProcessRunning =
+        !childProcess.killed && childProcess.exitCode === null;
+
+      // 如果程序已經結束，清理資源
+      if (!isProcessRunning) {
         activeProcesses.delete(processId);
+        // 清理檔案
         Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
       }
-      safeRespond(200, {
+
+      res.json({
         success: true,
-        processId: isRunning ? processId : null,
-        initialOutput: hasOutput ? initialOutput : "",
-        needsInput: isRunning,
-        finished: !isRunning,
+        processId: isProcessRunning ? processId : null, // 如果程序已結束，返回null
+        initialOutput: hasReceivedOutput ? initialOutput : "",
+        needsInput: isProcessRunning, // 如果程序還在運行，表示需要輸入
+        finished: !isProcessRunning, // 如果程序已結束，表示不需要輸入
       });
-    }, 500);
+    }, 500); // 增加等待時間以確保程序有足夠時間執行
   } catch (err) {
     console.error("Error in run-code-interactive:", err);
     console.error("Platform:", process.platform);
@@ -987,6 +921,7 @@ app.post("/api/send-input", async (req, res) => {
     });
   }
 });
+
 // === 停止程序 ===
 app.post("/api/stop-process", async (req, res) => {
   const { processId } = req.body;
