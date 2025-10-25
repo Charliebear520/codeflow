@@ -3,9 +3,12 @@ import { useSignIn, useAuth } from "@clerk/clerk-react";
 import "../styles/Login.css";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
+const API = import.meta.env.VITE_API_URL || "";
+
 
 function Login() {
   const navigate = useNavigate();
+  const { getToken } = useAuth();
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { isLoaded, signIn, setActive } = useSignIn();
 
@@ -42,7 +45,22 @@ function Login() {
       if (result.status === "complete") {
         // 登入成功，設置活動會話
         await setActive({ session: result.createdSessionId });
-        window.location.href = "/"; // 重定向到首頁
+        console.log("電子郵件驗證成功，已登入");
+        try {
+          const token = await getToken();
+          console.log('token starts with:', token?.slice(0,20));
+          await fetch(`/api/me`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include",
+            keepalive: true,                 // ★ 關鍵：避免在導向時被取消
+          });
+          console.log("已呼叫 /api/me");
+        } catch (e) {
+          console.warn("呼叫 /api/me 失敗：", e);
+        }
+        navigate("/", { replace: true });
+
       } else if (result.status === "needs_second_factor") {
         // 處理雙因素驗證
         setVerifying(true);
@@ -80,6 +98,13 @@ function Login() {
       if (result.status === "complete") {
         // 驗證成功，設置活動會話
         await setActive({ session: result.createdSessionId });
+        try {
+          const token = await window.Clerk?.session?.getToken() || (await getToken());
+          await fetch(`${API}/api/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include",
+          });
+        } catch (_) { }
         window.location.href = "/"; // 重定向到首頁
       } else {
         setErrorMessage("驗證失敗，請檢查您的驗證碼");
