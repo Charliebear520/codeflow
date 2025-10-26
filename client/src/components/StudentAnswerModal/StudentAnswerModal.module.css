@@ -9,3 +9,9 @@
     width: 500px;
     height: 500px;
 }
+.image{
+    max-width: 600px;
+}
+.title{
+    display: flex;
+}
