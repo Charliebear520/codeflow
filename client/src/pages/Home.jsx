@@ -36,7 +36,7 @@ const Home = () => {
       </button>
       */}
 
-      {/* <button
+      {<button
         style={{
           position: "fixed",
           bottom: 20,
@@ -54,7 +54,7 @@ const Home = () => {
         onClick={() => navigate("/stage-list")}
       >
         前往StageList頁面（測試用）
-      </button> */}
+      </button>
     </div>
   );
 };
