@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import os from "os";
+import path from "path";
 // import ImageKit from "imagekit"; // 暫時註解掉以避免導入問題
 // 移除靜態導入，改為動態導入以避免初始化問題
 // import {
@@ -14,14 +16,20 @@ import dotenv from "dotenv";
 import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";// 暫時禁用以避免導入問題
 import { exec,spawn } from "child_process";
 import { promisify } from "util";
-
 const execAsync = promisify(exec);
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
 import Student from "./models/Student.js";
 import Submission from "./models/Submission.js";
-import os from "os";
-import path from "path";
+import IdealAnswer from "./models/IdealAnswer.js";
+import {
+  generateIdealFlowSpec,
+  parseStudentFlowSpecFromImage,
+  mapEditorGraphToFlowSpec,
+  normalizeFlowSpec,
+  compareFlowSpecs,
+  generateFeedbackText,
+} from "./services/flowSpecService.js";
 
 // 動態導入Gemini服務的輔助函數
 const loadGeminiServices = async () => {
@@ -347,6 +355,147 @@ app.post("/api/check-flowchart", async (req, res) => {
     res.json({ result });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 產生/更新理想答案（教師）
+app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
+  try {
+    const { questionId, questionText } = req.body || {};
+    if (!questionId && !questionText) {
+      return res.status(400).json({ success: false, error: "需提供 questionId 或 questionText" });
+    }
+
+    // 取得題目文字：優先 body.questionText，其次從 Question 資料表讀取
+    let qText = (questionText || "").trim();
+    if (!qText && questionId) {
+      // questionId 可能是 ObjectId 或你們自訂字串，先以 ObjectId 嘗試，失敗再用 questionTitle 比對
+      if (mongoose.isValidObjectId(questionId)) {
+        const doc = await Question.findById(questionId).lean();
+        qText = doc?.description || doc?.questionTitle || "";
+      }
+      if (!qText) {
+        const docByTitle = await Question.findOne({ questionTitle: questionId }).lean();
+        qText = docByTitle?.description || docByTitle?.questionTitle || "";
+      }
+    }
+    if (!qText) {
+      return res.status(400).json({ success: false, error: "找不到題目內容，請提供 questionText" });
+    }
+
+    const flowSpec = await generateIdealFlowSpec(qText);
+    const saved = await IdealAnswer.findOneAndUpdate(
+      { questionId: String(questionId || "UNKNOWN") },
+      {
+        $set: {
+          flowSpec,
+          version: "v1",
+          modelUsed: "gemini-2.0-flash",
+          generatedAt: new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json({ success: true, data: saved });
+  } catch (err) {
+    console.error("ideal/flow/generate error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 取得理想答案
+app.get("/api/ideal/flow/:questionId", async (req, res) => {
+  try {
+    const doc = await IdealAnswer.findOne({ questionId: String(req.params.questionId) }).lean();
+    if (!doc) return res.status(404).json({ success: false, error: "ideal answer not found" });
+    res.json({ success: true, data: doc });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Stage1 比對：解析 -> 比對 -> 產生回饋（需登入）
+app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const studentDoc = await ensureStudent(userId);
+
+    const { questionId, imageBase64, graph } = req.body || {};
+    if (!questionId) return res.status(400).json({ success: false, error: "questionId 必填" });
+
+    // 取得題目內容（給 Vision/回饋參考，沒抓到也不阻擋）
+    let questionText = "";
+    if (mongoose.isValidObjectId(questionId)) {
+      const q = await Question.findById(questionId).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    } else {
+      const q = await Question.findOne({ questionTitle: questionId }).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    }
+
+    // 1) 取得或生成理想答案
+    let ideal = await IdealAnswer.findOne({ questionId: String(questionId) }).lean();
+    if (!ideal) {
+      const generated = await generateIdealFlowSpec(questionText || "請根據題意繪製流程圖");
+      ideal = await IdealAnswer.create({
+        questionId: String(questionId),
+        flowSpec: generated,
+        version: "v1",
+        modelUsed: "gemini-2.0-flash",
+        generatedAt: new Date(),
+      });
+    }
+    const idealSpec = normalizeFlowSpec(ideal.flowSpec);
+
+    // 2) 解析學生答案
+    let studentSpec;
+    if (graph && (graph.nodes?.length || 0) + (graph.edges?.length || 0) > 0) {
+      studentSpec = mapEditorGraphToFlowSpec(graph);
+    } else if (imageBase64) {
+      const base64 = imageBase64.startsWith("data:")
+        ? imageBase64.split(",")[1]
+        : imageBase64;
+      studentSpec = await parseStudentFlowSpecFromImage(base64, questionText || "");
+    } else {
+      return res.status(400).json({ success: false, error: "需提供 graph 或 imageBase64" });
+    }
+
+    // 3) 比對
+    const { diffs, scores } = compareFlowSpecs(idealSpec, studentSpec);
+
+    // 4) 產生回饋
+    const feedback = await generateFeedbackText(questionText || "", idealSpec, studentSpec, diffs, scores);
+
+    // 5) 寫回 Submission（保留你現有 stage1 結構，擴充比對結果）
+    const update = {
+      $set: {
+        "stages.stage1.flowSpec": studentSpec,
+        "stages.stage1.scores": scores,
+        "stages.stage1.diffs": diffs,
+        "stages.stage1.feedback": feedback,
+        "stages.stage1.updatedAt": new Date(),
+        idealVersion: ideal.version || "v1",
+        studentName: studentDoc.name ?? null,
+        studentEmail: studentDoc.email?.toLowerCase() ?? null,
+      },
+      $setOnInsert: {
+        student: studentDoc._id,
+        questionId,
+        createdAt: new Date(),
+      },
+    };
+
+    const doc = await Submission.findOneAndUpdate(
+      { student: studentDoc._id, questionId },
+      update,
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
+  } catch (err) {
+    console.error("stage1/compare error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
