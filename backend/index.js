@@ -1028,13 +1028,30 @@ app.get("/test", (req, res) => {
 
 // 教師後台資料：僅教師可訪問
 app.get("/api/admin/submissions", requireTeacher, async (req, res) => {
-  try {
-    // 範例：回傳最近題目（實際可換為作答紀錄）
-    const latest = await Question.find({}).sort({ createdAt: -1 }).limit(10);
-    res.json({ success: true, items: latest });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  // try {
+  //   // 範例：回傳最近題目（實際可換為作答紀錄）
+  //   const latest = await Question.find({}).sort({ createdAt: -1 }).limit(10);
+  //   res.json({ success: true, items: latest });
+  //   console.log("latest:", latest);
+  // } catch (err) {
+  //   res.status(500).json({ success: false, error: err.message });
+  // }
+  const { studentId, questionId, stage, page = 1, pageSize = 20 } = req.query;
+  const filter = {};
+  if (studentId) filter.student = studentId;
+  if (questionId && questionId !== "all") filter.questionId = questionId;
+  if (stage && ["stage1", "stage2", "stage3"].includes(stage)) {
+    filter[`stages.${stage}.completed`] = true;
   }
+  const skip = (Number(page) - 1) * Number(pageSize);
+  const items = await Submission.find(filter)
+    .populate("student", "name email className") //從"mongoose.model("Student", studentSchema)"中，讀取學生的資料(姓名、信箱、班級)
+    .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(Number(pageSize))
+    .lean();
+  const total = await Submission.countDocuments(filter);
+  res.json({ success: true, items, total, page: Number(page), pageSize: Number(pageSize) });
 });
 
 // AI錯誤解釋功能的API端点

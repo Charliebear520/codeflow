@@ -136,9 +136,9 @@ const Answer = () => {
   const handleSave = async () => {
     try {
       if (!isSignedIn) { message.error("請先登入"); return; }
-  
+
       let payload = { questionId: "Q001", completed: false };
-  
+
       if (activeKey === "1") {
         // 上傳流程圖
         if (fileList.length === 0 || !fileList[0].base64) {
@@ -159,7 +159,7 @@ const Answer = () => {
         const { nodes, edges } = flowRef.current.exportGraph();
         const hasData = (nodes?.length || 0) + (edges?.length || 0) > 0;
         if (!hasData) { message.error("還沒有流程圖可以儲存"); return; }
-  
+
         const flowElement = document.querySelector(".react-flow");
         if (!flowElement) {
           message.error("找不到流程圖元素");
@@ -170,14 +170,14 @@ const Answer = () => {
         payload.imageBase64 = dataUrl;
         payload.mode = "editor";
         // ...existing code...
-  console.log("送出前 payload：", payload);
-  console.log("imageBase64 長度：", payload.imageBase64 ? payload.imageBase64.length : "null");
-  // ...existing code...
+        console.log("送出前 payload：", payload);
+        console.log("imageBase64 長度：", payload.imageBase64 ? payload.imageBase64.length : "null");
+        // ...existing code...
       } else {
         message.error("未知的分頁");
         return;
       }
-  
+
       const token = await getToken();
       const res = await fetch(`http://localhost:5000/api/submissions/stage1`, {
         method: "POST",
@@ -189,7 +189,7 @@ const Answer = () => {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
-  
+
       message.success("已儲存第一階段的作答");
     } catch (err) {
       console.error(err);
@@ -211,7 +211,7 @@ const Answer = () => {
       </Button>
       {<Button danger onClick={handleReset}>
         清空
-      </Button> }
+      </Button>}
     </div>
   );
 
