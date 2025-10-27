@@ -27,6 +27,7 @@ import Student from "./models/Student.js";
 import Submission from "./models/Submission.js";
 import os from "os";
 import path from "path";
+import fsSync from "fs";
 
 // 動態導入Gemini服務的輔助函數
 const loadGeminiServices = async () => {
@@ -55,7 +56,30 @@ if (process.env.NODE_ENV !== "production") {
 
 const port = process.env.PORT || 3000;
 const app = express();
-app.get("/health", (req, res) => res.send("ok")); // 小健康檢查
+
+// 檢查端點
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+  });
+});
+
+// 更詳細的檢查端點
+app.get("/api/health", (req, res) => {
+  const state = mongoose.connection.readyState; // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
+  const states = ["disconnected", "connected", "connecting", "disconnecting"];
+  res.json({
+    ok: state === 1,
+    stateCode: state,
+    stateText: states[state] || "unknown",
+    host: mongoose.connection.host || null,
+    dbName: mongoose.connection.name || null,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+  });
+});
 
 // 存儲活躍的程序
 const activeProcesses = new Map();
@@ -145,7 +169,19 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-app.use(clerkMiddleware()); // 解析前端帶來的 Authorization: Bearer <token>
+
+// 全局錯誤處理中間件
+app.use((err, req, res, next) => {
+  console.error("Global error handler:", err);
+  res.status(500).json({
+    success: false,
+    error: "Internal server error",
+    message:
+      process.env.NODE_ENV === "development"
+        ? err.message
+        : "Something went wrong",
+  });
+});
 
 // 暫時禁用後端Clerk中間件，只保留前端認證保護
 // app.use(clerkMiddleware());
@@ -156,11 +192,22 @@ const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
 mongoose
   .connect(mongoUri, {
     //讓 server 選擇逾時更快失敗，除錯友善
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 20000,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 30000,
+    connectTimeoutMS: 10000,
+    maxPoolSize: 10,
+    retryWrites: true,
   })
   .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+    // 在生產環境中，如果 MongoDB 連接失敗，不要讓整個應用crush
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        "MongoDB connection failed, but continuing in production mode"
+      );
+    }
+  });
 
 // const imagekit = new ImageKit({ // 暫時註解掉
 //   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
@@ -280,18 +327,6 @@ app.get("/api/me", requireAuth(), async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
-});
-
-app.get("/api/health", (req, res) => {
-  const state = mongoose.connection.readyState; // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
-  const states = ["disconnected", "connected", "connecting", "disconnecting"];
-  res.json({
-    ok: state === 1,
-    stateCode: state,
-    stateText: states[state] || "unknown",
-    host: mongoose.connection.host || null,
-    dbName: mongoose.connection.name || null,
-  });
 });
 
 // 教師角色
