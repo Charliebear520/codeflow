@@ -1,10 +1,19 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("Missing GEMINI_API_KEY environment variable");
+// 延遲初始化，避免在模組載入時就檢查環境變數
+let genAI = null;
+function getGenAI() {
+  if (!genAI) {
+    if (!process.env.GEMINI_API_KEY) {
+      console.warn(
+        "GEMINI_API_KEY not set, error explanation will use fallback mode"
+      );
+      return null;
+    }
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  }
+  return genAI;
 }
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // 錯誤類型
 const ERROR_TYPES = {
@@ -158,7 +167,12 @@ function analyzeError(errorMessage, language) {
 // 使用LLM解释錯誤
 async function explainErrorWithLLM(errorMessage, language, code) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const aiClient = getGenAI();
+    if (!aiClient) {
+      return null; // 如果沒有API key，返回null，使用fallback
+    }
+
+    const model = aiClient.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `你是一位友善的程式設計助教，專門幫助初學者理解程式錯誤。
 

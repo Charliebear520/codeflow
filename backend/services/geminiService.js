@@ -13,6 +13,7 @@ let genAI = null;
 const getGenAI = () => {
   if (!genAI) {
     if (!process.env.GEMINI_API_KEY) {
+      console.error("Missing GEMINI_API_KEY in environment variables");
       throw new Error("Missing GEMINI_API_KEY in environment variables");
     }
     genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -28,7 +29,7 @@ export const generateFlowchartQuestion = async () => {
     // 使用 gemini模型
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
 
- const prompt = `你是一位專業的中文教育題目生成器，請**嚴格遵守**以下要求。
+    const prompt = `你是一位專業的中文教育題目生成器，請**嚴格遵守**以下要求。
 
     **核心任務：**生成一個流程圖練習題目。
     **語言要求：**必須且只能使用**繁體中文**。
@@ -45,7 +46,7 @@ export const generateFlowchartQuestion = async () => {
     6. **再次強調：所有輸出文字必須是繁體中文。**
     
     只返回題目文本，不包含任何額外的說明、註解或標題。`;
-    
+
     console.log("Sending question generation request to Gemini API...");
 
     const result = await model.generateContent(prompt);
