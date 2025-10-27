@@ -493,7 +493,7 @@ app.post("/api/generate-pseudocode", async (req, res) => {
   try {
     console.log("[generate-pseudocode] Request received");
     console.log("[generate-pseudocode] Request body:", req.body);
-    
+
     const { question } = req.body;
 
     if (!question) {
@@ -504,7 +504,10 @@ app.post("/api/generate-pseudocode", async (req, res) => {
       });
     }
 
-    console.log("[generate-pseudocode] Generating pseudocode for question:", question);
+    console.log(
+      "[generate-pseudocode] Generating pseudocode for question:",
+      question
+    );
 
     const prompt = `請根據題目生成Python虛擬碼，用 ___ 代表空白讓學生填寫。
 
@@ -526,7 +529,9 @@ app.post("/api/generate-pseudocode", async (req, res) => {
 
 題目：${question}`;
 
-    console.log("[generate-pseudocode] Calling Gemini API for pseudocode generation...");
+    console.log(
+      "[generate-pseudocode] Calling Gemini API for pseudocode generation..."
+    );
     console.log("[generate-pseudocode] Prompt:", prompt);
 
     const geminiServices = await loadGeminiServices();
@@ -534,7 +539,10 @@ app.post("/api/generate-pseudocode", async (req, res) => {
 
     try {
       const result = await geminiServices.generatePseudoCode(prompt);
-      console.log("[generate-pseudocode] Pseudocode generation successful:", result);
+      console.log(
+        "[generate-pseudocode] Pseudocode generation successful:",
+        result
+      );
       res.json(result);
     } catch (geminiError) {
       console.error("[generate-pseudocode] Gemini API error:", geminiError);
@@ -549,7 +557,10 @@ app.post("/api/generate-pseudocode", async (req, res) => {
         ],
         answers: ["if", "print", "else", "print"],
       };
-      console.log("[generate-pseudocode] Using fallback result:", fallbackResult);
+      console.log(
+        "[generate-pseudocode] Using fallback result:",
+        fallbackResult
+      );
       res.json(fallbackResult);
     }
   } catch (err) {
