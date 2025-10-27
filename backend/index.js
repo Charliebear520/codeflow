@@ -479,16 +479,20 @@ app.post("/api/generate-pseudocode-simple", async (req, res) => {
 // 新增：生成 PseudoCode 的 API 端點
 app.post("/api/generate-pseudocode", async (req, res) => {
   try {
+    console.log("[generate-pseudocode] Request received");
+    console.log("[generate-pseudocode] Request body:", req.body);
+    
     const { question } = req.body;
 
     if (!question) {
+      console.log("[generate-pseudocode] Missing question parameter");
       return res.status(400).json({
         success: false,
         error: "缺少題目參數",
       });
     }
 
-    console.log("Generating pseudocode for question:", question);
+    console.log("[generate-pseudocode] Generating pseudocode for question:", question);
 
     const prompt = `請根據題目生成Python虛擬碼，用 ___ 代表空白讓學生填寫。
 
@@ -510,18 +514,19 @@ app.post("/api/generate-pseudocode", async (req, res) => {
 
 題目：${question}`;
 
-    console.log("Calling Gemini API for pseudocode generation...");
-    console.log("Prompt:", prompt);
+    console.log("[generate-pseudocode] Calling Gemini API for pseudocode generation...");
+    console.log("[generate-pseudocode] Prompt:", prompt);
 
     const geminiServices = await loadGeminiServices();
-    console.log("Gemini services loaded successfully");
+    console.log("[generate-pseudocode] Gemini services loaded successfully");
 
     try {
       const result = await geminiServices.generatePseudoCode(prompt);
-      console.log("Pseudocode generation successful:", result);
+      console.log("[generate-pseudocode] Pseudocode generation successful:", result);
       res.json(result);
     } catch (geminiError) {
-      console.error("Gemini API error:", geminiError);
+      console.error("[generate-pseudocode] Gemini API error:", geminiError);
+      console.error("[generate-pseudocode] Error stack:", geminiError.stack);
       // 返回一個默認的響應，避免完全失敗
       const fallbackResult = {
         pseudoCode: [
@@ -532,15 +537,16 @@ app.post("/api/generate-pseudocode", async (req, res) => {
         ],
         answers: ["if", "print", "else", "print"],
       };
-      console.log("Using fallback result:", fallbackResult);
+      console.log("[generate-pseudocode] Using fallback result:", fallbackResult);
       res.json(fallbackResult);
     }
   } catch (err) {
-    console.error("Pseudocode generation error:", err);
+    console.error("[generate-pseudocode] Pseudocode generation error:", err);
+    console.error("[generate-pseudocode] Error stack:", err.stack);
     res.status(500).json({
       success: false,
       error: err.message,
-      details: "Pseudocode generation failed",
+      details: err.stack || "Pseudocode generation failed",
     });
   }
 });
