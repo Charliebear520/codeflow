@@ -41,6 +41,13 @@ const loadGeminiServices = async () => {
   };
 };
 
+// 導入錯誤解釋函數
+let explainError;
+const loadErrorExplainer = async () => {
+  const errorExplainerModule = await import("./services/errorExplainer.js");
+  explainError = errorExplainerModule.explainError;
+};
+
 // 加載環境變量（僅在非生產環境）
 if (process.env.NODE_ENV !== "production") {
   dotenv.config();
@@ -656,13 +663,10 @@ app.post("/api/run-code", async (req, res) => {
       const PY = await pickPython();
       if (!PY) {
         await fs.unlink(filepath).catch(() => {});
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error:
-              "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）",
-          });
+        return res.status(400).json({
+          success: false,
+          error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）",
+        });
       }
 
       const { stdout, stderr } = await execFilep(
@@ -717,14 +721,28 @@ app.post("/api/run-code", async (req, res) => {
           e.err?.message ||
           "compile error";
         // ← 這裡延用你原本的 explainError
-        const errorExplanation = await explainError(stderrMsg, language, code);
-        return res.json({
-          success: false,
-          stdout: e.stdout || "",
-          stderr: stderrMsg,
-          errorExplanation: errorExplanation.explanation,
-          errorType: errorExplanation.errorType,
-        });
+        try {
+          await loadErrorExplainer();
+          const errorExplanation = await explainError(
+            stderrMsg,
+            language,
+            code
+          );
+          return res.json({
+            success: false,
+            stdout: e.stdout || "",
+            stderr: stderrMsg,
+            errorExplanation: errorExplanation.explanation,
+            errorType: errorExplanation.errorType,
+          });
+        } catch (errorExplainErr) {
+          // 如果解釋失敗，返回基本錯誤訊息
+          return res.json({
+            success: false,
+            stdout: e.stdout || "",
+            stderr: stderrMsg,
+          });
+        }
       }
 
       // 執行
@@ -754,12 +772,10 @@ app.post("/api/run-code", async (req, res) => {
         });
       }
     } else {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "不支援的語言，目前僅支援 Python、JavaScript、C",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "不支援的語言，目前僅支援 Python、JavaScript、C",
+      });
     }
   } catch (err) {
     // 萬一哪裡 throw，盡量清掉暫存檔
@@ -1102,6 +1118,7 @@ app.post("/api/test-error-explanation", async (req, res) => {
       });
     }
 
+    await loadErrorExplainer();
     const result = await explainError(errorMessage, language, code || "");
 
     res.json({
