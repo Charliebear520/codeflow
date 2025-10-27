@@ -11,6 +11,10 @@ node_modules/
 backend/node_modules/
 client/node_modules/
 
+# Lock files (使用 yarn)
+package-lock.json
+**/package-lock.json
+
 # 构建输出
 dist/
 build/
