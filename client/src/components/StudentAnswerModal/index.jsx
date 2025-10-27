@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, Modal, Tabs } from 'antd';
+import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import styles from "./StudentAnswerModal.module.css"
 
 export default function StudentAnswerModal({
@@ -54,7 +55,6 @@ export default function StudentAnswerModal({
   if (openStage === "stage2") {
     content = (
       <div className={styles.block}>
-        <h3 className={styles.blockTitle}>PseudoCode</h3>
         {s2.pseudocode ? (
           <pre className={styles.codebox}>{s2.pseudocode}</pre>
         ) : (
@@ -113,6 +113,8 @@ export default function StudentAnswerModal({
       onCancel={onClose}
       onOk={onClose}
       width={760}
+      bodyStyle={{padding:24}}
+      closeIcon={<CloseOutlined style={{ color: "#3B82F6", fontSize: 20 }} />}
       destroyOnClose
     >
       {content}
