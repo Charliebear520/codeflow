@@ -11,8 +11,13 @@ import dotenv from "dotenv";
 //   checkPseudoCode,
 //   checkCode,
 // } from "./services/geminiService.js";
-import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";// 暫時禁用以避免導入問題
-import { exec,spawn } from "child_process";
+import {
+  clerkMiddleware,
+  requireAuth,
+  getAuth,
+  clerkClient,
+} from "@clerk/express"; // 暫時禁用以避免導入問題
+import { exec, spawn } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
@@ -119,8 +124,13 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error("Not allowed by CORS"));
   },
-  methods: ["GET", "POST", "OPTIONS"],
-  // allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+  ],
   credentials: true,
   optionsSuccessStatus: 204,
 };
@@ -128,7 +138,7 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-app.use(clerkMiddleware());// 解析前端帶來的 Authorization: Bearer <token>
+app.use(clerkMiddleware()); // 解析前端帶來的 Authorization: Bearer <token>
 
 // 暫時禁用後端Clerk中間件，只保留前端認證保護
 // app.use(clerkMiddleware());
@@ -159,7 +169,10 @@ async function ensureStudent(userId) {
   if (email) toSet.email = email.toLowerCase();
   if (Object.keys(toSet).length) update.$set = toSet;
 
-  return Student.findOneAndUpdate({ userId }, update, { new: true, upsert: true });
+  return Student.findOneAndUpdate({ userId }, update, {
+    new: true,
+    upsert: true,
+  });
 }
 
 // 小工具：Promise 版 exec + existsSync
@@ -173,14 +186,26 @@ function execp(cmd, opts = {}) {
 }
 
 // 檢查.env是否存在CC環境變數（包 try/catch）
-function exists(p) { try { return fsSync.existsSync(p); } catch { return false; } }
+function exists(p) {
+  try {
+    return fsSync.existsSync(p);
+  } catch {
+    return false;
+  }
+}
 
 async function pickCCompiler() {
   // 1) 優先吃 .env
   if (process.env.CC && exists(process.env.CC)) return process.env.CC;
   // 2) PATH 上
-  try { await execp("gcc --version"); return "gcc"; } catch { }
-  try { await execp("clang --version"); return "clang"; } catch { }
+  try {
+    await execp("gcc --version");
+    return "gcc";
+  } catch {}
+  try {
+    await execp("clang --version");
+    return "clang";
+  } catch {}
   // 3) 常見安裝路徑（可命中就用）
   const candidates = [
     "C:\\msys64\\ucrt64\\bin\\gcc.exe",
@@ -196,7 +221,7 @@ async function pickCCompiler() {
     const { stdout } = await execp("xcrun --find clang");
     const p = stdout.trim();
     if (p && exists(p)) return p;
-  } catch { }
+  } catch {}
 
   return null;
 }
@@ -227,11 +252,10 @@ app.get("/api/me", requireAuth(), async (req, res) => {
     if (Object.keys(toSet).length) update.$set = toSet;
 
     // upsert + 回傳最新
-    const student = await Student.findOneAndUpdate(
-      { userId },
-      update,
-      { new: true, upsert: true }
-    );
+    const student = await Student.findOneAndUpdate({ userId }, update, {
+      new: true,
+      upsert: true,
+    });
 
     res.json({ success: true, student });
   } catch (err) {
@@ -542,7 +566,9 @@ app.post("/api/check-pseudocode", async (req, res) => {
 app.post("/api/run-code", async (req, res) => {
   const { code, language } = req.body || {};
   if (!code || !language) {
-    return res.status(400).json({ success: false, error: "缺少 code 或 language 參數" });
+    return res
+      .status(400)
+      .json({ success: false, error: "缺少 code 或 language 參數" });
   }
 
   // ==== helpers ====
@@ -559,20 +585,41 @@ app.post("/api/run-code", async (req, res) => {
       });
     });
   }
-  function exists(p) { try { return fsSync.existsSync(p); } catch { return false; } }
+  function exists(p) {
+    try {
+      return fsSync.existsSync(p);
+    } catch {
+      return false;
+    }
+  }
 
   async function pickPython() {
     if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
-    try { await execFilep("python3", ["--version"]); return "python3"; } catch {}
-    try { await execFilep("python",  ["--version"]); return "python";  } catch {}
-    try { await execFilep("py",      ["-3", "--version"]); return "py"; } catch {}
+    try {
+      await execFilep("python3", ["--version"]);
+      return "python3";
+    } catch {}
+    try {
+      await execFilep("python", ["--version"]);
+      return "python";
+    } catch {}
+    try {
+      await execFilep("py", ["-3", "--version"]);
+      return "py";
+    } catch {}
     return null;
   }
 
   async function pickCCompiler() {
     if (process.env.CC && exists(process.env.CC)) return process.env.CC;
-    try { await execFilep("gcc",   ["--version"]); return "gcc";   } catch {}
-    try { await execFilep("clang", ["--version"]); return "clang"; } catch {}
+    try {
+      await execFilep("gcc", ["--version"]);
+      return "gcc";
+    } catch {}
+    try {
+      await execFilep("clang", ["--version"]);
+      return "clang";
+    } catch {}
     const candidates = [
       "C:\\msys64\\ucrt64\\bin\\gcc.exe",
       "C:\\msys64\\mingw64\\bin\\gcc.exe",
@@ -594,7 +641,9 @@ app.post("/api/run-code", async (req, res) => {
   const id = `run_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const isWin = process.platform === "win32";
 
-  let filename, filepath, cleanupFiles = [];
+  let filename,
+    filepath,
+    cleanupFiles = [];
 
   try {
     await fs.mkdir(tmpDir, { recursive: true });
@@ -606,27 +655,37 @@ app.post("/api/run-code", async (req, res) => {
 
       const PY = await pickPython();
       if (!PY) {
-        await fs.unlink(filepath).catch(()=>{});
-        return res.status(400).json({ success: false, error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）" });
+        await fs.unlink(filepath).catch(() => {});
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error:
+              "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）",
+          });
       }
 
-      const { stdout, stderr } = await execFilep(PY, PY === "py" ? ["-3", filepath] : [filepath], {
-        timeout: 3000, maxBuffer: 1024 * 200,
-      });
-      await fs.unlink(filepath).catch(()=>{});
+      const { stdout, stderr } = await execFilep(
+        PY,
+        PY === "py" ? ["-3", filepath] : [filepath],
+        {
+          timeout: 3000,
+          maxBuffer: 1024 * 200,
+        }
+      );
+      await fs.unlink(filepath).catch(() => {});
       return res.json({ success: true, stdout, stderr });
-
     } else if (language === "javascript") {
       filename = `${id}.js`;
       filepath = path.join(tmpDir, filename);
       await fs.writeFile(filepath, code, "utf-8");
 
       const { stdout, stderr } = await execFilep(process.execPath, [filepath], {
-        timeout: 3000, maxBuffer: 1024 * 200,
+        timeout: 3000,
+        maxBuffer: 1024 * 200,
       });
-      await fs.unlink(filepath).catch(()=>{});
+      await fs.unlink(filepath).catch(() => {});
       return res.json({ success: true, stdout, stderr });
-
     } else if (language === "c") {
       filename = `${id}.c`;
       filepath = path.join(tmpDir, filename);
@@ -634,10 +693,11 @@ app.post("/api/run-code", async (req, res) => {
 
       const CC = await pickCCompiler();
       if (!CC) {
-        await fs.unlink(filepath).catch(()=>{});
+        await fs.unlink(filepath).catch(() => {});
         return res.status(400).json({
           success: false,
-          error: "後端沒有可用的 C 編譯器（請安裝 gcc 或 clang，或在 .env 設 CC=編譯器路徑）",
+          error:
+            "後端沒有可用的 C 編譯器（請安裝 gcc 或 clang，或在 .env 設 CC=編譯器路徑）",
         });
       }
 
@@ -646,10 +706,16 @@ app.post("/api/run-code", async (req, res) => {
 
       // 編譯
       try {
-        await execFilep(CC, [filepath, "-O0", "-o", exePath], { timeout: 8000, maxBuffer: 1024*200 });
+        await execFilep(CC, [filepath, "-O0", "-o", exePath], {
+          timeout: 8000,
+          maxBuffer: 1024 * 200,
+        });
       } catch (e) {
-        await fs.unlink(filepath).catch(()=>{});
-        const stderrMsg = (e.stderr && e.stderr.toString()) || e.err?.message || "compile error";
+        await fs.unlink(filepath).catch(() => {});
+        const stderrMsg =
+          (e.stderr && e.stderr.toString()) ||
+          e.err?.message ||
+          "compile error";
         // ← 這裡延用你原本的 explainError
         const errorExplanation = await explainError(stderrMsg, language, code);
         return res.json({
@@ -664,29 +730,45 @@ app.post("/api/run-code", async (req, res) => {
       // 執行
       try {
         const { stdout, stderr } = await execFilep(exePath, [], {
-          timeout: 3000, maxBuffer: 1024 * 200,
+          timeout: 3000,
+          maxBuffer: 1024 * 200,
         });
-        await Promise.all([fs.unlink(filepath).catch(()=>{}), fs.unlink(exePath).catch(()=>{})]);
+        await Promise.all([
+          fs.unlink(filepath).catch(() => {}),
+          fs.unlink(exePath).catch(() => {}),
+        ]);
         console.log("CC =", process.env.CC || "auto");
         return res.json({ success: true, stdout, stderr });
       } catch (e) {
-        await Promise.all([fs.unlink(filepath).catch(()=>{}), fs.unlink(exePath).catch(()=>{})]);
+        await Promise.all([
+          fs.unlink(filepath).catch(() => {}),
+          fs.unlink(exePath).catch(() => {}),
+        ]);
         return res.json({
           success: false,
           stdout: e.stdout || "",
-          stderr: (e.stderr && e.stderr.toString()) || e.err?.message || "runtime error",
+          stderr:
+            (e.stderr && e.stderr.toString()) ||
+            e.err?.message ||
+            "runtime error",
         });
       }
-
     } else {
-      return res.status(400).json({ success: false, error: "不支援的語言，目前僅支援 Python、JavaScript、C" });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          error: "不支援的語言，目前僅支援 Python、JavaScript、C",
+        });
     }
-
   } catch (err) {
     // 萬一哪裡 throw，盡量清掉暫存檔
-    const del = cleanupFiles.length ? cleanupFiles : (filepath ? [filepath] : []);
-    if (del.length) await Promise.all(del.map(f => fs.unlink(f).catch(()=>{})));
-    res.status(500).json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
+    const del = cleanupFiles.length ? cleanupFiles : filepath ? [filepath] : [];
+    if (del.length)
+      await Promise.all(del.map((f) => fs.unlink(f).catch(() => {})));
+    res
+      .status(500)
+      .json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
   }
 });
 
@@ -1183,11 +1265,11 @@ app.get("/api/questions", async (req, res) => {
 
     const filter = q
       ? {
-        $or: [
-          { questionTitle: new RegExp(q, "i") },
-          { description: new RegExp(q, "i") },
-        ],
-      }
+          $or: [
+            { questionTitle: new RegExp(q, "i") },
+            { description: new RegExp(q, "i") },
+          ],
+        }
       : {};
 
     const [total, items] = await Promise.all([
@@ -1223,12 +1305,21 @@ app.get("/api/questions/:id", async (req, res) => {
 app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
   try {
     const { userId } = req.auth;
-    const { questionId, graph, imageBase64, completed = false, mode } = req.body || {};
+    const {
+      questionId,
+      graph,
+      imageBase64,
+      completed = false,
+      mode,
+    } = req.body || {};
     console.log("收到 req.body：", req.body);
 
-    if (!questionId) return res.status(400).json({ success: false, error: "questionId 必填" });
+    if (!questionId)
+      return res.status(400).json({ success: false, error: "questionId 必填" });
     if (!graph && !imageBase64)
-      return res.status(400).json({ success: false, error: "需提供 graph 或 imageBase64 其一" });
+      return res
+        .status(400)
+        .json({ success: false, error: "需提供 graph 或 imageBase64 其一" });
 
     const student = await ensureStudent(userId);
 
@@ -1257,7 +1348,6 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
 
     console.log("儲存前 update：", JSON.stringify(update, null, 2));
 
-
     const doc = await Submission.findOneAndUpdate(
       { student: student._id, questionId },
       update,
@@ -1268,7 +1358,6 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 
 app.get("/api/submissions/stage1", async (req, res) => {
   try {
@@ -1367,7 +1456,10 @@ app.post("/api/submissions/stage3", async (req, res) => {
     });
 
     console.log("stage3 upsert result _id:", newSubmission?._id?.toString());
-    console.log("stage3 upsert result stages.stage3:", JSON.stringify(newSubmission?.stages?.stage3));
+    console.log(
+      "stage3 upsert result stages.stage3:",
+      JSON.stringify(newSubmission?.stages?.stage3)
+    );
 
     return res.json({ success: true, data: newSubmission });
   } catch (err) {
