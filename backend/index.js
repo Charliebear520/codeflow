@@ -150,6 +150,18 @@ app.use(clerkMiddleware()); // 解析前端帶來的 Authorization: Bearer <toke
 // 暫時禁用後端Clerk中間件，只保留前端認證保護
 // app.use(clerkMiddleware());
 
+// 資料表連接 - 移到前面
+const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
+
+mongoose
+  .connect(mongoUri, {
+    //讓 server 選擇逾時更快失敗，除錯友善
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 20000,
+  })
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("MongoDB connection error:", err));
+
 // const imagekit = new ImageKit({ // 暫時註解掉
 //   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
 //   publicKey: process.env.IMAGE_KIT_PUBLIC_KEY,
@@ -1243,22 +1255,7 @@ if (process.env.NODE_ENV !== "production") {
 // 導出app供Vercel使用
 export default app;
 
-// 資料表連接
-// const mongoose = require("mongoose");
-
-const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
-
-mongoose
-  .connect(mongoUri, {
-    // useNewUrlParser: true,
-    // useUnifiedTopology: true,
-
-    //讓 server 選擇逾時更快失敗，除錯友善
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 20000,
-  })
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+// 資料表連接 - 已移到前面的配置區域
 
 //儲存題目到資料庫
 app.post("/api/add-question", async (req, res) => {
