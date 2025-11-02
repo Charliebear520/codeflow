@@ -28,7 +28,7 @@ export const generateFlowchartQuestion = async () => {
     // 使用 gemini模型
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
 
- const prompt = `你是一位專業的中文教育題目生成器，請**嚴格遵守**以下要求。
+    const prompt = `你是一位專業的中文教育題目生成器，請**嚴格遵守**以下要求。
 
     **核心任務：**生成一個流程圖練習題目。
     **語言要求：**必須且只能使用**繁體中文**。
@@ -45,7 +45,7 @@ export const generateFlowchartQuestion = async () => {
     6. **再次強調：所有輸出文字必須是繁體中文。**
     
     只返回題目文本，不包含任何額外的說明、註解或標題。`;
-    
+
     console.log("Sending question generation request to Gemini API...");
 
     const result = await model.generateContent(prompt);
@@ -210,7 +210,11 @@ export const generatePseudoCode = async (prompt) => {
 export const checkPseudoCode = async (question, userPseudoCode) => {
   try {
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
-    const prompt = `你是一位程式教學助教。請根據下方題目，檢查學生撰寫的虛擬碼（pseudocode）是否正確，並用繁體中文給予回饋：
+    const prompt = `你是一位專業的繁體中文程式教學助教。請**嚴格遵守**以下要求
+
+    **檢查資料：**確認學生所撰寫的虛擬碼（pseudocode）與題目的差異。
+    **核心任務：**生成修改建議給學生，使學生能夠確認錯誤或問題並改進其虛擬碼。
+    **語言要求：**必須且只能使用**繁體中文**。
 ---
 題目：${question}
 ---
@@ -236,7 +240,12 @@ ${userPseudoCode}
 export const checkCode = async (question, code, language) => {
   try {
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
-    const prompt = `你是一位專業的程式教學助教。請根據下方題目與學生撰寫的程式碼，檢查其語法、邏輯與結構，並用繁體中文給予詳細回饋：
+    const prompt = `你是一位專業的繁體中文程式教學助教。請**嚴格遵守**以下要求
+
+    **檢查資料：**確認學生所撰寫的程式碼的語法、邏輯與結構。
+    **核心任務：**生成修改建議給學生，使學生能夠確認錯誤或問題並改進其程式碼。
+    **語言要求：**必須且只能使用**繁體中文**。
+
 ---
 題目：${question}
 ---
