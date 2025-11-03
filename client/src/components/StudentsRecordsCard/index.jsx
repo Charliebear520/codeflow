@@ -1,7 +1,7 @@
 import styles from "./StudentsRecordsCard.module.css";
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button, Tag } from 'antd';
-import { useState,useMemo } from "react";
+import { useState, useMemo } from "react";
 import StudentAnswerModal from "../StudentAnswerModal";
 
 
@@ -29,10 +29,16 @@ const StudentsRecordsCard = ({ student, submission }) => {
   const s2 = submission?.stages?.stage2 || {};
   const s3 = submission?.stages?.stage3 || {};
 
+
   // 若 completed 還沒寫入，改用「是否有內容」當備援
   const stage1Done = !!(s1.completed || s1.imageBase64 || s1?.graph?.nodes?.length);
   const stage2Done = !!(s2.completed || (s2.pseudocode && s2.pseudocode.trim()));
   const stage3Done = !!(s3.completed || (s3.code && s3.code.trim()));
+
+  // 這邊是completed=true才能查看學生作答紀錄
+  // const stage1Done = !!s1.completed;
+  // const stage2Done = !!s2.completed;
+  // const stage3Done = !!s3.completed;
 
   const meta = useMemo(
     () => [
