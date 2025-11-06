@@ -34,17 +34,18 @@ const StudentsRecords = () => {
         </Row>
       </div>
 
-      <Row gutter={[16, 16]}>
-        {/* 這裡應使用 map 迴圈渲染，並在 Col 上設定 span={6} 達到四欄佈局 */}
-        <Col span={6}><StudentsRecordsCard /></Col>
-        <Col span={6}><StudentsRecordsCard /></Col>
-        <Col span={6}><StudentsRecordsCard /></Col>
-        <Col span={6}><StudentsRecordsCard /></Col>
-        <Col span={6}><StudentsRecordsCard /></Col>
-        <Col span={6}><StudentsRecordsCard /></Col>
-        <Col span={6}><StudentsRecordsCard /></Col>
-        <Col span={6}><StudentsRecordsCard /></Col>
-      </Row>
+      <div className={styles.StudentsCardContainer}>
+          {/* 這裡應使用 map 迴圈渲染，並在 Col 上設定 span={6} 達到四欄佈局 */}
+        <StudentsRecordsCard />
+        <StudentsRecordsCard />
+        <StudentsRecordsCard />
+        <StudentsRecordsCard />
+        <StudentsRecordsCard />
+        <StudentsRecordsCard />
+        <StudentsRecordsCard />
+
+      </div>
+
     </div>
   );
 };
