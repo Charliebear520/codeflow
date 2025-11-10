@@ -78,6 +78,7 @@ const OnlineCoding = ({
 
   // 新增：儲存中 flag，避免重複點擊 (修正 saving 未定義錯誤)
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
   const { getToken } = useAuth(); //額外加入
   const API_BASE = import.meta.env.VITE_API_BASE; //額外加入
 
@@ -148,6 +149,7 @@ const OnlineCoding = ({
       antdMessage.info("請先輸入程式碼與確認題目");
       return;
     }
+    setChecking(true);
     if (onChecking) onChecking(true);
     setApiError("");
     try {
@@ -187,6 +189,7 @@ const OnlineCoding = ({
       antdMessage.error("檢查失敗，請稍後再試。");
       if (onFeedback) onFeedback("");
     } finally {
+      setChecking(false);
       if (onChecking) onChecking(false);
     }
   };
@@ -353,6 +356,7 @@ const OnlineCoding = ({
         return;
       }
 
+      setChecking(true);
       if (onChecking) onChecking(true);
 
       let checkRes;
@@ -380,6 +384,7 @@ const OnlineCoding = ({
         antdMessage.error("檢查失敗，請稍後再試。");
         return;
       } finally {
+        setChecking(false);
         if (onChecking) onChecking(false);
       }
 
@@ -531,6 +536,8 @@ const OnlineCoding = ({
                   // e.target.style.backgroundColor = "#B2C8FF";
                   e.target.style.transform = "scale(1)";
                 }}
+                loading={checking || saving}
+                disabled={checking || saving}
               >
                 檢查
               </Button>
