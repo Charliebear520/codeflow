@@ -635,7 +635,7 @@ const OnlineCoding = ({
                     color: "#FFFFFF",
                     border: "none",
                   }}
-                  onClick={onTutorClick || (() => {})}
+                  onClick={() => {}}
                 >
                   詢問沐芙助教
                 </Button>
