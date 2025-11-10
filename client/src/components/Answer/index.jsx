@@ -49,7 +49,9 @@ const Answer = ({ onChecking }) => {
           return;
         }
 
-        const resultAction = await dispatch(checkFlowchart(base64Image));
+        const resultAction = await dispatch(
+          checkFlowchart({ imageData: base64Image, stage: 1 })
+        );
 
         if (checkFlowchart.fulfilled.match(resultAction)) {
           message.success("檢查完成");

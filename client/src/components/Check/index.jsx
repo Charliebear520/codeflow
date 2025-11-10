@@ -5,8 +5,14 @@ import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import ReactMarkdown from "react-markdown";
 
-const Check = ({ feedback, isChecking, onTutorClick }) => {
-  const { result } = useSelector((state) => state.check);
+const Check = ({ feedback, isChecking, onTutorClick, stage }) => {
+  const byStage = useSelector((state) => state.check.byStage);
+  const stageResult =
+    feedback != null
+      ? feedback
+      : stage
+      ? byStage?.[stage] || null
+      : null;
 
   return (
     <div className={styles.mainspace}>
@@ -47,10 +53,10 @@ const Check = ({ feedback, isChecking, onTutorClick }) => {
               <p style={{ color: "#9287EE" }}>AI 助教回饋：</p>
               <ReactMarkdown>{feedback}</ReactMarkdown>
             </div>
-          ) : result ? (
+          ) : stageResult ? (
             <div>
               <p style={{ color: "#9287EE" }}>流程圖分析結果：</p>
-              <ReactMarkdown>{result}</ReactMarkdown>
+              <ReactMarkdown>{stageResult}</ReactMarkdown>
             </div>
           ) : null}
         </div>
