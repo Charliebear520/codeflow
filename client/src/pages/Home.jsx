@@ -24,7 +24,7 @@ const Home = () => {
           <Answer onChecking={setIsChecking} />
         </Col>
         <Col span={6}>
-          <Check onTutorClick={handleTutorClick} isChecking={isChecking} />
+          <Check onTutorClick={handleTutorClick} isChecking={isChecking} stage={1} />
         </Col>
       </Row>
       {/* 原本的導頁功能先隱藏 */}

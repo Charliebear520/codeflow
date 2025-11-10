@@ -4,8 +4,10 @@ import TopicStage2 from "../components/TopicStage2";
 import Check from "../components/Check";
 import { Row, Col } from "antd";
 import OnlineCoding from "../components/OnlineCoding";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { resetCheck, setStageFeedback } from "../redux/slices/checkSlice";
 
 import styles from "./Stage2Page.module.css";
 
@@ -15,6 +17,7 @@ export default function Stage2Page() {
   // 新增放大模式狀態
   const [isExpanded, setIsExpanded] = useState(false);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   // 題目從 localStorage 取得，若無則用預設
   const defaultQuestion =
@@ -24,6 +27,19 @@ export default function Stage2Page() {
   );
   const [feedback, setFeedback] = useState("");
   const [isChecking, setIsChecking] = useState(false);
+  const savedStage2Feedback = useSelector((state) => state.check.byStage?.[2]);
+
+  // 進入第二階段時，清掉第一階段的全域檢查結果，避免右側回退顯示上一階段內容
+  useEffect(() => {
+    dispatch(resetCheck());
+  }, [dispatch]);
+
+  // 從 Redux 回填第二階段既有回饋
+  useEffect(() => {
+    if (savedStage2Feedback) {
+      setFeedback(savedStage2Feedback);
+    }
+  }, [savedStage2Feedback]);
 
   // 處理放大/縮小切換
   const handleToggleExpand = () => {
@@ -60,7 +76,10 @@ export default function Stage2Page() {
           <OnlineCoding
             question={question}
             currentStage={currentStage}
-            onFeedback={setFeedback}
+            onFeedback={(fb) => {
+              setFeedback(fb);
+              dispatch(setStageFeedback({ stage: 2, feedback: fb }));
+            }}
             onChecking={setIsChecking}
             isExpanded={isExpanded}
             onToggleExpand={handleToggleExpand}
