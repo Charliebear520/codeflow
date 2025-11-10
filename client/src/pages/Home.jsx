@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 const Home = () => {
   const navigate = useNavigate();
   const [clicked, setClicked] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
   const handleTutorClick = () => {
     navigate("/tutor");
@@ -20,10 +21,10 @@ const Home = () => {
           <Topic />
         </Col>
         <Col span={12}>
-          <Answer />
+          <Answer onChecking={setIsChecking} />
         </Col>
         <Col span={6}>
-          <Check onTutorClick={handleTutorClick} />
+          <Check onTutorClick={handleTutorClick} isChecking={isChecking} />
         </Col>
       </Row>
       {/* 原本的導頁功能先隱藏 */}

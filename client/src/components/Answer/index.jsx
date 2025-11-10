@@ -19,7 +19,7 @@ const initialNodes = []; // 空數組，不顯示任何初始節點
 
 const initialEdges = []; // 空數組，不顯示任何初始邊
 
-const Answer = () => {
+const Answer = ({ onChecking }) => {
   const [activeKey, setActiveKey] = useState("1");
   const { isSignedIn, getToken } = useAuth();
   const [img, setImg] = useState({
@@ -31,9 +31,12 @@ const Answer = () => {
   const dispatch = useDispatch();
   const [fileList, setFileList] = useState([]);
   const { message } = App.useApp(); // 使用 App 的 message API
+  const [checking, setChecking] = useState(false);
 
   const handleCheck = async () => {
     try {
+      setChecking(true);
+      if (onChecking) onChecking(true);
       if (activeKey === "1") {
         if (fileList.length === 0) {
           message.error("請先上傳流程圖");
@@ -77,6 +80,9 @@ const Answer = () => {
     } catch (error) {
       console.error("檢查過程發生錯誤:", error);
       message.error(error.message || "檢查過程發生錯誤");
+    } finally {
+      setChecking(false);
+      if (onChecking) onChecking(false);
     }
   };
 
@@ -198,6 +204,8 @@ const Answer = () => {
         type="primary"
         onClick={handleCheck}
         className={styles.checkButton}
+        loading={checking}
+        disabled={checking}
       >
         檢查
       </Button>
