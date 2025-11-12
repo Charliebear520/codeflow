@@ -14,7 +14,7 @@ import path from "path";
 //   checkCode,
 // } from "./services/geminiService.js";
 import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";// 暫時禁用以避免導入問題
-import { exec,spawn } from "child_process";
+import { exec, spawn } from "child_process";
 import { promisify } from "util";
 const execAsync = promisify(exec);
 import mongoose from "mongoose";
@@ -148,6 +148,11 @@ app.use(clerkMiddleware());// 解析前端帶來的 Authorization: Bearer <token
 // });
 
 // 小工具：確保 Student 存在並同步 name/email
+const ADMIN_EMAILS_SET = new Set(
+  (process.env.ADMIN_EMAILS || "").split(",").map(s => s.trim()).filter(Boolean)
+);
+
+
 async function ensureStudent(userId) {
   const u = await clerkClient.users.getUser(userId);
   const fullName =
@@ -161,13 +166,26 @@ async function ensureStudent(userId) {
     u.emailAddresses?.[0]?.emailAddress ||
     null;
 
-  const update = { $setOnInsert: { userId } };
-  const toSet = {};
-  if (fullName) toSet.name = fullName;
-  if (email) toSet.email = email.toLowerCase();
-  if (Object.keys(toSet).length) update.$set = toSet;
+  //role：在白名單就是 teacher，否則 student
+  const emailLower = email ? email.toLowerCase() : null;
+  const role = emailLower && ADMIN_EMAILS_SET.has(emailLower)
+    ? "teacher"
+    : "student";
 
-  return Student.findOneAndUpdate({ userId }, update, { new: true, upsert: true });
+  // upsert：第一次寫入 userId；之後每次登入都同步 name/email/role（若有變）
+  const setOnInsert = { userId };
+  const set = {};
+  if (fullName) set.name = fullName;
+  if (emailLower) set.email = emailLower;
+  set.role = role; // 總是以最新角色覆蓋（例如把某帳號升為 teacher）
+
+  const doc = await Student.findOneAndUpdate(
+    { userId },
+    { $setOnInsert: setOnInsert, $set: set },
+    { new: true, upsert: true }
+  );
+
+  return doc;
 }
 
 // 小工具：Promise 版 exec + existsSync
@@ -209,39 +227,50 @@ async function pickCCompiler() {
   return null;
 }
 
-// 取得當前登入學生基本資料（若無則自動建立）
+// 取得當前登入使用者基本資料（若無則自動建立）
 app.get("/api/me", requireAuth(), async (req, res) => {
+  console.log("Auth header =", req.headers.authorization || "(none)");
   try {
-    const { userId } = req.auth;
+    const { userId } = req.auth();
+    console.log("ADMIN_EMAILS=", process.env.ADMIN_EMAILS);
 
-    // 從 Clerk 取使用者資料
+    // 1) 從 Clerk 拉使用者資料
     const u = await clerkClient.users.getUser(userId);
+
     const fullName =
       u.fullName ||
       [u.firstName, u.lastName].filter(Boolean).join(" ") ||
       u.username ||
       u.primaryEmailAddress?.emailAddress ||
       "";
-    const email =
+
+    const emailRaw =
       u.primaryEmailAddress?.emailAddress ||
       u.emailAddresses?.[0]?.emailAddress ||
       null;
 
-    // 只 $set 有值的欄位，避免把 name 設成 undefined
-    const update = { $setOnInsert: { userId } };
-    const toSet = {};
-    if (fullName) toSet.name = fullName;
-    if (email) toSet.email = email.toLowerCase();
-    if (Object.keys(toSet).length) update.$set = toSet;
+    const email = emailRaw ? emailRaw.toLowerCase() : null;
+    console.log("User:", { userId, fullName, email });
 
-    // upsert + 回傳最新
-    const student = await Student.findOneAndUpdate(
+    // 2) 角色判斷：在白名單就是 teacher，否則 student
+    const role = email && ADMIN_EMAILS_SET.has(email) ? "teacher" : "student";
+    console.log("Determined role:", role);
+
+    // 3) upsert：第一次建立；之後每次同步 name/email/role
+    const doc = await Student.findOneAndUpdate(
       { userId },
-      update,
+      {
+        $setOnInsert: { userId },
+        $set: {
+          ...(fullName ? { name: fullName } : {}),
+          ...(email ? { email } : {}),
+          role, // 總是以最新角色覆蓋（便於升級/降級）
+        },
+      },
       { new: true, upsert: true }
     );
 
-    res.json({ success: true, student });
+    res.json({ success: true, me: doc });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -712,16 +741,16 @@ app.post("/api/run-code", async (req, res) => {
 
   async function pickPython() {
     if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
-    try { await execFilep("python3", ["--version"]); return "python3"; } catch {}
-    try { await execFilep("python",  ["--version"]); return "python";  } catch {}
-    try { await execFilep("py",      ["-3", "--version"]); return "py"; } catch {}
+    try { await execFilep("python3", ["--version"]); return "python3"; } catch { }
+    try { await execFilep("python", ["--version"]); return "python"; } catch { }
+    try { await execFilep("py", ["-3", "--version"]); return "py"; } catch { }
     return null;
   }
 
   async function pickCCompiler() {
     if (process.env.CC && exists(process.env.CC)) return process.env.CC;
-    try { await execFilep("gcc",   ["--version"]); return "gcc";   } catch {}
-    try { await execFilep("clang", ["--version"]); return "clang"; } catch {}
+    try { await execFilep("gcc", ["--version"]); return "gcc"; } catch { }
+    try { await execFilep("clang", ["--version"]); return "clang"; } catch { }
     const candidates = [
       "C:\\msys64\\ucrt64\\bin\\gcc.exe",
       "C:\\msys64\\mingw64\\bin\\gcc.exe",
@@ -734,7 +763,7 @@ app.post("/api/run-code", async (req, res) => {
       const { stdout } = await execFilep("xcrun", ["--find", "clang"]);
       const p = stdout.trim();
       if (p && exists(p)) return p;
-    } catch {}
+    } catch { }
     return null;
   }
   // ===============================================
@@ -755,14 +784,14 @@ app.post("/api/run-code", async (req, res) => {
 
       const PY = await pickPython();
       if (!PY) {
-        await fs.unlink(filepath).catch(()=>{});
+        await fs.unlink(filepath).catch(() => { });
         return res.status(400).json({ success: false, error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）" });
       }
 
       const { stdout, stderr } = await execFilep(PY, PY === "py" ? ["-3", filepath] : [filepath], {
         timeout: 3000, maxBuffer: 1024 * 200,
       });
-      await fs.unlink(filepath).catch(()=>{});
+      await fs.unlink(filepath).catch(() => { });
       return res.json({ success: true, stdout, stderr });
 
     } else if (language === "javascript") {
@@ -773,7 +802,7 @@ app.post("/api/run-code", async (req, res) => {
       const { stdout, stderr } = await execFilep(process.execPath, [filepath], {
         timeout: 3000, maxBuffer: 1024 * 200,
       });
-      await fs.unlink(filepath).catch(()=>{});
+      await fs.unlink(filepath).catch(() => { });
       return res.json({ success: true, stdout, stderr });
 
     } else if (language === "c") {
@@ -783,7 +812,7 @@ app.post("/api/run-code", async (req, res) => {
 
       const CC = await pickCCompiler();
       if (!CC) {
-        await fs.unlink(filepath).catch(()=>{});
+        await fs.unlink(filepath).catch(() => { });
         return res.status(400).json({
           success: false,
           error: "後端沒有可用的 C 編譯器（請安裝 gcc 或 clang，或在 .env 設 CC=編譯器路徑）",
@@ -795,9 +824,9 @@ app.post("/api/run-code", async (req, res) => {
 
       // 編譯
       try {
-        await execFilep(CC, [filepath, "-O0", "-o", exePath], { timeout: 8000, maxBuffer: 1024*200 });
+        await execFilep(CC, [filepath, "-O0", "-o", exePath], { timeout: 8000, maxBuffer: 1024 * 200 });
       } catch (e) {
-        await fs.unlink(filepath).catch(()=>{});
+        await fs.unlink(filepath).catch(() => { });
         const stderrMsg = (e.stderr && e.stderr.toString()) || e.err?.message || "compile error";
         // ← 這裡延用你原本的 explainError
         const errorExplanation = await explainError(stderrMsg, language, code);
@@ -815,11 +844,11 @@ app.post("/api/run-code", async (req, res) => {
         const { stdout, stderr } = await execFilep(exePath, [], {
           timeout: 3000, maxBuffer: 1024 * 200,
         });
-        await Promise.all([fs.unlink(filepath).catch(()=>{}), fs.unlink(exePath).catch(()=>{})]);
+        await Promise.all([fs.unlink(filepath).catch(() => { }), fs.unlink(exePath).catch(() => { })]);
         console.log("CC =", process.env.CC || "auto");
         return res.json({ success: true, stdout, stderr });
       } catch (e) {
-        await Promise.all([fs.unlink(filepath).catch(()=>{}), fs.unlink(exePath).catch(()=>{})]);
+        await Promise.all([fs.unlink(filepath).catch(() => { }), fs.unlink(exePath).catch(() => { })]);
         return res.json({
           success: false,
           stdout: e.stdout || "",
@@ -834,7 +863,7 @@ app.post("/api/run-code", async (req, res) => {
   } catch (err) {
     // 萬一哪裡 throw，盡量清掉暫存檔
     const del = cleanupFiles.length ? cleanupFiles : (filepath ? [filepath] : []);
-    if (del.length) await Promise.all(del.map(f => fs.unlink(f).catch(()=>{})));
+    if (del.length) await Promise.all(del.map(f => fs.unlink(f).catch(() => { })));
     res.status(500).json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
   }
 });
@@ -946,14 +975,14 @@ app.post("/api/run-code-interactive", async (req, res) => {
     childProcess.on("close", (code) => {
       activeProcesses.delete(processId);
       // 清理檔案
-      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     });
 
     childProcess.on("error", (error) => {
       console.error(`Process error for ${processId}:`, error);
       activeProcesses.delete(processId);
       // 清理檔案
-      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     });
 
     // 存儲程序引用
@@ -973,7 +1002,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
       if (!isProcessRunning) {
         activeProcesses.delete(processId);
         // 清理檔案
-        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
       }
 
       res.json({
@@ -992,7 +1021,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
 
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     }
     res.status(500).json({
       success: false,
@@ -1099,7 +1128,7 @@ app.post("/api/stop-process", async (req, res) => {
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
       const fs = await import("fs/promises");
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     }
 
     // 從活躍程序列表中移除
@@ -1148,13 +1177,30 @@ app.get("/test", (req, res) => {
 
 // 教師後台資料：僅教師可訪問
 app.get("/api/admin/submissions", requireTeacher, async (req, res) => {
-  try {
-    // 範例：回傳最近題目（實際可換為作答紀錄）
-    const latest = await Question.find({}).sort({ createdAt: -1 }).limit(10);
-    res.json({ success: true, items: latest });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  // try {
+  //   // 範例：回傳最近題目（實際可換為作答紀錄）
+  //   const latest = await Question.find({}).sort({ createdAt: -1 }).limit(10);
+  //   res.json({ success: true, items: latest });
+  //   console.log("latest:", latest);
+  // } catch (err) {
+  //   res.status(500).json({ success: false, error: err.message });
+  // }
+  const { studentId, questionId, stage, page = 1, pageSize = 20 } = req.query;
+  const filter = {};
+  if (studentId) filter.student = studentId;
+  if (questionId && questionId !== "all") filter.questionId = questionId;
+  if (stage && ["stage1", "stage2", "stage3"].includes(stage)) {
+    filter[`stages.${stage}.completed`] = true;
   }
+  const skip = (Number(page) - 1) * Number(pageSize);
+  const items = await Submission.find(filter)
+    .populate("student", "name email className") //從"mongoose.model("Student", studentSchema)"中，讀取學生的資料(姓名、信箱、班級)
+    .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(Number(pageSize))
+    .lean();
+  const total = await Submission.countDocuments(filter);
+  res.json({ success: true, items, total, page: Number(page), pageSize: Number(pageSize) });
 });
 
 // AI錯誤解釋功能的API端点

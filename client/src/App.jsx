@@ -22,6 +22,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AddQuestion from "./pages/AddQuestion";
 import { OrganizationSwitcher, useOrganization } from "@clerk/clerk-react";
+import BootstrapMe from "./components/BootstrapMe.jsx";
 
 // 教師Route：依據 Active Organization 的 membership role 判斷
 const TeacherRoute = ({ children }) => {
@@ -168,6 +169,7 @@ function App() {
 
   return (
     <ClerkProvider publishableKey={clerkPubKey}>
+       <BootstrapMe />
       <div className="app-container">
         <BrowserRouter>
           <Routes>
