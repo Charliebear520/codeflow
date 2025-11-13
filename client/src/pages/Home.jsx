@@ -37,6 +37,7 @@ const Home = () => {
       </button>
       */}
 
+      {/* 測試按鈕暫時隱藏
       {<button
         style={{
           position: "fixed",
@@ -56,6 +57,7 @@ const Home = () => {
       >
         前往StageList頁面（測試用）
       </button>
+      */}
     </div>
   );
 };

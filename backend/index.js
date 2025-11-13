@@ -191,8 +191,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 暫時禁用後端Clerk中間件，只保留前端認證保護
-// app.use(clerkMiddleware());
+// 啟用 Clerk 中間件以支援 getAuth()
+app.use(clerkMiddleware());
 
 // 資料表連接 - 移到前面
 const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
@@ -364,25 +364,30 @@ app.get("/api/me", requireAuth(), async (req, res) => {
   }
 });
 
-// 教師角色
+// 教師角色 - Express 中間件包裝器處理 async
 function requireTeacher(req, res, next) {
-  try {
-    const auth = getAuth(req) || {};
-    const userId = auth.userId;
-    const orgRole = auth.orgRole;
+  (async () => {
+    try {
+      const auth = getAuth(req) || {};
+      const userId = auth.userId;
 
-    if (!userId) {
+      if (!userId) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
+
+      // 從資料庫查詢使用者角色
+      const student = await Student.findOne({ userId }).lean();
+      
+      if (student && student.role === "teacher") {
+        return next();
+      }
+
+      return res.status(403).json({ success: false, error: "Forbidden - Teacher role required" });
+    } catch (e) {
+      console.error("requireTeacher error:", e);
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
-
-    if (orgRole === "teacher" || orgRole === "org:admin") {
-      return next();
-    }
-
-    return res.status(403).json({ success: false, error: "Forbidden" });
-  } catch (e) {
-    return res.status(401).json({ success: false, error: "Unauthorized" });
-  }
+  })();
 }
 
 app.get("/api/upload", (req, res) => {
