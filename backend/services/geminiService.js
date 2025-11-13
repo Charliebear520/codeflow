@@ -13,6 +13,7 @@ let genAI = null;
 const getGenAI = () => {
   if (!genAI) {
     if (!process.env.GEMINI_API_KEY) {
+      console.error("Missing GEMINI_API_KEY in environment variables");
       throw new Error("Missing GEMINI_API_KEY in environment variables");
     }
     genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -151,7 +152,7 @@ export const checkFlowchart = async (imageData, question) => {
     // 修改：根據傳入的題目動態生成 prompt
     const prompt = `題目：${question}
     
-    請分析這個針對上述題目繪製的流程圖並提供詳細的回饋：
+    請以國中程度的程式初學者能理解的程度，分析這個針對上述題目繪製的流程圖，並用繁體中文提供詳細的回饋：
     1. 流程圖的基本結構是否完整？（包含開始、結束節點）
     2. 判斷節點的邏輯是否清晰？是否正確使用了判斷符號？
     3. 流程的連接是否正確？

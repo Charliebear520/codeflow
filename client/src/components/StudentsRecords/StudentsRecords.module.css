@@ -22,3 +22,18 @@
   margin-bottom: 30px;
   /* background-color: blueviolet; */
 }
+
+.StudentsCardContainer{
+  width: 100%;
+  height: auto;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding-right: 10px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap; /* ✅ 允許自動換行 */
+  gap: 10px;
+  justify-content: start;
+  align-items: center;
+  /* background-color: aquamarine; */
+}

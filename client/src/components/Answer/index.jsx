@@ -15,29 +15,11 @@ import UploadImage from "../upload";
 // const { Dragger } = Upload;
 
 // 定義出初始節點和邊
-const initialNodes = [
-  {
-    id: "1",
-    type: "input",
-    data: { label: "input node" },
-    position: { x: 250, y: 50 },
-  },
-];
+const initialNodes = []; // 空數組，不顯示任何初始節點
 
-const initialEdges = [
-  {
-    id: "e1-2", // 確保每個邊都有唯一的 id
-    source: "1", // 來源節點的 id
-    target: "2", // 目標節點的 id
-    type: "straight", // 設置初始邊的類型為 straight
-    markerEnd: {
-      type: "arrow", // 使用箭頭作為標記
-      color: "#007bff", // 標記顏色
-    },
-  },
-];
+const initialEdges = []; // 空數組，不顯示任何初始邊
 
-const Answer = () => {
+const Answer = ({ onChecking }) => {
   const [activeKey, setActiveKey] = useState("1");
   const { isSignedIn, getToken } = useAuth();
   const [img, setImg] = useState({
@@ -49,9 +31,12 @@ const Answer = () => {
   const dispatch = useDispatch();
   const [fileList, setFileList] = useState([]);
   const { message } = App.useApp(); // 使用 App 的 message API
+  const [checking, setChecking] = useState(false);
 
   const handleCheck = async () => {
     try {
+      setChecking(true);
+      if (onChecking) onChecking(true);
       if (activeKey === "1") {
         if (fileList.length === 0) {
           message.error("請先上傳流程圖");
@@ -64,7 +49,9 @@ const Answer = () => {
           return;
         }
 
-        const resultAction = await dispatch(checkFlowchart(base64Image));
+        const resultAction = await dispatch(
+          checkFlowchart({ imageData: base64Image, stage: 1 })
+        );
 
         if (checkFlowchart.fulfilled.match(resultAction)) {
           message.success("檢查完成");
@@ -95,6 +82,9 @@ const Answer = () => {
     } catch (error) {
       console.error("檢查過程發生錯誤:", error);
       message.error(error.message || "檢查過程發生錯誤");
+    } finally {
+      setChecking(false);
+      if (onChecking) onChecking(false);
     }
   };
 
@@ -135,7 +125,10 @@ const Answer = () => {
   ];
   const handleSave = async () => {
     try {
-      if (!isSignedIn) { message.error("請先登入"); return; }
+      if (!isSignedIn) {
+        message.error("請先登入");
+        return;
+      }
 
       let payload = { questionId: "Q001", completed: false };
 
@@ -158,20 +151,29 @@ const Answer = () => {
         }
         const { nodes, edges } = flowRef.current.exportGraph();
         const hasData = (nodes?.length || 0) + (edges?.length || 0) > 0;
-        if (!hasData) { message.error("還沒有流程圖可以儲存"); return; }
+        if (!hasData) {
+          message.error("還沒有流程圖可以儲存");
+          return;
+        }
 
         const flowElement = document.querySelector(".react-flow");
         if (!flowElement) {
           message.error("找不到流程圖元素");
           return;
         }
-        const dataUrl = await toPng(flowElement, { backgroundColor: "#fff", pixelRatio: 2 });
+        const dataUrl = await toPng(flowElement, {
+          backgroundColor: "#fff",
+          pixelRatio: 2,
+        });
         payload.graph = { nodes, edges };
         payload.imageBase64 = dataUrl;
         payload.mode = "editor";
         // ...existing code...
         console.log("送出前 payload：", payload);
-        console.log("imageBase64 長度：", payload.imageBase64 ? payload.imageBase64.length : "null");
+        console.log(
+          "imageBase64 長度：",
+          payload.imageBase64 ? payload.imageBase64.length : "null"
+        );
         // ...existing code...
       } else {
         message.error("未知的分頁");
@@ -188,19 +190,25 @@ const Answer = () => {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok || !data.success)
+        throw new Error(data.error || `HTTP ${res.status}`);
 
       message.success("已儲存第一階段的作答");
     } catch (err) {
       console.error(err);
       message.error(`儲存失敗：${err.message}`);
     }
-  }
-
+  };
 
   const extraButtons = (
     <div style={{ display: "flex", gap: "8px" }}>
-      <Button type="primary" onClick={handleCheck} className={styles.checkButton}>
+      <Button
+        type="primary"
+        onClick={handleCheck}
+        className={styles.checkButton}
+        loading={checking}
+        disabled={checking}
+      >
         檢查
       </Button>
       <Button type="primary" className={styles.uploadButton}>

@@ -29,9 +29,7 @@ const Topic = () => {
   const fetchNewQuestion = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(
-        "/api/generate-question"
-      );
+      const response = await axios.get("/api/generate-question");
       if (response.data.success) {
         setQuestion(response.data.question);
         // 將當前題目存儲到 localStorage，以便在提交流程圖時使用
@@ -63,13 +61,10 @@ const Topic = () => {
 
     setHintLoading(true);
     try {
-      const response = await axios.post(
-        "/api/generate-hint",
-        {
-          question,
-          hintLevel,
-        }
-      );
+      const response = await axios.post("/api/generate-hint", {
+        question,
+        hintLevel,
+      });
 
       if (response.data.success) {
         const newHint = response.data.hint;
@@ -161,7 +156,7 @@ const Topic = () => {
   const content = (
     <div>
       <Image
-        src="/studentsAnswer02.png"
+        src="/studentanswer.png"
         alt="流程圖範例"
         style={{ width: "200px" }}
         preview={false}
@@ -212,7 +207,6 @@ const Topic = () => {
             overflow: "hidden",
             display: "flex",
             justifyContent: "center",
-           
           }}
         >
           <StageSwitcher current={currentStage} onChange={setCurrentStage} />
@@ -220,34 +214,32 @@ const Topic = () => {
       </div>
 
       <div className={styles.container}>
-      
-      <div style={{ height: "85%"}}>
-        <div className={styles.topicbox}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              flexDirection: "column",
-              overflowY: "hidden",
-            }}
-          >
-            <div style={{ paddingBottom: "2rem" }}>
-              <h3>Ch1,繪製流程圖</h3>
-            </div>
-            <p style={{ flex: 1, padding: "0 1rem 1rem 0" }}>{question}</p>
-            <br />
-          </div>
-          <div
+        <div style={{ height: "85%" }}>
+          <div className={styles.topicbox}>
+            <div
               style={{
-                width:"50%",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexDirection: "column",
+                overflowY: "hidden",
+              }}
+            >
+              <div style={{ paddingBottom: "2rem" }}>
+                <h3>Ch1,繪製流程圖</h3>
+              </div>
+              <p style={{ flex: 1, padding: "0 1rem 1rem 0" }}>{question}</p>
+              <br />
+            </div>
+            <div
+              style={{
+                width: "50%",
                 display: "flex",
                 flexDirection: "column",
                 gap: "10px",
                 marginTop: "10px",
                 overflowY: "hidden",
                 justifyContent: "flex-end",
-                
               }}
             >
               <Button
@@ -267,106 +259,104 @@ const Topic = () => {
               >
                 {`提示 (${hintLevel}/7)`}
               </Button>
-          </div>
+            </div>
 
-          <div className={styles.infobox}>
-            <div className={styles.examplebox}>
-              <img src={"/Camera.png"} height={15} width={16} />
-              <Popover placement="right" content={content} trigger="hover">
-                <h5 className={styles.example}>流程圖範例</h5>
-              </Popover>
-            </div>
-            <div className={styles.examplebox}>
-              <img src={"/Graduation.png"} height={15} width={16} />
-              <Popover placement="right" content={example} trigger="hover">
-                <h5 className={styles.example}>流程圖的概念</h5>
-              </Popover>
-            </div>
-            <div className={styles.examplebox}>
-              <img src={"/Book.png"} height={15} width={16} />
-              <Popover placement="right" content={content} trigger="hover">
-                <h5 className={styles.example}>流程圖大揭秘</h5>
-              </Popover>
+            <div className={styles.infobox}>
+              <div className={styles.examplebox}>
+                <img src={"/Camera.png"} height={15} width={16} />
+                <Popover placement="right" content={content} trigger="hover">
+                  <h5 className={styles.example}>流程圖範例</h5>
+                </Popover>
+              </div>
+              <div className={styles.examplebox}>
+                <img src={"/Graduation.png"} height={15} width={16} />
+                <Popover placement="right" content={example} trigger="hover">
+                  <h5 className={styles.example}>流程圖的概念</h5>
+                </Popover>
+              </div>
+              {/* <div className={styles.examplebox}>
+                <img src={"/Book.png"} height={15} width={16} />
+                <Popover placement="right" content={content} trigger="hover">
+                  <h5 className={styles.example}>流程圖大揭秘</h5>
+                </Popover>
+              </div> */}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* 提示對話框 */}
-      <Modal
-        title={
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span>{`繪圖提示 - 步驟 ${hintLevel}/7`}</span>
-            <Button
-              icon={<ReloadOutlined spin={regenerating} />}
-              onClick={regenerateHint}
-              disabled={hintLoading || regenerating}
-              size="small"
-              style={{ marginRight: "2rem" }}
+        {/* 提示對話框 */}
+        <Modal
+          title={
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
             >
-              重新生成提示
-            </Button>
-          </div>
-        }
-        open={isHintModalVisible}
-        onCancel={handleCloseHint}
-        footer={[
-          <Button
-            key="previous"
-            onClick={handlePreviousHint}
-            disabled={hintLevel === 1 || hintLoading}
-          >
-            上一步提示
-          </Button>,
-          <Button key="close" onClick={handleCloseHint}>
-            關閉
-          </Button>,
-          <Button
-            key="next"
-            type="primary"
-            onClick={handleNextHint}
-            disabled={hintLevel === 7 || hintLoading}
-          >
-            {hintLevel < 7 ? "下一步提示" : "完成"}
-          </Button>,
-        ]}
-        width={600}
-      >
-        {hintLoading ? (
-          <div style={{ textAlign: "center", padding: "20px" }}>
-            正在生成提示...
-          </div>
-        ) : (
-          <div>
-            <div style={{ textAlign: "center", marginBottom: "10px" }}>
-              {Array.from({ length: 7 }).map((_, index) => (
-                <Button
-                  key={index}
-                  type={index + 1 === hintLevel ? "primary" : "default"}
-                  shape="circle"
-                  size="small"
-                  style={{ margin: "0 5px" }}
-                  onClick={() => setHintLevel(index + 1)}
-                  disabled={hintLoading}
-                >
-                  {index + 1}
-                </Button>
-              ))}
+              <span>{`繪圖提示 - 步驟 ${hintLevel}/7`}</span>
+              <Button
+                icon={<ReloadOutlined spin={regenerating} />}
+                onClick={regenerateHint}
+                disabled={hintLoading || regenerating}
+                size="small"
+                style={{ marginRight: "2rem" }}
+              >
+                重新生成提示
+              </Button>
             </div>
-            <div style={{ whiteSpace: "pre-line" }}>{hintContent}</div>
-          </div>
-        )}
-      </Modal>
+          }
+          open={isHintModalVisible}
+          onCancel={handleCloseHint}
+          footer={[
+            <Button
+              key="previous"
+              onClick={handlePreviousHint}
+              disabled={hintLevel === 1 || hintLoading}
+            >
+              上一步提示
+            </Button>,
+            <Button key="close" onClick={handleCloseHint}>
+              關閉
+            </Button>,
+            <Button
+              key="next"
+              type="primary"
+              onClick={handleNextHint}
+              disabled={hintLevel === 7 || hintLoading}
+            >
+              {hintLevel < 7 ? "下一步提示" : "完成"}
+            </Button>,
+          ]}
+          width={600}
+        >
+          {hintLoading ? (
+            <div style={{ textAlign: "center", padding: "20px" }}>
+              正在生成提示...
+            </div>
+          ) : (
+            <div>
+              <div style={{ textAlign: "center", marginBottom: "10px" }}>
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <Button
+                    key={index}
+                    type={index + 1 === hintLevel ? "primary" : "default"}
+                    shape="circle"
+                    size="small"
+                    style={{ margin: "0 5px" }}
+                    onClick={() => setHintLevel(index + 1)}
+                    disabled={hintLoading}
+                  >
+                    {index + 1}
+                  </Button>
+                ))}
+              </div>
+              <div style={{ whiteSpace: "pre-line" }}>{hintContent}</div>
+            </div>
+          )}
+        </Modal>
+      </div>
     </div>
-
-    </div>
-   
   );
 };
 
