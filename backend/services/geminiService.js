@@ -140,33 +140,28 @@ export const generateFlowchartHint = async (question, hintLevel) => {
 export const checkFlowchart = async (imageData, question) => {
   try {
     console.log("Starting flowchart check...");
-    console.log("API Key available:", !!process.env.GEMINI_API_KEY); // 檢查 API key 是否存在
-
     if (!imageData) {
       throw new Error("No image data provided");
     }
 
-    // 使用新的模型名稱 gemini-2.0-flash
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    // 修改：根據傳入的題目動態生成 prompt
-    const prompt = `題目：${question}
-    
-    請以國中程度的程式初學者能理解的程度，分析這個針對上述題目繪製的流程圖，並用繁體中文提供詳細的回饋：
-    1. 流程圖的基本結構是否完整？（包含開始、結束節點）
-    2. 判斷節點的邏輯是否清晰？是否正確使用了判斷符號？
-    3. 流程的連接是否正確？
-    4. 流程圖是否正確解決了題目所述問題？
-    5. 如果有任何問題，請提供具體的改進建議。
+    const prompt = `
+你是一位非常簡潔的國中程式設計助教。請根據這張流程圖圖片，針對下方題目，用繁體中文提供 3-5 點簡短的引導式建議。
 
-    請用以下格式回答：
-    題目理解準確性：[評估]
-    結構完整性：[評估]
-    邏輯清晰度：[評估]
-    連接正確性：[評估]
-    改進建議：[具體建議]`;
+**題目**：${question}
 
-    console.log("Sending request to Gemini API...");
+**輸出規則 (必須嚴格遵守)**：
+1.  **風格**：引導式問句，例如「是不是少了...？」或「可以思考看看...」。
+2.  **格式**：條列式，3-5 點。
+3.  **長度**：總字數嚴格控制在 200 字以內。
+4.  **內容**：專注於結構、邏輯和完整性，不要給完整答案。
+5.  **如果圖片無法辨識**：就回傳「圖片有點模糊，我看不太清楚耶，可以換一張更清晰的圖片嗎？」。
+
+請僅輸出建議文字，不要包含任何標題或額外說明。
+`;
+
+    console.log("Sending request to Gemini API for flowchart check...");
 
     const result = await model.generateContent([
       prompt,

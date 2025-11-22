@@ -225,9 +225,11 @@ mongoose
 
 // 小工具：確保 Student 存在並同步 name/email
 const ADMIN_EMAILS_SET = new Set(
-  (process.env.ADMIN_EMAILS || "").split(",").map(s => s.trim()).filter(Boolean)
+  (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
 );
-
 
 async function ensureStudent(userId) {
   const u = await clerkClient.users.getUser(userId);
@@ -244,9 +246,8 @@ async function ensureStudent(userId) {
 
   //role：在白名單就是 teacher，否則 student
   const emailLower = email ? email.toLowerCase() : null;
-  const role = emailLower && ADMIN_EMAILS_SET.has(emailLower)
-    ? "teacher"
-    : "student";
+  const role =
+    emailLower && ADMIN_EMAILS_SET.has(emailLower) ? "teacher" : "student";
 
   // upsert：第一次寫入 userId；之後每次登入都同步 name/email/role（若有變）
   const setOnInsert = { userId };
@@ -377,12 +378,14 @@ function requireTeacher(req, res, next) {
 
       // 從資料庫查詢使用者角色
       const student = await Student.findOne({ userId }).lean();
-      
+
       if (student && student.role === "teacher") {
         return next();
       }
 
-      return res.status(403).json({ success: false, error: "Forbidden - Teacher role required" });
+      return res
+        .status(403)
+        .json({ success: false, error: "Forbidden - Teacher role required" });
     } catch (e) {
       console.error("requireTeacher error:", e);
       return res.status(401).json({ success: false, error: "Unauthorized" });
@@ -473,7 +476,9 @@ app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
   try {
     const { questionId, questionText } = req.body || {};
     if (!questionId && !questionText) {
-      return res.status(400).json({ success: false, error: "需提供 questionId 或 questionText" });
+      return res
+        .status(400)
+        .json({ success: false, error: "需提供 questionId 或 questionText" });
     }
 
     // 取得題目文字：優先 body.questionText，其次從 Question 資料表讀取
@@ -485,12 +490,16 @@ app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
         qText = doc?.description || doc?.questionTitle || "";
       }
       if (!qText) {
-        const docByTitle = await Question.findOne({ questionTitle: questionId }).lean();
+        const docByTitle = await Question.findOne({
+          questionTitle: questionId,
+        }).lean();
         qText = docByTitle?.description || docByTitle?.questionTitle || "";
       }
     }
     if (!qText) {
-      return res.status(400).json({ success: false, error: "找不到題目內容，請提供 questionText" });
+      return res
+        .status(400)
+        .json({ success: false, error: "找不到題目內容，請提供 questionText" });
     }
 
     const flowSpec = await generateIdealFlowSpec(qText);
@@ -517,8 +526,13 @@ app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
 // 取得理想答案
 app.get("/api/ideal/flow/:questionId", async (req, res) => {
   try {
-    const doc = await IdealAnswer.findOne({ questionId: String(req.params.questionId) }).lean();
-    if (!doc) return res.status(404).json({ success: false, error: "ideal answer not found" });
+    const doc = await IdealAnswer.findOne({
+      questionId: String(req.params.questionId),
+    }).lean();
+    if (!doc)
+      return res
+        .status(404)
+        .json({ success: false, error: "ideal answer not found" });
     res.json({ success: true, data: doc });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -532,7 +546,8 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
     const studentDoc = await ensureStudent(userId);
 
     const { questionId, imageBase64, graph } = req.body || {};
-    if (!questionId) return res.status(400).json({ success: false, error: "questionId 必填" });
+    if (!questionId)
+      return res.status(400).json({ success: false, error: "questionId 必填" });
 
     // 取得題目內容（給 Vision/回饋參考，沒抓到也不阻擋）
     let questionText = "";
@@ -545,9 +560,13 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
     }
 
     // 1) 取得或生成理想答案
-    let ideal = await IdealAnswer.findOne({ questionId: String(questionId) }).lean();
+    let ideal = await IdealAnswer.findOne({
+      questionId: String(questionId),
+    }).lean();
     if (!ideal) {
-      const generated = await generateIdealFlowSpec(questionText || "請根據題意繪製流程圖");
+      const generated = await generateIdealFlowSpec(
+        questionText || "請根據題意繪製流程圖"
+      );
       ideal = await IdealAnswer.create({
         questionId: String(questionId),
         flowSpec: generated,
@@ -557,25 +576,44 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
       });
     }
     const idealSpec = normalizeFlowSpec(ideal.flowSpec);
+    console.log("🎯 理想答案 idealSpec:", JSON.stringify(idealSpec, null, 2));
 
     // 2) 解析學生答案
     let studentSpec;
     if (graph && (graph.nodes?.length || 0) + (graph.edges?.length || 0) > 0) {
+      console.log("📊 原始 graph 資料:", JSON.stringify(graph, null, 2));
       studentSpec = mapEditorGraphToFlowSpec(graph);
+      console.log(
+        "✅ 正規化後的 studentSpec:",
+        JSON.stringify(studentSpec, null, 2)
+      );
     } else if (imageBase64) {
       const base64 = imageBase64.startsWith("data:")
         ? imageBase64.split(",")[1]
         : imageBase64;
-      studentSpec = await parseStudentFlowSpecFromImage(base64, questionText || "");
+      studentSpec = await parseStudentFlowSpecFromImage(
+        base64,
+        questionText || ""
+      );
     } else {
-      return res.status(400).json({ success: false, error: "需提供 graph 或 imageBase64" });
+      return res
+        .status(400)
+        .json({ success: false, error: "需提供 graph 或 imageBase64" });
     }
 
     // 3) 比對
     const { diffs, scores } = compareFlowSpecs(idealSpec, studentSpec);
+    console.log("📈 比對結果 scores:", scores);
+    console.log("📋 比對結果 diffs:", JSON.stringify(diffs, null, 2));
 
     // 4) 產生回饋
-    const feedback = await generateFeedbackText(questionText || "", idealSpec, studentSpec, diffs, scores);
+    const feedback = await generateFeedbackText(
+      questionText || "",
+      idealSpec,
+      studentSpec,
+      diffs,
+      scores
+    );
 
     // 5) 寫回 Submission（保留你現有 stage1 結構，擴充比對結果）
     const update = {
@@ -884,7 +922,7 @@ app.post("/api/run-code", async (req, res) => {
       const { stdout } = await execFilep("xcrun", ["--find", "clang"]);
       const p = stdout.trim();
       if (p && exists(p)) return p;
-    } catch { }
+    } catch {}
     return null;
   }
   // ===============================================
@@ -933,7 +971,7 @@ app.post("/api/run-code", async (req, res) => {
         timeout: 3000,
         maxBuffer: 1024 * 200,
       });
-      await fs.unlink(filepath).catch(() => { });
+      await fs.unlink(filepath).catch(() => {});
       return res.json({ success: true, stdout, stderr });
     } else if (language === "c") {
       filename = `${id}.c`;
@@ -942,7 +980,7 @@ app.post("/api/run-code", async (req, res) => {
 
       const CC = await pickCCompiler();
       if (!CC) {
-        await fs.unlink(filepath).catch(() => { });
+        await fs.unlink(filepath).catch(() => {});
         return res.status(400).json({
           success: false,
           error:
@@ -960,8 +998,11 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         });
       } catch (e) {
-        await fs.unlink(filepath).catch(() => { });
-        const stderrMsg = (e.stderr && e.stderr.toString()) || e.err?.message || "compile error";
+        await fs.unlink(filepath).catch(() => {});
+        const stderrMsg =
+          (e.stderr && e.stderr.toString()) ||
+          e.err?.message ||
+          "compile error";
         // ← 這裡延用你原本的 explainError
         try {
           await loadErrorExplainer();
@@ -1021,9 +1062,12 @@ app.post("/api/run-code", async (req, res) => {
     }
   } catch (err) {
     // 萬一哪裡 throw，盡量清掉暫存檔
-    const del = cleanupFiles.length ? cleanupFiles : (filepath ? [filepath] : []);
-    if (del.length) await Promise.all(del.map(f => fs.unlink(f).catch(() => { })));
-    res.status(500).json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
+    const del = cleanupFiles.length ? cleanupFiles : filepath ? [filepath] : [];
+    if (del.length)
+      await Promise.all(del.map((f) => fs.unlink(f).catch(() => {})));
+    res
+      .status(500)
+      .json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
   }
 });
 
@@ -1134,14 +1178,14 @@ app.post("/api/run-code-interactive", async (req, res) => {
     childProcess.on("close", (code) => {
       activeProcesses.delete(processId);
       // 清理檔案
-      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     });
 
     childProcess.on("error", (error) => {
       console.error(`Process error for ${processId}:`, error);
       activeProcesses.delete(processId);
       // 清理檔案
-      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     });
 
     // 存儲程序引用
@@ -1161,7 +1205,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
       if (!isProcessRunning) {
         activeProcesses.delete(processId);
         // 清理檔案
-        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
       }
 
       res.json({
@@ -1180,7 +1224,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
 
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     }
     res.status(500).json({
       success: false,
@@ -1287,7 +1331,7 @@ app.post("/api/stop-process", async (req, res) => {
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
       const fs = await import("fs/promises");
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     }
 
     // 從活躍程序列表中移除
@@ -1359,7 +1403,13 @@ app.get("/api/admin/submissions", requireTeacher, async (req, res) => {
     .limit(Number(pageSize))
     .lean();
   const total = await Submission.countDocuments(filter);
-  res.json({ success: true, items, total, page: Number(page), pageSize: Number(pageSize) });
+  res.json({
+    success: true,
+    items,
+    total,
+    page: Number(page),
+    pageSize: Number(pageSize),
+  });
 });
 
 // AI錯誤解釋功能的API端点
