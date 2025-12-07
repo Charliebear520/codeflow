@@ -13,12 +13,12 @@ function getGenAI() {
   return genAI;
 }
 
-// 預設權重與同義詞（可放 DB 讓教師自訂）
+// 預設權重與同義詞(可放 DB 讓教師自訂)
 const DEFAULT_SCORING = { structure: 0.3, nodes: 0.3, edges: 0.2, logic: 0.2 };
 const DEFAULT_SYNONYMS = {
   start: ["開始", "起點", "start", "start node"],
   end: ["結束", "終點", "end", "end node", "finish"],
-  decision: ["判斷", "決策", "條件", "decision", "if", "判斷節點"],
+  decision: ["判斷", "決策", "條件", "decision", "if", "判斷節點", "diamond"],
   input: ["輸入", "input", "讀入", "取得資料"],
   output: ["輸出", "output", "顯示", "print", "顯示結果"],
   process: ["處理", "process", "步驟", "執行", "運算"],
@@ -71,9 +71,14 @@ function summarizeFlowSpec(spec) {
   return `Nodes: ${nodes}\nEdges: ${edges}`;
 }
 
-// 比對器（非 AI）：回傳 diffs 與 scores
+// 比對器(非 AI)：回傳 diffs 與 scores
 function compareFlowSpecs(ideal, student) {
   console.log("🔍 開始比對流程圖...");
+  console.log("📘 理想答案 nodes:", JSON.stringify(ideal.nodes, null, 2));
+  console.log("📘 理想答案 edges:", JSON.stringify(ideal.edges, null, 2));
+  console.log("📗 學生答案 nodes:", JSON.stringify(student.nodes, null, 2));
+  console.log("📗 學生答案 edges:", JSON.stringify(student.edges, null, 2));
+
   const weights = { ...DEFAULT_SCORING, ...(ideal.scoringWeights || {}) };
 
   const mustTypes = new Set(
@@ -85,9 +90,6 @@ function compareFlowSpecs(ideal, student) {
   );
 
   const studentTypes = new Set((student.nodes || []).map((n) => n.type));
-
-  console.log("📌 必要節點類型:", Array.from(mustTypes));
-  console.log("📌 學生節點類型:", Array.from(studentTypes));
 
   // 結構：至少要有 start/end，且 decision 節點數量合理
   const structureIssues = [];
@@ -108,77 +110,67 @@ function compareFlowSpecs(ideal, student) {
       ? 1
       : (requiredNodes.length - missingNodes.length) / requiredNodes.length;
 
-  console.log(
-    `📊 節點涵蓋率: ${nodesCoverage.toFixed(2)} (必要:${
-      requiredNodes.length
-    }, 缺少:${missingNodes.length})`
-  );
+  // 建立 ID 對應映射:理想答案的語義 ID → 學生答案的 UUID
+  // 策略:依序配對相同 type 的節點 (不考慮 label,因為學生可能用不同文字)
+  const idMapping = {};
+  const usedStudentIds = new Set(); // 追蹤已使用的學生節點 ID
+  console.log("🔗 開始建立 ID 對應映射...");
 
-  // 邊涵蓋率（僅檢查 required=true 的邊）
-  // 改進:不依賴固定 ID,而是根據節點類型+標籤來比對
+  for (const idealNode of ideal.nodes || []) {
+    // 找第一個相同 type 且尚未使用的學生節點
+    const matchingStudent = (student.nodes || []).find(
+      (sn) => sn.type === idealNode.type && !usedStudentIds.has(sn.id)
+    );
+    if (matchingStudent) {
+      idMapping[idealNode.id] = matchingStudent.id;
+      usedStudentIds.add(matchingStudent.id);
+      console.log(
+        `  ✅ 映射: ${idealNode.id} (${idealNode.type}, "${idealNode.label}") → ${matchingStudent.id} (${matchingStudent.type}, "${matchingStudent.label}")`
+      );
+    } else {
+      console.log(
+        `  ⚠️ 找不到匹配節點: ${idealNode.id} (${idealNode.type}, "${idealNode.label}")`
+      );
+    }
+  }
+  console.log("🔗 ID 映射表:", JSON.stringify(idMapping, null, 2));
+
+  // 邊涵蓋率(僅檢查 required=true 的邊)
   const requiredEdges = (ideal.edges || []).filter((e) => e.required);
-
-  // 建立節點 ID → 節點資訊的映射
-  const idealNodeMap = {};
-  (ideal.nodes || []).forEach((n) => {
-    idealNodeMap[n.id] = { type: n.type, label: n.label };
-  });
-
-  const studentNodeMap = {};
-  (student.nodes || []).forEach((n) => {
-    studentNodeMap[n.id] = { type: n.type, label: n.label };
-  });
+  console.log(
+    "🔗 必要的邊(requiredEdges):",
+    JSON.stringify(requiredEdges, null, 2)
+  );
+  console.log("🔗 學生的所有邊:", JSON.stringify(student.edges, null, 2));
 
   const missingEdges = requiredEdges.filter((re) => {
-    const fromNode = idealNodeMap[re.from];
-    const toNode = idealNodeMap[re.to];
+    // 使用映射表將理想答案的 ID 轉換為學生的 ID
+    const mappedFrom = idMapping[re.from] || re.from;
+    const mappedTo = idMapping[re.to] || re.to;
 
-    // 在學生答案中找是否有類似的邊
-    return !(student.edges || []).some((se) => {
-      const studentFromNode = studentNodeMap[se.from];
-      const studentToNode = studentNodeMap[se.to];
-
-      // 檢查 from 節點是否匹配 (類型+標籤)
-      const fromMatches =
-        studentFromNode &&
-        studentFromNode.type === fromNode.type &&
-        studentFromNode.label === fromNode.label;
-
-      // 檢查 to 節點是否匹配 (類型+標籤)
-      const toMatches =
-        studentToNode &&
-        studentToNode.type === toNode.type &&
-        studentToNode.label === toNode.label;
-
-      // 檢查邊的標籤是否匹配 (如果有的話)
-      const labelMatches = re.label ? se.label === re.label : true;
-
-      return fromMatches && toMatches && labelMatches;
+    const found = (student.edges || []).some((se) => {
+      const fromMatch = se.from === mappedFrom;
+      const toMatch = se.to === mappedTo;
+      const labelMatch = re.label ? se.label === re.label : true;
+      console.log(`  檢查邊 ${re.from} → ${re.to} (${re.label || "無標籤"})`);
+      console.log(`    映射後: ${mappedFrom} → ${mappedTo}`);
+      console.log(`    學生邊 ${se.from} → ${se.to} (${se.label || "無標籤"})`);
+      console.log(
+        `    from匹配:${fromMatch}, to匹配:${toMatch}, label匹配:${labelMatch}`
+      );
+      return fromMatch && toMatch && labelMatch;
     });
+    console.log(
+      `  必要邊 ${re.from} → ${re.to} ${found ? "✅找到" : "❌缺少"}`
+    );
+    return !found;
   });
+  console.log("❌ 缺少的邊:", JSON.stringify(missingEdges, null, 2));
 
   const edgesCoverage =
     requiredEdges.length === 0
       ? 1
       : (requiredEdges.length - missingEdges.length) / requiredEdges.length;
-
-  console.log(
-    `🔗 邊涵蓋率: ${edgesCoverage.toFixed(2)} (必要:${
-      requiredEdges.length
-    }, 缺少:${missingEdges.length})`
-  );
-  if (missingEdges.length > 0) {
-    console.log(
-      "❌ 缺少的邊:",
-      missingEdges.map((e) => {
-        const from = idealNodeMap[e.from];
-        const to = idealNodeMap[e.to];
-        return `${from?.type}(${from?.label}) --${e.label || ""}-> ${
-          to?.type
-        }(${to?.label})`;
-      })
-    );
-  }
 
   // 邏輯簡檢：decision 節點是否帶有 yes/no 出邊
   const studentEdgesByFrom = {};
