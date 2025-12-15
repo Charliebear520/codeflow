@@ -28,6 +28,7 @@ const Answer = ({ onChecking }) => {
     dbData: {},
   });
   const flowRef = useRef(null);
+  const lastTickRef = useRef(Date.now());
   const dispatch = useDispatch();
   const [fileList, setFileList] = useState([]);
   const { message } = App.useApp(); // 使用 App 的 message API
@@ -175,12 +176,13 @@ const Answer = ({ onChecking }) => {
   ];
   const handleSave = async () => {
     try {
-      if (!isSignedIn) {
-        message.error("請先登入");
-        return;
-      }
+      if (!isSignedIn) { message.error("請先登入"); return; }
 
       let payload = { questionId: "Q001", completed: false };
+      const now = Date.now();
+      const deltaSec = Math.max(0, Math.floor((now - (lastTickRef.current || now)) / 1000));
+      lastTickRef.current = now;
+      payload.durationDeltaSec = deltaSec;
 
       if (activeKey === "1") {
         // 上傳流程圖
@@ -201,10 +203,7 @@ const Answer = ({ onChecking }) => {
         }
         const { nodes, edges } = flowRef.current.exportGraph();
         const hasData = (nodes?.length || 0) + (edges?.length || 0) > 0;
-        if (!hasData) {
-          message.error("還沒有流程圖可以儲存");
-          return;
-        }
+        if (!hasData) { message.error("還沒有流程圖可以儲存"); return; }
 
         const flowElement = document.querySelector(".react-flow");
         if (!flowElement) {
@@ -220,10 +219,7 @@ const Answer = ({ onChecking }) => {
         payload.mode = "editor";
         // ...existing code...
         console.log("送出前 payload：", payload);
-        console.log(
-          "imageBase64 長度：",
-          payload.imageBase64 ? payload.imageBase64.length : "null"
-        );
+        console.log("imageBase64 長度：", payload.imageBase64 ? payload.imageBase64.length : "null");
         // ...existing code...
       } else {
         message.error("未知的分頁");
@@ -240,8 +236,7 @@ const Answer = ({ onChecking }) => {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok || !data.success)
-        throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
 
       message.success("已儲存第一階段的作答");
     } catch (err) {
@@ -267,11 +262,9 @@ const Answer = ({ onChecking }) => {
       <Button type="primary" className={styles.saveButton} onClick={handleSave}>
         儲存
       </Button>
-      {
-        <Button danger onClick={handleReset}>
-          清空
-        </Button>
-      }
+      {/* <Button danger onClick={handleReset}>
+        清空
+      </Button> */}
     </div>
   );
 

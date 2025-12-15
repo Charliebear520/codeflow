@@ -1623,6 +1623,8 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
     } = req.body || {};
     console.log("收到 req.body：", req.body);
 
+    const student = await ensureStudent(userId);
+
     if (!questionId)
       return res.status(400).json({ success: false, error: "questionId 必填" });
     if (!graph && !imageBase64)
@@ -1633,35 +1635,31 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
     const delta = Number.isFinite(Number(durationDeltaSec))
       ? Math.max(0, Math.floor(Number(durationDeltaSec)))
       : 0;
-
-    const student = await ensureStudent(userId);
-
-    // 只在有值時才帶入
-    const stage1 = {
-      ...(graph ? { graph } : {}),
-      ...(imageBase64 ? { imageBase64 } : {}),
-      mode: mode || null,
-      completed,
-      updatedAt: new Date(),
+    const setFields = {
+      "stages.stage1.mode": mode || null,
+      "stages.stage1.completed": !!completed,
+      "stages.stage1.updatedAt": new Date(),
+      studentName: student.name ?? null,
+      studentEmail: student.email?.toLowerCase() ?? null,
     };
 
-    console.log("儲存前 stage1：", stage1);
+    // 只在有值時才帶入
+    if (graph) setFields["stages.stage1.graph"] = graph;
+    if (imageBase64) setFields["stages.stage1.imageBase64"] = imageBase64;
+
+    console.log("儲存前 setFields：", setFields);
 
     const update = {
-      $set: {
-        "stages.stage1": stage1,
-        studentName: student.name ?? null,
-        studentEmail: student.email?.toLowerCase() ?? null,
-      },
+      $set: setFields,
       $setOnInsert: {
         student: student._id,
         questionId,
-        "stages.stage1.durationSec": 0,
       },
       $inc: {
-        "stages.stage1.durationSec": delta,
+        "stages.stage1.durationSec": delta, // 原子累加
       },
     };
+
 
     console.log("儲存前 update：", JSON.stringify(update, null, 2));
 
