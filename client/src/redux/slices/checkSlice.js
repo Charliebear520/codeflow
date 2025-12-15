@@ -3,8 +3,8 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 export const checkFlowchart = createAsyncThunk(
   "check/checkFlowchart",
   async (payload) => {
-    // 解構 payload 以獲取 imageData 和 question
-    const { imageData, question } =
+    // 解構 payload 以獲取 imageData、question、stage
+    const { imageData, question, stage } =
       typeof payload === "object" ? payload : { imageData: payload };
 
     // 從 localStorage 獲取當前問題（如果沒有直接提供）
@@ -32,12 +32,22 @@ export const checkFlowchart = createAsyncThunk(
       throw new Error(data.error || "檢查失敗");
     }
 
-    return data.result;
+    return { result: data.result, stage: stage || 1 };
   }
 );
 
 const initialState = {
-  result: null,
+  // 針對三個階段分開保存回覆
+  byStage: {
+    1: null,
+    2: null,
+    3: null,
+  },
+  // 新增：完整比對結果（用於新的檢查流程）
+  scores: null,
+  diffs: null,
+  feedback: null,
+  submissionId: null,
   isChecking: false,
   error: null,
 };
@@ -46,10 +56,35 @@ const checkSlice = createSlice({
   name: "check",
   initialState,
   reducers: {
-    resetCheck: (state) => {
-      state.result = null;
+    // 新增：設定完整的檢查結果（對應新的比對 API）
+    setCheckResult: (state, action) => {
+      state.scores = action.payload.scores;
+      state.diffs = action.payload.diffs;
+      state.feedback = action.payload.feedback;
+      state.submissionId = action.payload.submissionId;
       state.isChecking = false;
       state.error = null;
+    },
+    resetCheck: (state) => {
+      state.byStage = { 1: null, 2: null, 3: null };
+      state.scores = null;
+      state.diffs = null;
+      state.feedback = null;
+      state.submissionId = null;
+      state.isChecking = false;
+      state.error = null;
+    },
+    resetStage: (state, action) => {
+      const stage = action.payload;
+      if (stage === 1 || stage === 2 || stage === 3) {
+        state.byStage[stage] = null;
+      }
+    },
+    setStageFeedback: (state, action) => {
+      const { stage, feedback } = action.payload || {};
+      if (stage === 1 || stage === 2 || stage === 3) {
+        state.byStage[stage] = feedback || null;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -60,7 +95,9 @@ const checkSlice = createSlice({
       })
       .addCase(checkFlowchart.fulfilled, (state, action) => {
         state.isChecking = false;
-        state.result = action.payload;
+        const { result, stage } = action.payload || {};
+        const key = stage === 2 || stage === 3 ? stage : 1;
+        state.byStage[key] = result;
         state.error = null;
       })
       .addCase(checkFlowchart.rejected, (state, action) => {
@@ -70,5 +107,6 @@ const checkSlice = createSlice({
   },
 });
 
-export const { resetCheck } = checkSlice.actions;
+export const { setCheckResult, resetCheck, resetStage, setStageFeedback } =
+  checkSlice.actions;
 export default checkSlice.reducer;

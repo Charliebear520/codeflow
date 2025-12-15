@@ -17,6 +17,7 @@ import {
   useReactFlow,
   Background,
   Panel,
+  NodeToolbar,
 } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
@@ -28,13 +29,6 @@ import RectangleNode from "../Shapes/Rectangle/RectangleNode";
 import DecisionNode from "../Shapes/Decision/DecisionNode";
 import ProcessNode from "../Shapes/Process/ProcessNode";
 import DiamondNode from "../Shapes/Diamond/DiamondNode";
-
-const nodeTypes = {
-  rectangle: RectangleNode,
-  decision: DecisionNode,
-  process: ProcessNode,
-  diamond: DiamondNode,
-};
 
 let id = 0;
 const getId = () => `dndnode_${id++}`;
@@ -60,13 +54,13 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
     },
     // 新增：匯出目前的作答（JSON）
     exportGraph: () => ({
-      nodes: nodes.map(n => ({
+      nodes: nodes.map((n) => ({
         id: n.id,
         type: n.type,
         position: n.position,
         data: { label: n.data?.label ?? "" },
       })),
-      edges: edges.map(e => ({
+      edges: edges.map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
@@ -119,6 +113,21 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
           : node
       )
     );
+  };
+
+  const deleteNode = (nodeId) => {
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    // 同時刪除與該節點相關的邊
+    setEdges((eds) =>
+      eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+    );
+  };
+
+  const nodeTypes = {
+    rectangle: (props) => <RectangleNode {...props} onDelete={deleteNode} />,
+    decision: (props) => <DecisionNode {...props} onDelete={deleteNode} />,
+    process: (props) => <ProcessNode {...props} onDelete={deleteNode} />,
+    diamond: (props) => <DiamondNode {...props} onDelete={deleteNode} />,
   };
 
   const onDrop = useCallback(

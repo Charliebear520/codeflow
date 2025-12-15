@@ -244,12 +244,12 @@ const TopicStage2 = ({
                 <h5 className={styles.example}>流程圖的概念</h5>
               </Popover>
             </div>
-            <div className={styles.examplebox}>
+            {/* <div className={styles.examplebox}>
               <img src={"/Book.png"} height={14} width={14} />
               <Popover placement="right" content={content} trigger="hover">
                 <h5 className={styles.example}>流程圖大揭秘</h5>
               </Popover>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import os from "os";
+import path from "path";
 // import ImageKit from "imagekit"; // 暫時註解掉以避免導入問題
 // 移除靜態導入，改為動態導入以避免初始化問題
 // import {
@@ -11,17 +13,29 @@ import dotenv from "dotenv";
 //   checkPseudoCode,
 //   checkCode,
 // } from "./services/geminiService.js";
-import { clerkMiddleware, requireAuth, getAuth, clerkClient } from "@clerk/express";// 暫時禁用以避免導入問題
+import {
+  clerkMiddleware,
+  requireAuth,
+  getAuth,
+  clerkClient,
+} from "@clerk/express"; // 暫時禁用以避免導入問題
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
-
 const execAsync = promisify(exec);
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
 import Student from "./models/Student.js";
 import Submission from "./models/Submission.js";
-import os from "os";
-import path from "path";
+import IdealAnswer from "./models/IdealAnswer.js";
+import {
+  generateIdealFlowSpec,
+  parseStudentFlowSpecFromImage,
+  mapEditorGraphToFlowSpec,
+  normalizeFlowSpec,
+  compareFlowSpecs,
+  generateFeedbackText,
+} from "./services/flowSpecService.js";
+import fsSync from "fs";
 
 // 動態導入Gemini服務的輔助函數
 const loadGeminiServices = async () => {
@@ -36,6 +50,13 @@ const loadGeminiServices = async () => {
   };
 };
 
+// 導入錯誤解釋函數
+let explainError;
+const loadErrorExplainer = async () => {
+  const errorExplainerModule = await import("./services/errorExplainer.js");
+  explainError = errorExplainerModule.explainError;
+};
+
 // 加載環境變量（僅在非生產環境）
 if (process.env.NODE_ENV !== "production") {
   dotenv.config();
@@ -43,7 +64,30 @@ if (process.env.NODE_ENV !== "production") {
 
 const port = process.env.PORT || 3000;
 const app = express();
-app.get("/health", (req, res) => res.send("ok")); // 小健康檢查
+
+// 檢查端點
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+  });
+});
+
+// 更詳細的檢查端點
+app.get("/api/health", (req, res) => {
+  const state = mongoose.connection.readyState; // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
+  const states = ["disconnected", "connected", "connecting", "disconnecting"];
+  res.json({
+    ok: state === 1,
+    stateCode: state,
+    stateText: states[state] || "unknown",
+    host: mongoose.connection.host || null,
+    dbName: mongoose.connection.name || null,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+  });
+});
 
 // 存儲活躍的程序
 const activeProcesses = new Map();
@@ -119,8 +163,13 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error("Not allowed by CORS"));
   },
-  methods: ["GET", "POST", "OPTIONS"],
-  // allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+  ],
   credentials: true,
   optionsSuccessStatus: 204,
 };
@@ -128,10 +177,45 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-app.use(clerkMiddleware());// 解析前端帶來的 Authorization: Bearer <token>
 
-// 暫時禁用後端Clerk中間件，只保留前端認證保護
-// app.use(clerkMiddleware());
+// 全局錯誤處理中間件
+app.use((err, req, res, next) => {
+  console.error("Global error handler:", err);
+  res.status(500).json({
+    success: false,
+    error: "Internal server error",
+    message:
+      process.env.NODE_ENV === "development"
+        ? err.message
+        : "Something went wrong",
+  });
+});
+
+// 啟用 Clerk 中間件以支援 getAuth()
+app.use(clerkMiddleware());
+
+// 資料表連接 - 移到前面
+const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
+
+mongoose
+  .connect(mongoUri, {
+    //讓 server 選擇逾時更快失敗，除錯友善
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 30000,
+    connectTimeoutMS: 10000,
+    maxPoolSize: 10,
+    retryWrites: true,
+  })
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+    // 在生產環境中，如果 MongoDB 連接失敗，不要讓整個應用crush
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        "MongoDB connection failed, but continuing in production mode"
+      );
+    }
+  });
 
 // const imagekit = new ImageKit({ // 暫時註解掉
 //   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
@@ -141,9 +225,11 @@ app.use(clerkMiddleware());// 解析前端帶來的 Authorization: Bearer <token
 
 // 小工具：確保 Student 存在並同步 name/email
 const ADMIN_EMAILS_SET = new Set(
-  (process.env.ADMIN_EMAILS || "").split(",").map(s => s.trim()).filter(Boolean)
+  (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
 );
-
 
 async function ensureStudent(userId) {
   const u = await clerkClient.users.getUser(userId);
@@ -160,9 +246,8 @@ async function ensureStudent(userId) {
 
   //role：在白名單就是 teacher，否則 student
   const emailLower = email ? email.toLowerCase() : null;
-  const role = emailLower && ADMIN_EMAILS_SET.has(emailLower)
-    ? "teacher"
-    : "student";
+  const role =
+    emailLower && ADMIN_EMAILS_SET.has(emailLower) ? "teacher" : "student";
 
   // upsert：第一次寫入 userId；之後每次登入都同步 name/email/role（若有變）
   const setOnInsert = { userId };
@@ -191,14 +276,26 @@ function execp(cmd, opts = {}) {
 }
 
 // 檢查.env是否存在CC環境變數（包 try/catch）
-function exists(p) { try { return fsSync.existsSync(p); } catch { return false; } }
+function exists(p) {
+  try {
+    return fsSync.existsSync(p);
+  } catch {
+    return false;
+  }
+}
 
 async function pickCCompiler() {
   // 1) 優先吃 .env
   if (process.env.CC && exists(process.env.CC)) return process.env.CC;
   // 2) PATH 上
-  try { await execp("gcc --version"); return "gcc"; } catch { }
-  try { await execp("clang --version"); return "clang"; } catch { }
+  try {
+    await execp("gcc --version");
+    return "gcc";
+  } catch {}
+  try {
+    await execp("clang --version");
+    return "clang";
+  } catch {}
   // 3) 常見安裝路徑（可命中就用）
   const candidates = [
     "C:\\msys64\\ucrt64\\bin\\gcc.exe",
@@ -214,7 +311,7 @@ async function pickCCompiler() {
     const { stdout } = await execp("xcrun --find clang");
     const p = stdout.trim();
     if (p && exists(p)) return p;
-  } catch { }
+  } catch {}
 
   return null;
 }
@@ -268,37 +365,32 @@ app.get("/api/me", requireAuth(), async (req, res) => {
   }
 });
 
-app.get("/api/health", (req, res) => {
-  const state = mongoose.connection.readyState; // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
-  const states = ["disconnected", "connected", "connecting", "disconnecting"];
-  res.json({
-    ok: state === 1,
-    stateCode: state,
-    stateText: states[state] || "unknown",
-    host: mongoose.connection.host || null,
-    dbName: mongoose.connection.name || null,
-  });
-});
-
-// 教師角色
+// 教師角色 - Express 中間件包裝器處理 async
 function requireTeacher(req, res, next) {
-  try {
-    const auth = getAuth(req) || {};
-    const userId = auth.userId;
-    const orgRole = auth.orgRole;
+  (async () => {
+    try {
+      const auth = getAuth(req) || {};
+      const userId = auth.userId;
 
-    if (!userId) {
+      if (!userId) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
+
+      // 從資料庫查詢使用者角色
+      const student = await Student.findOne({ userId }).lean();
+
+      if (student && student.role === "teacher") {
+        return next();
+      }
+
+      return res
+        .status(403)
+        .json({ success: false, error: "Forbidden - Teacher role required" });
+    } catch (e) {
+      console.error("requireTeacher error:", e);
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
-
-    if (orgRole === "teacher" || orgRole === "org:admin") {
-      return next();
-    }
-
-    return res.status(403).json({ success: false, error: "Forbidden" });
-  } catch (e) {
-    return res.status(401).json({ success: false, error: "Unauthorized" });
-  }
+  })();
 }
 
 app.get("/api/upload", (req, res) => {
@@ -376,6 +468,182 @@ app.post("/api/check-flowchart", async (req, res) => {
     res.json({ result });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 產生/更新理想答案（教師）
+app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
+  try {
+    const { questionId, questionText } = req.body || {};
+    if (!questionId && !questionText) {
+      return res
+        .status(400)
+        .json({ success: false, error: "需提供 questionId 或 questionText" });
+    }
+
+    // 取得題目文字：優先 body.questionText，其次從 Question 資料表讀取
+    let qText = (questionText || "").trim();
+    if (!qText && questionId) {
+      // questionId 可能是 ObjectId 或你們自訂字串，先以 ObjectId 嘗試，失敗再用 questionTitle 比對
+      if (mongoose.isValidObjectId(questionId)) {
+        const doc = await Question.findById(questionId).lean();
+        qText = doc?.description || doc?.questionTitle || "";
+      }
+      if (!qText) {
+        const docByTitle = await Question.findOne({
+          questionTitle: questionId,
+        }).lean();
+        qText = docByTitle?.description || docByTitle?.questionTitle || "";
+      }
+    }
+    if (!qText) {
+      return res
+        .status(400)
+        .json({ success: false, error: "找不到題目內容，請提供 questionText" });
+    }
+
+    const flowSpec = await generateIdealFlowSpec(qText);
+    const saved = await IdealAnswer.findOneAndUpdate(
+      { questionId: String(questionId || "UNKNOWN") },
+      {
+        $set: {
+          flowSpec,
+          version: "v1",
+          modelUsed: "gemini-2.0-flash",
+          generatedAt: new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json({ success: true, data: saved });
+  } catch (err) {
+    console.error("ideal/flow/generate error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 取得理想答案
+app.get("/api/ideal/flow/:questionId", async (req, res) => {
+  try {
+    const doc = await IdealAnswer.findOne({
+      questionId: String(req.params.questionId),
+    }).lean();
+    if (!doc)
+      return res
+        .status(404)
+        .json({ success: false, error: "ideal answer not found" });
+    res.json({ success: true, data: doc });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Stage1 比對：解析 -> 比對 -> 產生回饋（需登入）
+app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const studentDoc = await ensureStudent(userId);
+
+    const { questionId, imageBase64, graph } = req.body || {};
+    if (!questionId)
+      return res.status(400).json({ success: false, error: "questionId 必填" });
+
+    // 取得題目內容（給 Vision/回饋參考，沒抓到也不阻擋）
+    let questionText = "";
+    if (mongoose.isValidObjectId(questionId)) {
+      const q = await Question.findById(questionId).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    } else {
+      const q = await Question.findOne({ questionTitle: questionId }).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    }
+
+    // 1) 取得或生成理想答案
+    let ideal = await IdealAnswer.findOne({
+      questionId: String(questionId),
+    }).lean();
+    if (!ideal) {
+      const generated = await generateIdealFlowSpec(
+        questionText || "請根據題意繪製流程圖"
+      );
+      ideal = await IdealAnswer.create({
+        questionId: String(questionId),
+        flowSpec: generated,
+        version: "v1",
+        modelUsed: "gemini-2.0-flash",
+        generatedAt: new Date(),
+      });
+    }
+    const idealSpec = normalizeFlowSpec(ideal.flowSpec);
+    console.log("🎯 理想答案 idealSpec:", JSON.stringify(idealSpec, null, 2));
+
+    // 2) 解析學生答案
+    let studentSpec;
+    if (graph && (graph.nodes?.length || 0) + (graph.edges?.length || 0) > 0) {
+      console.log("📊 原始 graph 資料:", JSON.stringify(graph, null, 2));
+      studentSpec = mapEditorGraphToFlowSpec(graph);
+      console.log(
+        "✅ 正規化後的 studentSpec:",
+        JSON.stringify(studentSpec, null, 2)
+      );
+    } else if (imageBase64) {
+      const base64 = imageBase64.startsWith("data:")
+        ? imageBase64.split(",")[1]
+        : imageBase64;
+      studentSpec = await parseStudentFlowSpecFromImage(
+        base64,
+        questionText || ""
+      );
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, error: "需提供 graph 或 imageBase64" });
+    }
+
+    // 3) 比對
+    const { diffs, scores } = compareFlowSpecs(idealSpec, studentSpec);
+    console.log("📈 比對結果 scores:", scores);
+    console.log("📋 比對結果 diffs:", JSON.stringify(diffs, null, 2));
+
+    // 4) 產生回饋
+    const feedback = await generateFeedbackText(
+      questionText || "",
+      idealSpec,
+      studentSpec,
+      diffs,
+      scores
+    );
+
+    // 5) 寫回 Submission（保留你現有 stage1 結構，擴充比對結果）
+    const update = {
+      $set: {
+        "stages.stage1.flowSpec": studentSpec,
+        "stages.stage1.scores": scores,
+        "stages.stage1.diffs": diffs,
+        "stages.stage1.feedback": feedback,
+        "stages.stage1.updatedAt": new Date(),
+        idealVersion: ideal.version || "v1",
+        studentName: studentDoc.name ?? null,
+        studentEmail: studentDoc.email?.toLowerCase() ?? null,
+      },
+      $setOnInsert: {
+        student: studentDoc._id,
+        questionId,
+        createdAt: new Date(),
+      },
+    };
+
+    const doc = await Submission.findOneAndUpdate(
+      { student: studentDoc._id, questionId },
+      update,
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
+  } catch (err) {
+    console.error("stage1/compare error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -477,16 +745,23 @@ app.post("/api/generate-pseudocode-simple", async (req, res) => {
 // 新增：生成 PseudoCode 的 API 端點
 app.post("/api/generate-pseudocode", async (req, res) => {
   try {
+    console.log("[generate-pseudocode] Request received");
+    console.log("[generate-pseudocode] Request body:", req.body);
+
     const { question } = req.body;
 
     if (!question) {
+      console.log("[generate-pseudocode] Missing question parameter");
       return res.status(400).json({
         success: false,
         error: "缺少題目參數",
       });
     }
 
-    console.log("Generating pseudocode for question:", question);
+    console.log(
+      "[generate-pseudocode] Generating pseudocode for question:",
+      question
+    );
 
     const prompt = `請根據題目生成Python虛擬碼，用 ___ 代表空白讓學生填寫。
 
@@ -508,18 +783,24 @@ app.post("/api/generate-pseudocode", async (req, res) => {
 
 題目：${question}`;
 
-    console.log("Calling Gemini API for pseudocode generation...");
-    console.log("Prompt:", prompt);
+    console.log(
+      "[generate-pseudocode] Calling Gemini API for pseudocode generation..."
+    );
+    console.log("[generate-pseudocode] Prompt:", prompt);
 
     const geminiServices = await loadGeminiServices();
-    console.log("Gemini services loaded successfully");
+    console.log("[generate-pseudocode] Gemini services loaded successfully");
 
     try {
       const result = await geminiServices.generatePseudoCode(prompt);
-      console.log("Pseudocode generation successful:", result);
+      console.log(
+        "[generate-pseudocode] Pseudocode generation successful:",
+        result
+      );
       res.json(result);
     } catch (geminiError) {
-      console.error("Gemini API error:", geminiError);
+      console.error("[generate-pseudocode] Gemini API error:", geminiError);
+      console.error("[generate-pseudocode] Error stack:", geminiError.stack);
       // 返回一個默認的響應，避免完全失敗
       const fallbackResult = {
         pseudoCode: [
@@ -530,15 +811,19 @@ app.post("/api/generate-pseudocode", async (req, res) => {
         ],
         answers: ["if", "print", "else", "print"],
       };
-      console.log("Using fallback result:", fallbackResult);
+      console.log(
+        "[generate-pseudocode] Using fallback result:",
+        fallbackResult
+      );
       res.json(fallbackResult);
     }
   } catch (err) {
-    console.error("Pseudocode generation error:", err);
+    console.error("[generate-pseudocode] Pseudocode generation error:", err);
+    console.error("[generate-pseudocode] Error stack:", err.stack);
     res.status(500).json({
       success: false,
       error: err.message,
-      details: "Pseudocode generation failed",
+      details: err.stack || "Pseudocode generation failed",
     });
   }
 });
@@ -571,7 +856,9 @@ app.post("/api/check-pseudocode", async (req, res) => {
 app.post("/api/run-code", async (req, res) => {
   const { code, language } = req.body || {};
   if (!code || !language) {
-    return res.status(400).json({ success: false, error: "缺少 code 或 language 參數" });
+    return res
+      .status(400)
+      .json({ success: false, error: "缺少 code 或 language 參數" });
   }
 
   // ==== helpers ====
@@ -588,20 +875,41 @@ app.post("/api/run-code", async (req, res) => {
       });
     });
   }
-  function exists(p) { try { return fsSync.existsSync(p); } catch { return false; } }
+  function exists(p) {
+    try {
+      return fsSync.existsSync(p);
+    } catch {
+      return false;
+    }
+  }
 
   async function pickPython() {
     if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
-    try { await execFilep("python3", ["--version"]); return "python3"; } catch { }
-    try { await execFilep("python", ["--version"]); return "python"; } catch { }
-    try { await execFilep("py", ["-3", "--version"]); return "py"; } catch { }
+    try {
+      await execFilep("python3", ["--version"]);
+      return "python3";
+    } catch {}
+    try {
+      await execFilep("python", ["--version"]);
+      return "python";
+    } catch {}
+    try {
+      await execFilep("py", ["-3", "--version"]);
+      return "py";
+    } catch {}
     return null;
   }
 
   async function pickCCompiler() {
     if (process.env.CC && exists(process.env.CC)) return process.env.CC;
-    try { await execFilep("gcc", ["--version"]); return "gcc"; } catch { }
-    try { await execFilep("clang", ["--version"]); return "clang"; } catch { }
+    try {
+      await execFilep("gcc", ["--version"]);
+      return "gcc";
+    } catch {}
+    try {
+      await execFilep("clang", ["--version"]);
+      return "clang";
+    } catch {}
     const candidates = [
       "C:\\msys64\\ucrt64\\bin\\gcc.exe",
       "C:\\msys64\\mingw64\\bin\\gcc.exe",
@@ -623,7 +931,9 @@ app.post("/api/run-code", async (req, res) => {
   const id = `run_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const isWin = process.platform === "win32";
 
-  let filename, filepath, cleanupFiles = [];
+  let filename,
+    filepath,
+    cleanupFiles = [];
 
   try {
     await fs.mkdir(tmpDir, { recursive: true });
@@ -635,27 +945,34 @@ app.post("/api/run-code", async (req, res) => {
 
       const PY = await pickPython();
       if (!PY) {
-        await fs.unlink(filepath).catch(() => { });
-        return res.status(400).json({ success: false, error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）" });
+        await fs.unlink(filepath).catch(() => {});
+        return res.status(400).json({
+          success: false,
+          error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）",
+        });
       }
 
-      const { stdout, stderr } = await execFilep(PY, PY === "py" ? ["-3", filepath] : [filepath], {
-        timeout: 3000, maxBuffer: 1024 * 200,
-      });
-      await fs.unlink(filepath).catch(() => { });
+      const { stdout, stderr } = await execFilep(
+        PY,
+        PY === "py" ? ["-3", filepath] : [filepath],
+        {
+          timeout: 3000,
+          maxBuffer: 1024 * 200,
+        }
+      );
+      await fs.unlink(filepath).catch(() => {});
       return res.json({ success: true, stdout, stderr });
-
     } else if (language === "javascript") {
       filename = `${id}.js`;
       filepath = path.join(tmpDir, filename);
       await fs.writeFile(filepath, code, "utf-8");
 
       const { stdout, stderr } = await execFilep(process.execPath, [filepath], {
-        timeout: 3000, maxBuffer: 1024 * 200,
+        timeout: 3000,
+        maxBuffer: 1024 * 200,
       });
-      await fs.unlink(filepath).catch(() => { });
+      await fs.unlink(filepath).catch(() => {});
       return res.json({ success: true, stdout, stderr });
-
     } else if (language === "c") {
       filename = `${id}.c`;
       filepath = path.join(tmpDir, filename);
@@ -663,10 +980,11 @@ app.post("/api/run-code", async (req, res) => {
 
       const CC = await pickCCompiler();
       if (!CC) {
-        await fs.unlink(filepath).catch(() => { });
+        await fs.unlink(filepath).catch(() => {});
         return res.status(400).json({
           success: false,
-          error: "後端沒有可用的 C 編譯器（請安裝 gcc 或 clang，或在 .env 設 CC=編譯器路徑）",
+          error:
+            "後端沒有可用的 C 編譯器（請安裝 gcc 或 clang，或在 .env 設 CC=編譯器路徑）",
         });
       }
 
@@ -675,47 +993,81 @@ app.post("/api/run-code", async (req, res) => {
 
       // 編譯
       try {
-        await execFilep(CC, [filepath, "-O0", "-o", exePath], { timeout: 8000, maxBuffer: 1024 * 200 });
-      } catch (e) {
-        await fs.unlink(filepath).catch(() => { });
-        const stderrMsg = (e.stderr && e.stderr.toString()) || e.err?.message || "compile error";
-        // ← 這裡延用你原本的 explainError
-        const errorExplanation = await explainError(stderrMsg, language, code);
-        return res.json({
-          success: false,
-          stdout: e.stdout || "",
-          stderr: stderrMsg,
-          errorExplanation: errorExplanation.explanation,
-          errorType: errorExplanation.errorType,
+        await execFilep(CC, [filepath, "-O0", "-o", exePath], {
+          timeout: 8000,
+          maxBuffer: 1024 * 200,
         });
+      } catch (e) {
+        await fs.unlink(filepath).catch(() => {});
+        const stderrMsg =
+          (e.stderr && e.stderr.toString()) ||
+          e.err?.message ||
+          "compile error";
+        // ← 這裡延用你原本的 explainError
+        try {
+          await loadErrorExplainer();
+          const errorExplanation = await explainError(
+            stderrMsg,
+            language,
+            code
+          );
+          return res.json({
+            success: false,
+            stdout: e.stdout || "",
+            stderr: stderrMsg,
+            errorExplanation: errorExplanation.explanation,
+            errorType: errorExplanation.errorType,
+          });
+        } catch (errorExplainErr) {
+          // 如果解釋失敗，返回基本錯誤訊息
+          return res.json({
+            success: false,
+            stdout: e.stdout || "",
+            stderr: stderrMsg,
+          });
+        }
       }
 
       // 執行
       try {
         const { stdout, stderr } = await execFilep(exePath, [], {
-          timeout: 3000, maxBuffer: 1024 * 200,
+          timeout: 3000,
+          maxBuffer: 1024 * 200,
         });
-        await Promise.all([fs.unlink(filepath).catch(() => { }), fs.unlink(exePath).catch(() => { })]);
+        await Promise.all([
+          fs.unlink(filepath).catch(() => {}),
+          fs.unlink(exePath).catch(() => {}),
+        ]);
         console.log("CC =", process.env.CC || "auto");
         return res.json({ success: true, stdout, stderr });
       } catch (e) {
-        await Promise.all([fs.unlink(filepath).catch(() => { }), fs.unlink(exePath).catch(() => { })]);
+        await Promise.all([
+          fs.unlink(filepath).catch(() => {}),
+          fs.unlink(exePath).catch(() => {}),
+        ]);
         return res.json({
           success: false,
           stdout: e.stdout || "",
-          stderr: (e.stderr && e.stderr.toString()) || e.err?.message || "runtime error",
+          stderr:
+            (e.stderr && e.stderr.toString()) ||
+            e.err?.message ||
+            "runtime error",
         });
       }
-
     } else {
-      return res.status(400).json({ success: false, error: "不支援的語言，目前僅支援 Python、JavaScript、C" });
+      return res.status(400).json({
+        success: false,
+        error: "不支援的語言，目前僅支援 Python、JavaScript、C",
+      });
     }
-
   } catch (err) {
     // 萬一哪裡 throw，盡量清掉暫存檔
-    const del = cleanupFiles.length ? cleanupFiles : (filepath ? [filepath] : []);
-    if (del.length) await Promise.all(del.map(f => fs.unlink(f).catch(() => { })));
-    res.status(500).json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
+    const del = cleanupFiles.length ? cleanupFiles : filepath ? [filepath] : [];
+    if (del.length)
+      await Promise.all(del.map((f) => fs.unlink(f).catch(() => {})));
+    res
+      .status(500)
+      .json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
   }
 });
 
@@ -1051,7 +1403,13 @@ app.get("/api/admin/submissions", requireTeacher, async (req, res) => {
     .limit(Number(pageSize))
     .lean();
   const total = await Submission.countDocuments(filter);
-  res.json({ success: true, items, total, page: Number(page), pageSize: Number(pageSize) });
+  res.json({
+    success: true,
+    items,
+    total,
+    page: Number(page),
+    pageSize: Number(pageSize),
+  });
 });
 
 // AI錯誤解釋功能的API端点
@@ -1066,6 +1424,7 @@ app.post("/api/test-error-explanation", async (req, res) => {
       });
     }
 
+    await loadErrorExplainer();
     const result = await explainError(errorMessage, language, code || "");
 
     res.json({
@@ -1184,22 +1543,7 @@ if (process.env.NODE_ENV !== "production") {
 // 導出app供Vercel使用
 export default app;
 
-// 資料表連接
-// const mongoose = require("mongoose");
-
-const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
-
-mongoose
-  .connect(mongoUri, {
-    // useNewUrlParser: true,
-    // useUnifiedTopology: true,
-
-    //讓 server 選擇逾時更快失敗，除錯友善
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 20000,
-  })
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+// 資料表連接 - 已移到前面的配置區域
 
 //儲存題目到資料庫
 app.post("/api/add-question", async (req, res) => {
@@ -1229,11 +1573,11 @@ app.get("/api/questions", async (req, res) => {
 
     const filter = q
       ? {
-        $or: [
-          { questionTitle: new RegExp(q, "i") },
-          { description: new RegExp(q, "i") },
-        ],
-      }
+          $or: [
+            { questionTitle: new RegExp(q, "i") },
+            { description: new RegExp(q, "i") },
+          ],
+        }
       : {};
 
     const [total, items] = await Promise.all([
@@ -1269,12 +1613,21 @@ app.get("/api/questions/:id", async (req, res) => {
 app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
   try {
     const { userId } = req.auth;
-    const { questionId, graph, imageBase64, completed = false, mode } = req.body || {};
+    const {
+      questionId,
+      graph,
+      imageBase64,
+      completed = false,
+      mode,
+    } = req.body || {};
     console.log("收到 req.body：", req.body);
 
-    if (!questionId) return res.status(400).json({ success: false, error: "questionId 必填" });
+    if (!questionId)
+      return res.status(400).json({ success: false, error: "questionId 必填" });
     if (!graph && !imageBase64)
-      return res.status(400).json({ success: false, error: "需提供 graph 或 imageBase64 其一" });
+      return res
+        .status(400)
+        .json({ success: false, error: "需提供 graph 或 imageBase64 其一" });
 
     const student = await ensureStudent(userId);
 
@@ -1303,7 +1656,6 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
 
     console.log("儲存前 update：", JSON.stringify(update, null, 2));
 
-
     const doc = await Submission.findOneAndUpdate(
       { student: student._id, questionId },
       update,
@@ -1314,7 +1666,6 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 
 app.get("/api/submissions/stage1", async (req, res) => {
   try {
@@ -1413,7 +1764,10 @@ app.post("/api/submissions/stage3", async (req, res) => {
     });
 
     console.log("stage3 upsert result _id:", newSubmission?._id?.toString());
-    console.log("stage3 upsert result stages.stage3:", JSON.stringify(newSubmission?.stages?.stage3));
+    console.log(
+      "stage3 upsert result stages.stage3:",
+      JSON.stringify(newSubmission?.stages?.stage3)
+    );
 
     return res.json({ success: true, data: newSubmission });
   } catch (err) {

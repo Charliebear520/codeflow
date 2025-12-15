@@ -4,6 +4,8 @@ import Check from "../components/Check";
 import TopicStage3 from "../components/TopicStage3";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { resetCheck, setStageFeedback } from "../redux/slices/checkSlice";
 
 export default function Stage3Page() {
   // 題目從 localStorage 取得，若無則用預設
@@ -18,10 +20,24 @@ export default function Stage3Page() {
   // 控制全螢幕狀態
   const [fullscreen, setFullscreen] = useState(false);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const savedStage3Feedback = useSelector((state) => state.check.byStage?.[3]);
 
   const handleTutorClick = () => {
     navigate("/tutor");
   };
+
+  // 進入第三階段時，清掉先前階段的全域檢查結果，避免右側回退顯示上一階段內容
+  useEffect(() => {
+    dispatch(resetCheck());
+  }, [dispatch]);
+
+  // 從 Redux 回填第三階段既有回饋
+  useEffect(() => {
+    if (savedStage3Feedback) {
+      setFeedback(savedStage3Feedback);
+    }
+  }, [savedStage3Feedback]);
 
   return (
     <div>
@@ -36,7 +52,10 @@ export default function Stage3Page() {
         <Col span={12}>
           <OnlineCoding
             question={question}
-            onFeedback={setFeedback}
+            onFeedback={(fb) => {
+              setFeedback(fb);
+              dispatch(setStageFeedback({ stage: 3, feedback: fb }));
+            }}
             onChecking={setIsChecking}
             isExpanded={false}
             onToggleExpand={() => {}}
