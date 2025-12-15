@@ -291,11 +291,11 @@ async function pickCCompiler() {
   try {
     await execp("gcc --version");
     return "gcc";
-  } catch {}
+  } catch { }
   try {
     await execp("clang --version");
     return "clang";
-  } catch {}
+  } catch { }
   // 3) 常見安裝路徑（可命中就用）
   const candidates = [
     "C:\\msys64\\ucrt64\\bin\\gcc.exe",
@@ -311,7 +311,7 @@ async function pickCCompiler() {
     const { stdout } = await execp("xcrun --find clang");
     const p = stdout.trim();
     if (p && exists(p)) return p;
-  } catch {}
+  } catch { }
 
   return null;
 }
@@ -888,15 +888,15 @@ app.post("/api/run-code", async (req, res) => {
     try {
       await execFilep("python3", ["--version"]);
       return "python3";
-    } catch {}
+    } catch { }
     try {
       await execFilep("python", ["--version"]);
       return "python";
-    } catch {}
+    } catch { }
     try {
       await execFilep("py", ["-3", "--version"]);
       return "py";
-    } catch {}
+    } catch { }
     return null;
   }
 
@@ -905,11 +905,11 @@ app.post("/api/run-code", async (req, res) => {
     try {
       await execFilep("gcc", ["--version"]);
       return "gcc";
-    } catch {}
+    } catch { }
     try {
       await execFilep("clang", ["--version"]);
       return "clang";
-    } catch {}
+    } catch { }
     const candidates = [
       "C:\\msys64\\ucrt64\\bin\\gcc.exe",
       "C:\\msys64\\mingw64\\bin\\gcc.exe",
@@ -945,7 +945,7 @@ app.post("/api/run-code", async (req, res) => {
 
       const PY = await pickPython();
       if (!PY) {
-        await fs.unlink(filepath).catch(() => {});
+        await fs.unlink(filepath).catch(() => { });
         return res.status(400).json({
           success: false,
           error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）",
@@ -960,7 +960,7 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         }
       );
-      await fs.unlink(filepath).catch(() => {});
+      await fs.unlink(filepath).catch(() => { });
       return res.json({ success: true, stdout, stderr });
     } else if (language === "javascript") {
       filename = `${id}.js`;
@@ -971,7 +971,7 @@ app.post("/api/run-code", async (req, res) => {
         timeout: 3000,
         maxBuffer: 1024 * 200,
       });
-      await fs.unlink(filepath).catch(() => {});
+      await fs.unlink(filepath).catch(() => { });
       return res.json({ success: true, stdout, stderr });
     } else if (language === "c") {
       filename = `${id}.c`;
@@ -980,7 +980,7 @@ app.post("/api/run-code", async (req, res) => {
 
       const CC = await pickCCompiler();
       if (!CC) {
-        await fs.unlink(filepath).catch(() => {});
+        await fs.unlink(filepath).catch(() => { });
         return res.status(400).json({
           success: false,
           error:
@@ -998,7 +998,7 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         });
       } catch (e) {
-        await fs.unlink(filepath).catch(() => {});
+        await fs.unlink(filepath).catch(() => { });
         const stderrMsg =
           (e.stderr && e.stderr.toString()) ||
           e.err?.message ||
@@ -1035,15 +1035,15 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         });
         await Promise.all([
-          fs.unlink(filepath).catch(() => {}),
-          fs.unlink(exePath).catch(() => {}),
+          fs.unlink(filepath).catch(() => { }),
+          fs.unlink(exePath).catch(() => { }),
         ]);
         console.log("CC =", process.env.CC || "auto");
         return res.json({ success: true, stdout, stderr });
       } catch (e) {
         await Promise.all([
-          fs.unlink(filepath).catch(() => {}),
-          fs.unlink(exePath).catch(() => {}),
+          fs.unlink(filepath).catch(() => { }),
+          fs.unlink(exePath).catch(() => { }),
         ]);
         return res.json({
           success: false,
@@ -1064,7 +1064,7 @@ app.post("/api/run-code", async (req, res) => {
     // 萬一哪裡 throw，盡量清掉暫存檔
     const del = cleanupFiles.length ? cleanupFiles : filepath ? [filepath] : [];
     if (del.length)
-      await Promise.all(del.map((f) => fs.unlink(f).catch(() => {})));
+      await Promise.all(del.map((f) => fs.unlink(f).catch(() => { })));
     res
       .status(500)
       .json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
@@ -1573,11 +1573,11 @@ app.get("/api/questions", async (req, res) => {
 
     const filter = q
       ? {
-          $or: [
-            { questionTitle: new RegExp(q, "i") },
-            { description: new RegExp(q, "i") },
-          ],
-        }
+        $or: [
+          { questionTitle: new RegExp(q, "i") },
+          { description: new RegExp(q, "i") },
+        ],
+      }
       : {};
 
     const [total, items] = await Promise.all([
@@ -1619,6 +1619,7 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       imageBase64,
       completed = false,
       mode,
+      durationDeltaSec = 0,
     } = req.body || {};
     console.log("收到 req.body：", req.body);
 
@@ -1628,6 +1629,10 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       return res
         .status(400)
         .json({ success: false, error: "需提供 graph 或 imageBase64 其一" });
+
+    const delta = Number.isFinite(Number(durationDeltaSec))
+      ? Math.max(0, Math.floor(Number(durationDeltaSec)))
+      : 0;
 
     const student = await ensureStudent(userId);
 
@@ -1651,6 +1656,10 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       $setOnInsert: {
         student: student._id,
         questionId,
+        "stages.stage1.durationSec": 0,
+      },
+      $inc: {
+        "stages.stage1.durationSec": delta,
       },
     };
 
@@ -1661,7 +1670,7 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       update,
       { new: true, upsert: true }
     );
-    res.status(201).json({ success: true, submissionId: doc._id });
+    res.status(201).json({ success: true, submissionId: doc._id, durationSec: doc?.stages?.stage1?.durationSec ?? 0, });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1680,19 +1689,31 @@ app.post("/api/submissions/stage2", async (req, res) => {
   try {
     console.log("stage2 req.body:", req.body);
 
-    const { questionId, pseudocode, completed } = req.body;
+    const { questionId, pseudocode, completed, durationDeltaSec = 0 } = req.body;
 
     // log 查詢條件
     console.log("stage2 findOneAndUpdate filter:", { questionId });
 
-    // log 更新內容
+    const delta = Number.isFinite(Number(durationDeltaSec))
+      ? Math.max(0, Math.floor(Number(durationDeltaSec)))
+      : 0;
+
     const updateObj = {
       $set: {
         "stages.stage2.pseudocode": pseudocode,
         "stages.stage2.completed": completed,
         "stages.stage2.updatedAt": new Date(),
       },
+      $setOnInsert: {
+        "stages.stage1.durationSec": 0,
+      },
+      $inc: {
+        "stages.stage2.durationSec": delta,
+      }
     };
+
+
+    // log 更新內容
     console.log("stage2 updateObj:", updateObj);
 
     // 執行更新
@@ -1704,7 +1725,7 @@ app.post("/api/submissions/stage2", async (req, res) => {
 
     console.log("stage2 newSubmission:", newSubmission);
 
-    res.json({ success: true, data: newSubmission });
+    res.json({ success: true, data: newSubmission, durationSec: newSubmission?.stages?.stage2?.durationSec ?? 0, });
   } catch (err) {
     console.error("Error saving stage2:", err);
     res.status(500).json({ success: false, error: "伺服器錯誤" });
@@ -1733,9 +1754,14 @@ app.post("/api/submissions/stage3", async (req, res) => {
       console.log("stage3 resolved studentId from clerk:", studentId);
     }
 
+    const { questionId, code, language, completed, durationDeltaSec = 0 } = req.body || {};
     if (!req.body?.questionId) {
       return res.status(400).json({ success: false, error: "questionId 必填" });
     }
+
+    const delta = Number.isFinite(Number(durationDeltaSec))
+      ? Math.max(0, Math.floor(Number(durationDeltaSec)))
+      : 0;
 
     // 用 questionId + studentId 作為 filter（若沒有 studentId 則只用 questionId）
     const filter = { questionId: req.body.questionId };
@@ -1753,6 +1779,9 @@ app.post("/api/submissions/stage3", async (req, res) => {
         ...(studentId ? { student: studentId } : {}),
         createdAt: new Date(),
       },
+      $inc: {
+        "stages.stage3.durationSec": delta,
+      },
     };
 
     console.log("stage3 filter:", JSON.stringify(filter));
@@ -1769,7 +1798,7 @@ app.post("/api/submissions/stage3", async (req, res) => {
       JSON.stringify(newSubmission?.stages?.stage3)
     );
 
-    return res.json({ success: true, data: newSubmission });
+    return res.json({ success: true, data: newSubmission, durationSec: newSubmission?.stages?.stage3?.durationSec ?? 0, });
   } catch (err) {
     console.error("Error saving stage3:", err);
     return res.status(500).json({ success: false, error: "伺服器錯誤" });

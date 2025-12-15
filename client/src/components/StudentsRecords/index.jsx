@@ -32,6 +32,7 @@ const StudentsRecords = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
+        console.log("fetch submissions:", data);
         if (!data.success) throw new Error(data.error || "讀取失敗");
         setSubs(data.items || []);
       } catch (e) {

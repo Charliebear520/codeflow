@@ -9,11 +9,12 @@ const stageSchema_1 = new Schema(
       edges: [Schema.Types.Mixed],
     },
     imageBase64: { type: String, default: null },
-    mode: { type: String, enum: ["upload", "editor"]},
+    mode: { type: String, enum: ["upload", "editor"] },
     completed: { type: Boolean, default: false },
     score: { type: Number, default: null },
     feedback: { type: String, default: "" },
     updatedAt: { type: Date, default: null },
+    durationSec: { type: Number, default: 0, min: 0 },
   },
   { _id: false }
 );
@@ -25,6 +26,7 @@ const stageSchema_2 = new Schema(
     score: { type: Number, default: null },
     feedback: { type: String, default: "" },
     updatedAt: { type: Date, default: null },
+    durationSec: { type: Number, default: 0, min: 0 },
   },
   { _id: false }
 );
@@ -37,6 +39,7 @@ const stageSchema_3 = new Schema(
     score: { type: Number, default: null },
     feedback: { type: String, default: "" },
     updatedAt: { type: Date, default: null },
+    durationSec: { type: Number, default: 0, min: 0 },
   },
   { _id: false }
 );
