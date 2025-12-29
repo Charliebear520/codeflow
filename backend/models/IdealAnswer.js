@@ -8,7 +8,7 @@ const idealAnswerSchema = new Schema(
     questionId: { type: String, required: true, index: true, unique: true },
     flowSpec: { type: Schema.Types.Mixed, required: true },
     version: { type: String, default: "v1" },
-    modelUsed: { type: String, default: "gemini-2.0-flash" },
+    modelUsed: { type: String, default: "gemini-2.5-flash" },
     generatedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

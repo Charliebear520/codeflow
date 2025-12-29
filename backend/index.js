@@ -509,7 +509,7 @@ app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
         $set: {
           flowSpec,
           version: "v1",
-          modelUsed: "gemini-2.0-flash",
+          modelUsed: "gemini-2.5-flash",
           generatedAt: new Date(),
         },
       },
@@ -571,7 +571,7 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
         questionId: String(questionId),
         flowSpec: generated,
         version: "v1",
-        modelUsed: "gemini-2.0-flash",
+        modelUsed: "gemini-2.5-flash",
         generatedAt: new Date(),
       });
     }
@@ -1512,7 +1512,7 @@ app.get("/api/test-gemini", async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(
       "Hello, this is a test. Please respond with 'API is working'."
     );
@@ -1683,9 +1683,12 @@ app.get("/api/submissions/stage1", async (req, res) => {
   }
 });
 
-app.post("/api/submissions/stage2", async (req, res) => {
+app.post("/api/submissions/stage2", requireAuth, async (req, res) => {
   try {
     console.log("stage2 req.body:", req.body);
+
+    const { userId } = req.auth();
+    const student = await ensureStudent(userId);
 
     const { questionId, pseudocode, completed, durationDeltaSec = 0 } = req.body;
 
@@ -1696,14 +1699,21 @@ app.post("/api/submissions/stage2", async (req, res) => {
       ? Math.max(0, Math.floor(Number(durationDeltaSec)))
       : 0;
 
+    // 只在有值時才 set，避免覆寫成 undefined/null
+    const setFields = {
+      "stages.stage2.completed": !!completed,
+      "stages.stage2.updatedAt": new Date(),
+    };
+    if (typeof pseudocode === "string") {
+      setFields["stages.stage2.pseudocode"] = pseudocode;
+    }
+
     const updateObj = {
-      $set: {
-        "stages.stage2.pseudocode": pseudocode,
-        "stages.stage2.completed": completed,
-        "stages.stage2.updatedAt": new Date(),
-      },
+      $set: setFields,
       $setOnInsert: {
-        "stages.stage1.durationSec": 0,
+        student: student._id,
+        questionId,
+        "stages.stage2.durationSec": 0,
       },
       $inc: {
         "stages.stage2.durationSec": delta,
@@ -1716,11 +1726,15 @@ app.post("/api/submissions/stage2", async (req, res) => {
 
     // 執行更新
     const newSubmission = await Submission.findOneAndUpdate(
-      { questionId },
+      { student: student._id, questionId },
       updateObj,
       { upsert: true, new: true }
     );
-
+    // const doc = await Submission.findOneAndUpdate(
+    //   { student: student._id, questionId },
+    //   update,
+    //   { new: true, upsert: true }
+    // );
     console.log("stage2 newSubmission:", newSubmission);
 
     res.json({ success: true, data: newSubmission, durationSec: newSubmission?.stages?.stage2?.durationSec ?? 0, });

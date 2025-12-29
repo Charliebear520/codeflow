@@ -27,7 +27,7 @@ export const generateFlowchartQuestion = async () => {
     console.log("Generating flowchart question...");
 
     // 使用 gemini模型
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `你是一位專業的中文教育題目生成器，請**嚴格遵守**以下要求。
 
@@ -63,8 +63,8 @@ export const generateFlowchartHint = async (question, hintLevel) => {
   try {
     console.log(`Generating flowchart hint... Level: ${hintLevel}`);
 
-    // 使用 gemini-2.0-flash 模型
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    // 使用 gemini-2.5-flash 模型
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // 根據不同層級生成不同的提示
     const promptBase = `基於以下流程圖題目：「${question}」
@@ -144,7 +144,7 @@ export const checkFlowchart = async (imageData, question) => {
       throw new Error("No image data provided");
     }
 
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
 你是一位非常簡潔的國中程式設計助教。請根據這張流程圖圖片，針對下方題目，用繁體中文提供 3-5 點簡短的引導式建議。
@@ -184,7 +184,7 @@ export const checkFlowchart = async (imageData, question) => {
 
 // 第二階段：生成PseudoCode
 export const generatePseudoCode = async (prompt) => {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
   const result = await model.generateContent(prompt);
   const response = await result.response;
   let text = response.text();
@@ -205,7 +205,7 @@ export const generatePseudoCode = async (prompt) => {
 // 第二階段：檢查PseudoCode
 export const checkPseudoCode = async (question, userPseudoCode) => {
   try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `你是一位專業的繁體中文程式教學助教。請**嚴格遵守**以下要求
 
     **檢查資料：**確認學生所撰寫的虛擬碼（pseudocode）與題目的差異。
@@ -235,7 +235,7 @@ ${userPseudoCode}
 // 第三階段：檢查Code
 export const checkCode = async (question, code, language) => {
   try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `你是一位專業的繁體中文程式教學助教。請**嚴格遵守**以下要求
 
     **檢查資料：**確認學生所撰寫的程式碼的語法、邏輯與結構。

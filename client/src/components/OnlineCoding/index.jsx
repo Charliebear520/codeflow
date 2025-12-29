@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect,useRef } from "react";
 import { Button, App, Spin, Splitter, Popover } from "antd";
 import {
   ArrowsAltOutlined,
@@ -76,6 +76,8 @@ const OnlineCoding = ({
   const [terminalInput, setTerminalInput] = useState(""); // 當前輸入
   const [isTerminalActive, setIsTerminalActive] = useState(false); // 終端機是否活躍
   const [processId, setProcessId] = useState(null); // 當前執行的程序ID
+  const flowRef = useRef(null); //取得現在時間，儲存作答時間用的
+  const lastTickRef = useRef(Date.now());
 
   // 新增：儲存中 flag，避免重複點擊 (修正 saving 未定義錯誤)
   const [checking, setChecking] = useState(false);
@@ -345,6 +347,12 @@ const OnlineCoding = ({
     ]);
   };
   const HandleSave = async () => {
+          let payload = { questionId: "Q001", completed: false };
+      const now = Date.now();
+      const deltaSec = Math.max(0, Math.floor((now - (lastTickRef.current || now)) / 1000));
+      lastTickRef.current = now;
+      payload.durationDeltaSec = deltaSec;
+
     if (saving) return; // 防止重複點擊
     setSaving(true);
     setApiError("");
@@ -423,6 +431,7 @@ const OnlineCoding = ({
         saveRes = await fetch(`/api/submissions/stage2`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          Authorization: `Bearer ${await getToken()}`,
           body: JSON.stringify({
             questionId,
             pseudocode: code,
@@ -635,7 +644,7 @@ const OnlineCoding = ({
                     color: "#FFFFFF",
                     border: "none",
                   }}
-                  onClick={() => {}}
+                  onClick={() => { }}
                 >
                   詢問沐芙助教
                 </Button>
@@ -747,10 +756,10 @@ const OnlineCoding = ({
                               item.type === "error"
                                 ? "#ff6b6b"
                                 : item.type === "input"
-                                ? "#4CAF50"
-                                : item.type === "system"
-                                ? "#FFA726"
-                                : "rgb(0 0 0)",
+                                  ? "#4CAF50"
+                                  : item.type === "system"
+                                    ? "#FFA726"
+                                    : "rgb(0 0 0)",
                             whiteSpace: "pre-wrap",
                             wordWrap: "break-word",
                           }}
