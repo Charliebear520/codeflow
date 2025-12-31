@@ -1551,3 +1551,52 @@ app.get("/api/submissions/stage3", async (req, res) => {
 //     res.status(500).json({ success: false, error: error.message });
 //   }
 // });
+
+
+// 新增：通用的助教對話 API 端點
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { prompt, stage, currentData, question } = req.body;
+
+    // 1. 取得已經封裝好的 Gemini 服務
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    
+    // 檢查 API KEY 是否存在
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("Missing GEMINI_API_KEY in .env file");
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    // 💡 確保這裡的模型名稱與你 geminiService.js 裡的一致
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    // 2. 設定 AI 的說話人格與背景資訊
+    const systemInstruction = `
+      你是一位親切的程式助教「沐芙」，正在引導學生學習程式邏輯。
+      當前階段：${stage || '未提供'}
+      題目內容：${question || '未提供'}
+      之前的分析回饋：${currentData || '無'}
+
+      請遵循以下原則：
+      1. 使用繁體中文回答，語氣溫柔且多鼓勵。
+      2. 不要直接給答案，要用提問或提示的方式引導學生。
+      3. 回答時可以使用 Markdown 格式。
+    `;
+
+    // 3. 發送請求給 Gemini
+   const result = await model.generateContent([systemInstruction, prompt]);
+    const response = await result.response;
+    const text = response.text();
+
+    // 4. 回傳給前端
+   res.json({ success: true, result: text }); // 💡 確保回傳格式包含 success: true
+    
+  } catch (error) {
+    console.error("Gemini Chat Error 詳細錯誤:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "AI 助教目前忙線中，請檢查後端終端機報錯訊息。",
+      details: error.message 
+    });
+  }
+});

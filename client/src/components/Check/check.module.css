@@ -11,8 +11,7 @@
   height: 95%; /* 設定高度為視窗高度 */
   overflow: hidden; /* 防止滾動條出現 */
   /* gap:1rem; */
- 
- 
+
 }
 
 .tutorbox {
@@ -29,11 +28,12 @@
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
   flex-grow: 1; 
   margin-bottom: 1rem; 
-  padding: 1rem; 
+  padding: 10px; 
   overflow-y: scroll; 
-  /* overflow-y: hidden; */
+  overflow: hidden; /* 改為 hidden，讓裡面的 chatBox 自己捲動 */
   box-sizing: border-box;
   height: 100%;
+  
 }
 
 .chatArea {
@@ -53,7 +53,7 @@
   position: relative;
   background-color: #F3F5FA; /* 截圖中的淺藍灰色 */
   color: #333;
-  padding: 12px 16px;
+  padding: 10px 12px;
   border-radius: 12px;
   border-top-left-radius: 2px; /* 讓左上角尖一點，製造「說話」的感覺 */
   font-size: 14px;
@@ -64,11 +64,16 @@
 .chatBox {
   height: 100%;
   overflow-y: auto;
-  padding: 12px;
+  padding: 10px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  flex-grow: 1;      /* 讓對話區佔滿所有剩餘空間 */
+  overflow-y: auto;  /* 這是唯一需要捲軸的地方 */
+ /* 讓捲軸美化一點 (選配) */
+  scrollbar-width: thin;
+  scrollbar-color: #d1d1d1 transparent;
 }
 
 .placeholder {
@@ -81,12 +86,13 @@
 .rowLeft {
   display: flex;
   align-items: flex-start;
+  
 }
 
 .bubbleLeft {
-  background: #e4ecff;
+  background-color: #eff3fd;
   padding: 12px 16px;
-  border-radius: 16px;
+  border-radius: 2px 16px 16px 16px; /* 左上角稍尖 */
   max-width: 75%;
   color: #333;
 }
@@ -99,9 +105,9 @@
 }
 
 .bubbleRight {
-  background: #d9c9ff;
-  padding: 12px 16px;
-  border-radius: 16px;
+  background-color: #eff3fd;
+  padding: 10px 12px;
+  border-radius: 16px 2px 16px 16px; /* 右上角稍尖 */
   max-width: 75%;
   color: #333;
 }
@@ -117,4 +123,76 @@
   justify-content: center;
   margin-right: 8px;
   font-size: 18px;
+}
+
+/* 右側訊息優化：頭像放在右邊，間距改左邊 */
+.rowRight .avatarUser {
+  margin-right: 0;
+  margin-left: 8px;
+  order: 2; /* 確保頭像在氣泡後面 */
+}
+
+/* 為了讓 Markdown 圖片或程式碼不會爆出去 */
+.bubbleLeft img, .bubbleRight img {
+  max-width: 100%;
+}
+
+.actionButtons{
+  display: flex;
+  justify-content: center;
+  margin: 5px 0;
+  gap: 12px;
+}
+
+/* 移除 Ant Design 按鈕點擊後產生的預設外框 */
+.actionButtons button:focus,
+.actionButtons button:active,
+.sendButton:focus {
+  outline: none !important; /* 移除瀏覽器預設外框 */
+  box-shadow: none !important; /* 移除 Antd 預設的藍色/黑色陰影外框 */
+}
+
+/* 如果你想自訂點擊時的微小變化，可以改用變色而不是邊框 */
+.actionButtons button:active, .sendButton:active {
+  transform: scale(0.98); /* 點擊時輕微縮小，增加回饋感 */
+  filter: brightness(0.9); /* 點擊時顏色稍微變暗 */
+
+}
+
+/* 傳送按鈕專屬樣式 */
+.sendButton {
+  width: 48px ;  /* 寬度與高度必須一致 */
+  height: 40px;
+  border-radius: 50% !important; /* 強制變圓形 */
+  background-color: #d9c9ff;
+  /* 💡 初始狀態就不要有邊框 */
+  border: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  box-shadow: 0px 2px 5px rgba(55, 91, 211, 0.3); /* 增加一點點陰影感 */
+}
+
+/* 當按鈕被禁用時 (輸入框為空) */
+.sendButton:disabled {
+  background-color: #f5f5f5 !important;
+  border-color: #d9d9d9 !important;
+  color: #bfbfbf !important;
+  cursor: not-allowed;
+}
+
+/* 💡 自訂 Hover 樣式 (滑鼠移上去時) */
+.sendButton:hover:not(:disabled) {
+  background-color: #c4b0ff !important; /* 變成稍微深一點的紫色 */
+  transform: translateY(-1px); /* 稍微浮起 */
+  outline: none !important; /* 移除瀏覽器預設外框 */
+}
+
+/* 💡 自訂 Active 樣式 (按下那一刻) */
+.sendButton:active:not(:disabled) {
+  background-color: #ae94ff !important; /* 按下時變成最深的紫色 */
+  transform: scale(0.95); /* 輕微縮小，更有按壓感 */
+  outline: none !important;
+  box-shadow: none !important;
 }
