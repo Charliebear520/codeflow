@@ -1,4 +1,4 @@
-import React, { useState, useEffect,useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button, App, Spin, Splitter, Popover } from "antd";
 import {
   ArrowsAltOutlined,
@@ -347,11 +347,12 @@ const OnlineCoding = ({
     ]);
   };
   const HandleSave = async () => {
-          let payload = { questionId: "Q001", completed: false };
-      const now = Date.now();
-      const deltaSec = Math.max(0, Math.floor((now - (lastTickRef.current || now)) / 1000));
-      lastTickRef.current = now;
-      payload.durationDeltaSec = deltaSec;
+    const token = await getToken();
+    let payload = { questionId: "Q001", completed: false };
+    const now = Date.now();
+    const deltaSec = Math.max(0, Math.floor((now - (lastTickRef.current || now)) / 1000));
+    lastTickRef.current = now;
+    payload.durationDeltaSec = deltaSec;
 
     if (saving) return; // 防止重複點擊
     setSaving(true);
@@ -418,24 +419,31 @@ const OnlineCoding = ({
         console.log("[HandleSave] 儲存第三階段資料...");
         saveRes = await fetch(`/api/submissions/stage3`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             questionId,
             code,
             language,
             completed: false,
+            durationDeltaSec: deltaSec,
           }),
         });
       } else {
         console.log("[HandleSave] 儲存第二階段資料...");
         saveRes = await fetch(`/api/submissions/stage2`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          Authorization: `Bearer ${await getToken()}`,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             questionId,
             pseudocode: code,
             completed: false,
+            durationDeltaSec: deltaSec,
           }),
         });
       }

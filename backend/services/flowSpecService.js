@@ -273,7 +273,7 @@ function mapEditorGraphToFlowSpec(graph = {}, synonyms = DEFAULT_SYNONYMS) {
 
 // 產生理想答案（交由 AI 輸出 JSON，並做基本清洗）
 async function generateIdealFlowSpec(questionText) {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
   const prompt = `
 你是一位流程圖教學助教。請針對題目用 JSON 結構輸出理想流程（嚴格輸出 JSON，不要任何多餘文字）。
 
@@ -309,7 +309,7 @@ ${questionText}
 
 // 自圖片解析學生流程圖（Vision 模型）
 async function parseStudentFlowSpecFromImage(imageBase64, questionText) {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
   const prompt = `
 你是流程圖解析器。請解析圖片中的流程圖，輸出 JSON（節點與連線），標準化決策分支為 yes/no，不要任何多餘文字。若無法判讀，適度推論。
 
@@ -340,7 +340,7 @@ async function parseStudentFlowSpecFromImage(imageBase64, questionText) {
 // 產生回饋（AI 優先，失敗則 fallback 模板）
 async function generateFeedbackText(question, ideal, student, diffs, scores) {
   try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `
 你是一位非常簡潔的國中程式設計助教。你的任務是根據現有的「比對差異」和「分數」，只用繁體中文提供 3-5 點簡短的引導式建議。
 
