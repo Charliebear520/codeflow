@@ -8,10 +8,11 @@ const idealAnswerSchema = new Schema(
     questionId: { type: String, required: true, index: true, unique: true },
     flowSpec: { type: Schema.Types.Mixed, required: true },
     version: { type: String, default: "v1" },
-    modelUsed: { type: String, default: "gemini-2.0-flash" },
+    modelUsed: { type: String, default: "Gemini 2.5 Flash" },
     generatedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-export default mongoose.models.IdealAnswer || mongoose.model("IdealAnswer", idealAnswerSchema);
+export default mongoose.models.IdealAnswer ||
+  mongoose.model("IdealAnswer", idealAnswerSchema);

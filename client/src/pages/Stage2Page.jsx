@@ -92,6 +92,8 @@ export default function Stage2Page() {
               feedback={feedback}
               isChecking={isChecking}
               onTutorClick={handleTutorClick}
+              stage={2}
+              question={question}
             />
           </Col>
         )}

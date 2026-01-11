@@ -37,8 +37,19 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
   const reactFlowWrapper = useRef(null);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const { screenToFlowPosition } = useReactFlow();
+  const reactFlowInstance = useReactFlow();
+  const { screenToFlowPosition } = reactFlowInstance;
   const [type] = useDnD();
+
+  // 暴露 ReactFlow 實例到 window 以便 Check 組件可以訪問
+  useEffect(() => {
+    if (reactFlowInstance) {
+      window.reactFlowInstance = reactFlowInstance;
+    }
+    return () => {
+      window.reactFlowInstance = null;
+    };
+  }, [reactFlowInstance]);
 
   // 狀態：編輯節點與邊的相關資料
   const [isEditing, setIsEditing] = useState(false);

@@ -273,7 +273,7 @@ function mapEditorGraphToFlowSpec(graph = {}, synonyms = DEFAULT_SYNONYMS) {
 
 // 產生理想答案（交由 AI 輸出 JSON，並做基本清洗）
 async function generateIdealFlowSpec(questionText) {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
   const prompt = `
 你是一位流程圖教學助教。請針對題目用 JSON 結構輸出理想流程（嚴格輸出 JSON，不要任何多餘文字）。
 
@@ -309,7 +309,7 @@ ${questionText}
 
 // 自圖片解析學生流程圖（Vision 模型）
 async function parseStudentFlowSpecFromImage(imageBase64, questionText) {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
   const prompt = `
 你是流程圖解析器。請解析圖片中的流程圖，輸出 JSON（節點與連線），標準化決策分支為 yes/no，不要任何多餘文字。若無法判讀，適度推論。
 
@@ -339,8 +339,13 @@ async function parseStudentFlowSpecFromImage(imageBase64, questionText) {
 
 // 產生回饋（AI 優先，失敗則 fallback 模板）
 async function generateFeedbackText(question, ideal, student, diffs, scores) {
+  console.log("🔍 ========== generateFeedbackText DEBUG 開始 ==========");
+  console.log("📥 輸入參數:");
+  console.log("  - diffs:", JSON.stringify(diffs, null, 2));
+  console.log("  - scores:", JSON.stringify(scores, null, 2));
+
   try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
     const prompt = `
 你是一位非常簡潔的國中程式設計助教。你的任務是根據現有的「比對差異」和「分數」，只用繁體中文提供 3-5 點簡短的引導式建議。
 
@@ -352,36 +357,73 @@ async function generateFeedbackText(question, ideal, student, diffs, scores) {
 1.  **絕對不要** 自己重新分析題目或給出完整答案。
 2.  **只根據** 上方提供的「比對差異」來產生提示。
 3.  **風格**：引導式問句，例如「是不是少了...？」或「可以思考看看...」。
-4.  **格式**：條列式，3-5 點。
+4.  **格式規範（極為重要）**：
+    - 絕對禁止使用任何符號：不可使用「-」、「•」、「*」、「1.」、「2.」等任何列表符號
+    - 使用完整的句子段落，每個建議寫成一段完整的話
+    - 建議之間用一個空行分隔
+    - 每個建議都是獨立的段落，不要編號或加符號
 5.  **長度**：總字數嚴格控制在 150 字以內。
 6.  **如果「比對差異」很少或沒有問題**：就說「做得很好，架構很完整！可以再檢查看看細節喔。」
 7.  **語言**：僅使用繁體中文。
 
 請僅輸出建議文字，不要包含任何標題或額外說明。
 `;
+
+    console.log("📤 發送給 AI 的 Prompt:");
+    console.log("=".repeat(80));
+    console.log(prompt);
+    console.log("=".repeat(80));
+
     const result = await model.generateContent(prompt);
-    return (await result.response).text().trim();
-  } catch {
-    // Fallback：用規則式差異產出簡易回饋
+    const feedback = (await result.response).text().trim();
+
+    console.log("📨 AI 返回的原始 feedback:");
+    console.log("=".repeat(80));
+    console.log(feedback);
+    console.log("=".repeat(80));
+    console.log("🔍 檢查列表符號:");
+    console.log("  - feedback 長度:", feedback.length);
+    console.log("  - 包含 '-':", feedback.includes("-"));
+    console.log("  - 包含 '•':", feedback.includes("•"));
+    console.log("  - 包含 '*':", feedback.includes("*"));
+    console.log("  - 包含 '1.':", feedback.includes("1."));
+    console.log("  - 包含 '2.':", feedback.includes("2."));
+    console.log("========== generateFeedbackText DEBUG 結束 ==========\n");
+
+    return feedback;
+  } catch (error) {
+    // Fallback:用規則式差異產出簡易回饋
+    console.log("\n");
+    console.log("=".repeat(80));
+    console.log("❌ GEMINI API 調用失敗!");
+    console.log("=".repeat(80));
+    console.log("錯誤類型:", error?.name || "未知");
+    console.log("錯誤訊息:", error?.message || "無訊息");
+    console.log("錯誤堆疊:", error?.stack || "無堆疊");
+    console.log("=".repeat(80));
+    console.log("⚠️ 使用 Fallback 模板回應\n");
+
     const tips = [];
     if (diffs.structureIssues?.length) {
-      tips.push(`流程圖的開始和結束都放好了嗎？可以檢查看看喔。`);
+      tips.push(`流程圖的開始和結束都放好了嗎?可以檢查看看喔`);
     }
     if (diffs.missingNodes?.length) {
-      tips.push(`好像少了一些關鍵步驟，試著想想看少了哪些動作？`);
+      tips.push(`好像少了一些關鍵步驟,試著想想看少了哪些動作`);
     }
     if (diffs.missingEdges?.length) {
-      tips.push("箭頭都連對了嗎？檢查一下是不是有漏掉的連線。");
+      tips.push("箭頭都連對了嗎?檢查一下是不是有漏掉的連線");
     }
     if (diffs.logicIssues?.length) {
-      tips.push(`決策節點（菱形）的「是/否」分支是不是都清楚標示了呢？`);
+      tips.push(`決策節點(菱形)的「是/否」分支是不是都清楚標示了呢`);
     }
     if (tips.length === 0) {
-      return "做得很好，架構很完整！可以再檢查看看細節喔。";
+      tips.push("看起來做得很不錯喔,再仔細檢查一下細節");
     }
-    return `你的分數是：${Math.round(
-      scores.total * 100
-    )} 分。\n\n這裡有些小提示，希望能幫助你：\n- ${tips.join("\n- ")}`;
+
+    // 完全移除列表符號,使用段落格式
+    const scoreText = `你的分數是 ${Math.round(scores.total * 100)} 分`;
+    const tipsText = tips.join("\n\n"); // 用空行分隔,不加任何符號
+    return `${scoreText}\n\n這裡有些小提示,希望能幫助你\n\n${tipsText}`;
   }
 }
 

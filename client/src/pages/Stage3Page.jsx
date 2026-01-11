@@ -67,6 +67,8 @@ export default function Stage3Page() {
             feedback={feedback}
             isChecking={isChecking}
             onTutorClick={handleTutorClick}
+            stage={3}
+            question={question}
           />
         </Col>
       </Row>

@@ -509,7 +509,7 @@ app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
         $set: {
           flowSpec,
           version: "v1",
-          modelUsed: "gemini-2.0-flash",
+          modelUsed: "Gemini 2.5 Flash",
           generatedAt: new Date(),
         },
       },
@@ -571,7 +571,7 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
         questionId: String(questionId),
         flowSpec: generated,
         version: "v1",
-        modelUsed: "gemini-2.0-flash",
+        modelUsed: "Gemini 2.5 Flash",
         generatedAt: new Date(),
       });
     }
@@ -1512,7 +1512,7 @@ app.get("/api/test-gemini", async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "Gemini 2.5 Flash" });
     const result = await model.generateContent(
       "Hello, this is a test. Please respond with 'API is working'."
     );
@@ -1528,20 +1528,6 @@ app.get("/api/test-gemini", async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
-// 啟動服務器 - 適配Vercel無服務器函數
-if (process.env.NODE_ENV !== "production") {
-  app.listen(port, "0.0.0.0", () => {
-    console.log(`Server is running on http://localhost:${port}`);
-    console.log("Environment check:");
-    console.log("- PORT:", port);
-    console.log("- GEMINI_API_KEY available:", !!process.env.GEMINI_API_KEY);
-    console.log("- NODE_ENV:", process.env.NODE_ENV);
-  });
-}
-
-// 導出app供Vercel使用
-export default app;
 
 // 資料表連接 - 已移到前面的配置區域
 
@@ -1794,7 +1780,6 @@ app.get("/api/submissions/stage3", async (req, res) => {
 //   }
 // });
 
-
 // 新增：通用的助教對話 API 端點
 app.post("/api/chat", async (req, res) => {
   try {
@@ -1802,7 +1787,7 @@ app.post("/api/chat", async (req, res) => {
 
     // 1. 取得已經封裝好的 Gemini 服務
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    
+
     // 檢查 API KEY 是否存在
     if (!process.env.GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY in .env file");
@@ -1810,14 +1795,14 @@ app.post("/api/chat", async (req, res) => {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     // 💡 確保這裡的模型名稱與你 geminiService.js 裡的一致
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "Gemini 2.5 Flash" });
 
     // 2. 設定 AI 的說話人格與背景資訊
     const systemInstruction = `
       你是一位親切的程式助教「沐芙」，正在引導學生學習程式邏輯。
-      當前階段：${stage || '未提供'}
-      題目內容：${question || '未提供'}
-      之前的分析回饋：${currentData || '無'}
+      當前階段：${stage || "未提供"}
+      題目內容：${question || "未提供"}
+      之前的分析回饋：${currentData || "無"}
 
       請遵循以下原則：
       1. 使用繁體中文回答，語氣溫柔且多鼓勵。
@@ -1826,19 +1811,60 @@ app.post("/api/chat", async (req, res) => {
     `;
 
     // 3. 發送請求給 Gemini
-   const result = await model.generateContent([systemInstruction, prompt]);
+    const result = await model.generateContent([systemInstruction, prompt]);
     const response = await result.response;
     const text = response.text();
 
     // 4. 回傳給前端
-   res.json({ success: true, result: text }); // 💡 確保回傳格式包含 success: true
-    
+    res.json({ success: true, result: text }); // 💡 確保回傳格式包含 success: true
   } catch (error) {
     console.error("Gemini Chat Error 詳細錯誤:", error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: "AI 助教目前忙線中，請檢查後端終端機報錯訊息。",
-      details: error.message 
+      details: error.message,
     });
   }
 });
+
+// 啟動服務器 - 適配Vercel無服務器函數
+console.log(
+  "About to start server. NODE_ENV:",
+  process.env.NODE_ENV,
+  "Condition:",
+  process.env.NODE_ENV !== "production"
+);
+if (process.env.NODE_ENV !== "production") {
+  console.log("Calling app.listen...");
+  const server = app.listen(port, "0.0.0.0", () => {
+    console.log(`Server is running on http://localhost:${port}`);
+    console.log("Environment check:");
+    console.log("- PORT:", port);
+    console.log("- GEMINI_API_KEY available:", !!process.env.GEMINI_API_KEY);
+    console.log("- NODE_ENV:", process.env.NODE_ENV);
+  });
+
+  // 確保在退出前正確關閉server
+  process.on("SIGTERM", () => {
+    console.log("SIGTERM received, closing server...");
+    server.close(() => {
+      console.log("Server closed");
+      process.exit(0);
+    });
+  });
+
+  process.on("SIGINT", () => {
+    console.log("SIGINT received, closing server...");
+    server.close(() => {
+      console.log("Server closed");
+      process.exit(0);
+    });
+  });
+
+  console.log("app.listen called, server is now listening...");
+} else {
+  console.log("Skipping app.listen in production mode");
+}
+
+// 導出app供Vercel使用 (僅在作為模塊導入時)
+// export default app;
