@@ -11,6 +11,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { cpp } from "@codemirror/lang-cpp";
 import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
+import { useEditor } from "../../contexts/EditorContext";
 import "./blankHighlight.css";
 import styles from "./answer.module.css";
 import { useAuth } from "@clerk/clerk-react"; //額外加入
@@ -64,6 +65,7 @@ const OnlineCoding = ({
   onTutorClick,
 }) => {
   const { message: antdMessage } = App.useApp();
+  const { updateContent, updateLanguage, updateStage } = useEditor(); // 使用 Context
   const [code, setCode] = useState(value || "");
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -81,6 +83,21 @@ const OnlineCoding = ({
   const [checking, setChecking] = useState(false);
   const { getToken } = useAuth(); //額外加入
   const API_BASE = import.meta.env.VITE_API_BASE; //額外加入
+
+  // 同步內容到 Context
+  useEffect(() => {
+    updateContent(code);
+    updateLanguage(language);
+    // currentStage: 0=stage1, 1=stage2, 2=stage3
+    updateStage((currentStage ?? 0) + 1);
+  }, [
+    code,
+    language,
+    currentStage,
+    updateContent,
+    updateLanguage,
+    updateStage,
+  ]);
 
   // 語言對應 CodeMirror extension
   const getLanguageExtension = () => {

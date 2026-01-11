@@ -21,6 +21,30 @@ const getGenAI = () => {
   return genAI;
 };
 
+// 匯出 getGenAI 供其他服務使用
+export { getGenAI };
+
+/**
+ * 通用的 Gemini 內容生成函數
+ * @param {string} prompt - 提示詞
+ * @param {string} modelName - 模型名稱，預設為 "gemini-2.5-flash"
+ * @returns {Promise<string>} - 生成的文字內容
+ */
+export const generateContent = async (
+  prompt,
+  modelName = "gemini-2.5-flash"
+) => {
+  try {
+    const model = getGenAI().getGenerativeModel({ model: modelName });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Error in generateContent:", error);
+    throw error;
+  }
+};
+
 // 第一階段：生成流程圖題目
 export const generateFlowchartQuestion = async () => {
   try {

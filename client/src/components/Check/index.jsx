@@ -7,6 +7,7 @@ import { useSelector, useDispatch } from "react-redux";
 import ReactMarkdown from "react-markdown";
 import { useAuth } from "@clerk/clerk-react";
 import { toPng } from "html-to-image";
+import { useEditor } from "../../contexts/EditorContext";
 
 const { TextArea } = Input;
 
@@ -23,6 +24,9 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   const { message } = App.useApp();
   const dispatch = useDispatch();
 
+  // 從 EditorContext 取得當前階段的內容
+  const { content, language } = useEditor();
+
   // 從 Redux 取得資料
   const byStage = useSelector((state) => state.check.byStage);
   const scores = useSelector((state) => state.check.scores);
@@ -35,6 +39,82 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
 
   // 從 Redux 獲取詳細的建議資料
   const hasSuggestionsData = scores && diffs && checkFeedback;
+
+  // *** 輔助函數：根據 stage 取得 API 端點 ***
+  const getApiEndpoint = (stageNum) => {
+    return `http://localhost:5000/api/submissions/stage${stageNum}/compare`;
+  };
+
+  // *** 輔助函數：根據 stage 準備 payload ***
+  const preparePayload = async (stageNum) => {
+    const basePayload = { questionId: question?.questionId || "Q001" };
+
+    if (stageNum === 1) {
+      // Stage 1: 流程圖
+      const reactFlowWrapper = document.querySelector(".react-flow");
+      if (!reactFlowWrapper) {
+        throw new Error("找不到流程圖，請確認已繪製流程圖");
+      }
+
+      const reactFlowInstance = window.reactFlowInstance;
+      if (!reactFlowInstance) {
+        throw new Error("流程圖尚未初始化，請稍後再試");
+      }
+
+      const nodes = reactFlowInstance.getNodes();
+      const edges = reactFlowInstance.getEdges();
+
+      if (!nodes || nodes.length === 0) {
+        throw new Error("請先繪製流程圖");
+      }
+
+      const dataUrl = await toPng(reactFlowWrapper, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+      });
+
+      return {
+        ...basePayload,
+        graph: { nodes, edges },
+        imageBase64: dataUrl.split(",")[1],
+      };
+    } else if (stageNum === 2) {
+      // Stage 2: 虛擬碼
+      if (!content || content.trim() === "") {
+        throw new Error("請先撰寫虛擬碼");
+      }
+      return {
+        ...basePayload,
+        pseudocode: content,
+      };
+    } else if (stageNum === 3) {
+      // Stage 3: 程式碼
+      if (!content || content.trim() === "") {
+        throw new Error("請先撰寫程式碼");
+      }
+      return {
+        ...basePayload,
+        code: content,
+        language: language || "python",
+      };
+    }
+
+    throw new Error(`未知的 stage: ${stageNum}`);
+  };
+
+  // *** 輔助函數：根據 stage 計算 hash ***
+  const getContentHash = (stageNum) => {
+    if (stageNum === 1) {
+      // Stage 1: 使用流程圖 hash
+      return getFlowHash();
+    } else if (stageNum === 2 || stageNum === 3) {
+      // Stage 2/3: 使用內容 hash
+      return `${stageNum}-${content?.length || 0}-${
+        content?.substring(0, 100) || ""
+      }`;
+    }
+    return null;
+  };
 
   // 1. 自動捲動邏輯
   useEffect(() => {
@@ -133,55 +213,122 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   };
 
   // *** 格式化檢查結果(數字列表) ***
-  const formatCheckResult = (diffs) => {
+  const formatCheckResult = (diffs, currentStage) => {
     if (!diffs) return "暫無分析資料";
 
     let itemNumber = 1;
     const items = [];
 
-    // 1. 缺少節點
-    if (diffs.missingNodes && diffs.missingNodes.length > 0) {
-      diffs.missingNodes.forEach((node) => {
-        items.push(
-          `${itemNumber}. 缺少節點：**${node.type}**${
-            node.label ? ` - ${node.label}` : ""
-          }`
-        );
-        itemNumber++;
-      });
+    // Stage 1: 流程圖
+    if (currentStage === 1) {
+      if (diffs.missingNodes && diffs.missingNodes.length > 0) {
+        diffs.missingNodes.forEach((node) => {
+          items.push(
+            `${itemNumber}. 缺少節點：**${node.type}**${
+              node.label ? ` - ${node.label}` : ""
+            }`
+          );
+          itemNumber++;
+        });
+      }
+      if (diffs.missingEdges && diffs.missingEdges.length > 0) {
+        diffs.missingEdges.forEach((edge) => {
+          items.push(
+            `${itemNumber}. 缺少連線：${edge.from} → ${edge.to}${
+              edge.label ? ` (${edge.label})` : ""
+            }`
+          );
+          itemNumber++;
+        });
+      }
+      if (diffs.structureIssues && diffs.structureIssues.length > 0) {
+        diffs.structureIssues.forEach((issue) => {
+          items.push(`${itemNumber}. 結構問題：${issue}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.logicIssues && diffs.logicIssues.length > 0) {
+        diffs.logicIssues.forEach((issue) => {
+          items.push(`${itemNumber}. 邏輯問題：${issue}`);
+          itemNumber++;
+        });
+      }
+    }
+    // Stage 2: 虛擬碼
+    else if (currentStage === 2) {
+      if (diffs.missingLogic && diffs.missingLogic.length > 0) {
+        diffs.missingLogic.forEach((logic) => {
+          items.push(`${itemNumber}. ${logic}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.incorrectConditions && diffs.incorrectConditions.length > 0) {
+        diffs.incorrectConditions.forEach((cond) => {
+          items.push(`${itemNumber}. 條件問題：${cond}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.missingVariables && diffs.missingVariables.length > 0) {
+        diffs.missingVariables.forEach((v) => {
+          items.push(`${itemNumber}. 建議使用變數：${v}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.missingLoops && diffs.missingLoops.length > 0) {
+        diffs.missingLoops.forEach((loop) => {
+          items.push(`${itemNumber}. 建議使用迴圈：${loop}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.structureIssues && diffs.structureIssues.length > 0) {
+        diffs.structureIssues.forEach((issue) => {
+          items.push(`${itemNumber}. ${issue}`);
+          itemNumber++;
+        });
+      }
+    }
+    // Stage 3: 程式碼
+    else if (currentStage === 3) {
+      if (diffs.syntaxErrors && diffs.syntaxErrors.length > 0) {
+        diffs.syntaxErrors.forEach((err) => {
+          items.push(`${itemNumber}. 語法問題：${err}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.logicErrors && diffs.logicErrors.length > 0) {
+        diffs.logicErrors.forEach((err) => {
+          items.push(`${itemNumber}. ${err}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.runtimeWarnings && diffs.runtimeWarnings.length > 0) {
+        diffs.runtimeWarnings.forEach((warn) => {
+          items.push(`${itemNumber}. 執行時警告：${warn}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.missingFeatures && diffs.missingFeatures.length > 0) {
+        diffs.missingFeatures.forEach((feature) => {
+          items.push(`${itemNumber}. ${feature}`);
+          itemNumber++;
+        });
+      }
+      if (diffs.missingControlFlow && diffs.missingControlFlow.length > 0) {
+        diffs.missingControlFlow.forEach((cf) => {
+          items.push(`${itemNumber}. ${cf}`);
+          itemNumber++;
+        });
+      }
     }
 
-    // 2. 缺少連線
-    if (diffs.missingEdges && diffs.missingEdges.length > 0) {
-      diffs.missingEdges.forEach((edge) => {
-        items.push(
-          `${itemNumber}. 缺少連線：${edge.from} → ${edge.to}${
-            edge.label ? ` (${edge.label})` : ""
-          }`
-        );
-        itemNumber++;
-      });
-    }
-
-    // 3. 結構問題
-    if (diffs.structureIssues && diffs.structureIssues.length > 0) {
-      diffs.structureIssues.forEach((issue) => {
-        items.push(`${itemNumber}. 結構問題：${issue}`);
-        itemNumber++;
-      });
-    }
-
-    // 4. 邏輯問題
-    if (diffs.logicIssues && diffs.logicIssues.length > 0) {
-      diffs.logicIssues.forEach((issue) => {
-        items.push(`${itemNumber}. 邏輯問題：${issue}`);
-        itemNumber++;
-      });
-    }
-
-    // 如果沒有任何問題
     if (items.length === 0) {
-      return "✅ 太棒了！流程圖沒有發現任何問題！";
+      const contentType =
+        currentStage === 1
+          ? "流程圖"
+          : currentStage === 2
+          ? "虛擬碼"
+          : "程式碼";
+      return `✅ 太棒了！${contentType}沒有發現任何問題！`;
     }
 
     return items.join("\n\n");
@@ -189,7 +336,6 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
 
   // *** 執行檢查並顯示 AI 建議 ***
   const handleCheck = async () => {
-    console.log("🟢 ========== 【檢查】按鈕 DEBUG 開始 ==========");
     if (isTyping) return;
 
     // 先將使用者訊息加入畫面
@@ -204,7 +350,9 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
       // 顯示檢查中訊息
       const checkingMsg = {
         sender: "assistant",
-        text: "好的！讓我先幫你檢查流程圖... 🔍",
+        text: `好的！讓我先幫你檢查${
+          stage === 1 ? "流程圖" : stage === 2 ? "虛擬碼" : "程式碼"
+        }... 🔍`,
       };
       setMessages((prev) => [...prev, checkingMsg]);
 
@@ -213,86 +361,28 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
         throw new Error("請先登入");
       }
 
-      // 從 ReactFlow DOM 獲取流程圖資料
-      const reactFlowWrapper = document.querySelector(".react-flow");
-      if (!reactFlowWrapper) {
-        throw new Error("找不到流程圖，請確認已繪製流程圖");
-      }
-
-      // 使用 React Flow 的內部實例獲取資料
-      const reactFlowInstance = window.reactFlowInstance;
-      if (!reactFlowInstance) {
-        throw new Error("流程圖尚未初始化，請稍後再試");
-      }
-
-      const nodes = reactFlowInstance.getNodes();
-      const edges = reactFlowInstance.getEdges();
-
-      if (!nodes || nodes.length === 0) {
-        throw new Error("請先繪製流程圖");
-      }
-
-      console.log("🔍 Debug 檢查點 1: 流程圖資料");
-      console.log("  - nodes 數量:", nodes.length);
-      console.log("  - edges 數量:", edges.length);
-
-      // 生成圖片
-      const dataUrl = await toPng(reactFlowWrapper, {
-        backgroundColor: "#ffffff",
-        pixelRatio: 2,
-      });
-
-      const payload = {
-        questionId: "Q001",
-        graph: { nodes, edges },
-        imageBase64: dataUrl.split(",")[1],
-      };
-
-      console.log("🔍 Debug 檢查點 2: 準備呼叫 API");
-      console.log(
-        "  - endpoint: http://localhost:5000/api/submissions/stage1/compare"
-      );
-      console.log("  - questionId:", payload.questionId);
-      console.log("  - 圖片大小:", payload.imageBase64.length, "bytes");
+      // 準備 payload（根據 stage 決定）
+      const payload = await preparePayload(stage);
 
       const token = await getToken();
-      const res = await fetch(
-        `http://localhost:5000/api/submissions/stage1/compare`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const endpoint = getApiEndpoint(stage);
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await res.json();
-
-      console.log("🔍 Debug 檢查點 3: API 回應");
-      console.log("  - HTTP 狀態:", res.status, res.statusText);
-      console.log("  - res.ok:", res.ok);
-      console.log("  - data.success:", data.success);
-      console.log("  - data.scores:", data.scores);
-      console.log("  - data.diffs:", data.diffs);
-      console.log("🚨 關鍵: data.feedback 內容");
-      console.log("=".repeat(80));
-      console.log(data.feedback);
-      console.log("=".repeat(80));
-      console.log("  - feedback 長度:", data.feedback?.length);
-      console.log("  - 包含 '-':", data.feedback?.includes("-"));
-      console.log("  - 包含 '•':", data.feedback?.includes("•"));
-      console.log("  - 包含 '*':", data.feedback?.includes("*"));
-      console.log("  - 包含 '1.':", data.feedback?.includes("1."));
-      console.log("  - 包含 '2.':", data.feedback?.includes("2."));
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || "檢查失敗");
       }
 
       // 儲存到 Redux
-      console.log("🔍 Debug 檢查點 4: 儲存到 Redux");
       dispatch({
         type: "check/setCheckResult",
         payload: {
@@ -302,34 +392,20 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
           submissionId: data.submissionId,
         },
       });
-      console.log("  - 已儲存 feedback 到 Redux.check.feedback");
 
       // 更新最後檢查的 hash
-      const newHash = getFlowHash();
+      const newHash = getContentHash(stage);
       setLastCheckHash(newHash);
-      console.log("🔍 Debug 檢查點 5: 更新 lastCheckHash");
-      console.log("  - 新的 lastCheckHash:", newHash);
 
       // 顯示檢查結果（使用 data.diffs 結構化資料）
-      const formattedResult = formatCheckResult(data.diffs);
+      const formattedResult = formatCheckResult(data.diffs, stage);
       const checkResultText = `## 檢查結果\n\n${formattedResult}\n\n---\n\n有任何問題都可以隨時問我喔！`;
-
-      console.log("🔍 Debug 檢查點 6: 最終顯示文字");
-      console.log("  - 使用數據來源: data.diffs (結構化資料)");
-      console.log("  - checkResultText 長度:", checkResultText.length);
-      console.log("  - 格式: 數字列表 (1. 2. 3.)");
-      console.log("🟢 ========== 【檢查】按鈕 DEBUG 結束 ==========\n");
 
       setMessages((prev) => [
         ...prev.slice(0, -1), // 移除「檢查中」訊息
         { sender: "assistant", text: checkResultText },
       ]);
     } catch (error) {
-      console.error("❌ 檢查失敗:", error);
-      console.error("  - 錯誤訊息:", error.message);
-      console.error("  - 錯誤堆疊:", error.stack);
-      console.log("🟢 ========== 【檢查】按鈕 DEBUG 結束 (錯誤) ==========\n");
-
       setMessages((prev) => [
         ...prev.slice(0, -1), // 移除「檢查中」訊息
         {
@@ -357,43 +433,25 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
 
     // B. 特殊處理：如果是「接下來該怎麼做」
     if (textToSend.includes("接下來")) {
-      console.log("🔵 ========== 【接下來該怎麼做】DEBUG 開始 ==========");
       setIsTyping(true);
 
-      // 檢查流程圖是否有變更
-      const currentHash = getFlowHash();
-      const flowChanged = !lastCheckHash || currentHash !== lastCheckHash;
+      // 檢查內容是否有變更
+      const currentHash = getContentHash(stage);
+      const contentChanged = !lastCheckHash || currentHash !== lastCheckHash;
 
-      console.log("🔍 Debug 檢查點 1: 流程圖狀態");
-      console.log("  - currentHash:", currentHash);
-      console.log("  - lastCheckHash:", lastCheckHash);
-      console.log("  - flowChanged:", flowChanged);
-      console.log("  - hasSuggestionsData:", hasSuggestionsData);
-      console.log("  - scores:", scores);
-      console.log("  - diffs:", diffs);
-      console.log("🚨 關鍵: checkFeedback 狀態");
-      console.log("  - checkFeedback:", checkFeedback);
-      console.log("  - checkFeedback 長度:", checkFeedback?.length);
-      console.log("  - 包含 '-':", checkFeedback?.includes("-"));
-      console.log("  - 包含 '•':", checkFeedback?.includes("•"));
-      console.log("  - 包含 '*':", checkFeedback?.includes("*"));
-
-      // B1. 如果沒有建議資料或流程圖已變更，需要重新執行檢查
-      if (!hasSuggestionsData || flowChanged) {
-        console.log("🟢 決策: 需要重新檢查");
-        console.log(
-          "  - 原因: hasSuggestionsData=",
-          hasSuggestionsData,
-          ", flowChanged=",
-          flowChanged
-        );
+      // B1. 如果沒有建議資料或內容已變更，需要重新執行檢查
+      if (!hasSuggestionsData || contentChanged) {
         try {
           // 顯示檢查中訊息
           const checkingMsg = {
             sender: "assistant",
-            text: flowChanged
-              ? "流程圖有變更，讓我重新幫你檢查... 🔍"
-              : "好的！讓我先幫你檢查流程圖... 🔍",
+            text: contentChanged
+              ? `${
+                  stage === 1 ? "流程圖" : stage === 2 ? "虛擬碼" : "程式碼"
+                }有變更，讓我重新幫你檢查... 🔍`
+              : `好的！讓我先幫你檢查${
+                  stage === 1 ? "流程圖" : stage === 2 ? "虛擬碼" : "程式碼"
+                }... 🔍`,
           };
           setMessages((prev) => [...prev, checkingMsg]);
 
@@ -402,85 +460,28 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
             throw new Error("請先登入");
           }
 
-          // 從 ReactFlow DOM 獲取流程圖資料
-          const reactFlowWrapper = document.querySelector(".react-flow");
-          if (!reactFlowWrapper) {
-            throw new Error("找不到流程圖，請確認已繪製流程圖");
-          }
-
-          // 使用 React Flow 的內部實例獲取資料
-          const reactFlowInstance = window.reactFlowInstance;
-          if (!reactFlowInstance) {
-            throw new Error("流程圖尚未初始化，請稍後再試");
-          }
-
-          const nodes = reactFlowInstance.getNodes();
-          const edges = reactFlowInstance.getEdges();
-
-          if (!nodes || nodes.length === 0) {
-            throw new Error("請先繪製流程圖");
-          }
-
-          // 生成圖片
-          const dataUrl = await toPng(reactFlowWrapper, {
-            backgroundColor: "#ffffff",
-            pixelRatio: 2,
-          });
-
-          const payload = {
-            questionId: "Q001",
-            graph: { nodes, edges },
-            imageBase64: dataUrl.split(",")[1],
-          };
+          // 準備 payload（根據 stage 決定）
+          const payload = await preparePayload(stage);
 
           const token = await getToken();
+          const endpoint = getApiEndpoint(stage);
 
-          console.log("🔍 Debug 檢查點 2: 準備呼叫 API");
-          console.log(
-            "  - endpoint: http://localhost:5000/api/submissions/stage1/compare"
-          );
-          console.log("  - questionId:", payload.questionId);
-          console.log("  - nodes 數量:", payload.graph.nodes.length);
-          console.log("  - edges 數量:", payload.graph.edges.length);
-          console.log("  - 圖片大小:", payload.imageBase64.length, "bytes");
-
-          const res = await fetch(
-            `http://localhost:5000/api/submissions/stage1/compare`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(payload),
-            }
-          );
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          });
 
           const data = await res.json();
-
-          console.log("🔍 Debug 檢查點 3: API 回應");
-          console.log("  - HTTP 狀態:", res.status, res.statusText);
-          console.log("  - res.ok:", res.ok);
-          console.log("  - data.success:", data.success);
-          console.log("  - data.scores:", data.scores);
-          console.log("  - data.diffs:", data.diffs);
-          console.log("🚨 關鍵: data.feedback 內容");
-          console.log("=".repeat(80));
-          console.log(data.feedback);
-          console.log("=".repeat(80));
-          console.log("  - feedback 長度:", data.feedback?.length);
-          console.log("  - 包含 '-':", data.feedback?.includes("-"));
-          console.log("  - 包含 '•':", data.feedback?.includes("•"));
-          console.log("  - 包含 '*':", data.feedback?.includes("*"));
-          console.log("  - 包含 '1.':", data.feedback?.includes("1."));
-          console.log("  - 包含 '2.':", data.feedback?.includes("2."));
 
           if (!res.ok || !data.success) {
             throw new Error(data.error || "檢查失敗");
           }
 
           // 儲存到 Redux
-          console.log("🔍 Debug 檢查點 4: 儲存到 Redux");
           dispatch({
             type: "check/setCheckResult",
             payload: {
@@ -490,24 +491,26 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
               submissionId: data.submissionId,
             },
           });
-          console.log("  - 已儲存 feedback 到 Redux.check.feedback");
 
           // 更新最後檢查的 hash
           setLastCheckHash(currentHash);
-          console.log("🔍 Debug 檢查點 5: 更新 lastCheckHash");
-          console.log("  - 新的 lastCheckHash:", currentHash);
 
-          // 顯示最新的 AI 建議
+          // 顯示最新的 AI 建議（字數限制：120-180字）
+          const contentType =
+            stage === 1 ? "流程圖" : stage === 2 ? "虛擬碼" : "程式碼";
+          let feedback = data.feedback;
+          if (feedback && feedback.length > 180) {
+            feedback = feedback.substring(0, 180) + "...";
+          }
           const suggestionsText =
-            `## 助教建議\n\n${data.feedback}\n\n` +
-            `---\n\n你可以根據以上建議調整你的流程圖，有任何問題都可以隨時問我喔！`;
+            `## 助教建議\n\n${feedback}\n\n` +
+            `---\n\n你可以根據以上建議調整你的${contentType}，有任何問題都可以隨時問我喔！`;
 
           setMessages((prev) => [
             ...prev.slice(0, -1), // 移除「檢查中」訊息
             { sender: "assistant", text: suggestionsText },
           ]);
         } catch (error) {
-          console.error("自動檢查失敗:", error);
           setMessages((prev) => [
             ...prev.slice(0, -1), // 移除「檢查中」訊息
             {
@@ -521,25 +524,12 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
         return;
       }
 
-      // B2. 如果流程圖沒變更且有建議資料，直接顯示快取的建議
-      console.log("🟡 決策: 使用快取資料 (Redux)");
-      console.log("🚨 關鍵: 從 Redux 讀取的 checkFeedback");
-      console.log("=".repeat(80));
-      console.log(checkFeedback);
-      console.log("=".repeat(80));
-      console.log("  - checkFeedback 長度:", checkFeedback?.length);
-      console.log("  - 包含 '-':", checkFeedback?.includes("-"));
-      console.log("  - 包含 '•':", checkFeedback?.includes("•"));
-      console.log("  - 包含 '*':", checkFeedback?.includes("*"));
-      console.log("  - 包含 '1.':", checkFeedback?.includes("1."));
-
+      // B2. 如果內容沒變更且有建議資料，直接顯示快取的建議
+      const contentType =
+        stage === 1 ? "流程圖" : stage === 2 ? "虛擬碼" : "程式碼";
       const suggestionsText =
         `## 助教建議\n\n${checkFeedback}\n\n` +
-        `---\n\n你可以根據以上建議調整你的流程圖，有任何問題都可以隨時問我喔！`;
-
-      console.log("🔍 Debug 檢查點 6: 最終顯示文字");
-      console.log("  - suggestionsText 長度:", suggestionsText.length);
-      console.log("🔵 ========== DEBUG 結束 ==========\n");
+        `---\n\n你可以根據以上建議調整你的${contentType}，有任何問題都可以隨時問我喔！`;
 
       setTimeout(() => {
         const aiReply = {

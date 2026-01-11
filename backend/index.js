@@ -35,6 +35,16 @@ import {
   compareFlowSpecs,
   generateFeedbackText,
 } from "./services/flowSpecService.js";
+import {
+  generateIdealPseudocode,
+  comparePseudocode,
+  generatePseudocodeFeedback,
+} from "./services/pseudocodeService.js";
+import {
+  generateIdealCode,
+  compareCode,
+  generateCodeFeedback,
+} from "./services/codeService.js";
 import fsSync from "fs";
 
 // 動態導入Gemini服務的輔助函數
@@ -643,6 +653,213 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
     res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
   } catch (err) {
     console.error("stage1/compare error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Stage 2: 虛擬碼檢查端點
+app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const studentDoc = await ensureStudent(userId);
+
+    const { questionId, pseudocode } = req.body || {};
+    if (!questionId)
+      return res.status(400).json({ success: false, error: "questionId 必填" });
+    if (!pseudocode)
+      return res.status(400).json({ success: false, error: "pseudocode 必填" });
+
+    // 取得題目內容
+    let questionText = "";
+    if (mongoose.isValidObjectId(questionId)) {
+      const q = await Question.findById(questionId).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    } else {
+      const q = await Question.findOne({ questionTitle: questionId }).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    }
+
+    // 1) 取得或生成理想虛擬碼
+    let ideal = await IdealAnswer.findOne({
+      questionId: String(questionId),
+    });
+
+    if (!ideal || !ideal.pseudocode) {
+      console.log("生成新的理想虛擬碼...");
+      const generated = await generateIdealPseudocode(
+        questionText || "請根據題意撰寫虛擬碼"
+      );
+
+      ideal = await IdealAnswer.findOneAndUpdate(
+        { questionId: String(questionId) },
+        {
+          $set: {
+            pseudocode: generated.pseudocode,
+            pseudocodeStructure: generated.structure,
+            modelUsed: "gemini-2.5-flash",
+            generatedAt: new Date(),
+          },
+          $setOnInsert: {
+            questionId: String(questionId),
+            flowSpec: {},
+            version: "v1",
+          },
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    // 2) 比對虛擬碼
+    const { diffs, scores } = comparePseudocode(
+      ideal.pseudocodeStructure,
+      pseudocode,
+      questionText
+    );
+    console.log("📈 Stage2 比對結果 scores:", scores);
+    console.log("📋 Stage2 比對結果 diffs:", JSON.stringify(diffs, null, 2));
+
+    // 3) 產生回饋
+    const feedback = await generatePseudocodeFeedback(
+      questionText || "",
+      ideal,
+      pseudocode,
+      diffs,
+      scores
+    );
+
+    // 4) 寫回 Submission
+    const update = {
+      $set: {
+        "stages.stage2.pseudocode": pseudocode,
+        "stages.stage2.scores": scores,
+        "stages.stage2.diffs": diffs,
+        "stages.stage2.feedback": feedback,
+        "stages.stage2.updatedAt": new Date(),
+        studentName: studentDoc.name ?? null,
+        studentEmail: studentDoc.email?.toLowerCase() ?? null,
+      },
+      $setOnInsert: {
+        student: studentDoc._id,
+        questionId,
+        createdAt: new Date(),
+      },
+    };
+
+    const doc = await Submission.findOneAndUpdate(
+      { student: studentDoc._id, questionId },
+      update,
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
+  } catch (err) {
+    console.error("stage2/compare error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Stage 3: 程式碼檢查端點
+app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const studentDoc = await ensureStudent(userId);
+
+    const { questionId, code, language = "python" } = req.body || {};
+    if (!questionId)
+      return res.status(400).json({ success: false, error: "questionId 必填" });
+    if (!code)
+      return res.status(400).json({ success: false, error: "code 必填" });
+
+    // 取得題目內容
+    let questionText = "";
+    if (mongoose.isValidObjectId(questionId)) {
+      const q = await Question.findById(questionId).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    } else {
+      const q = await Question.findOne({ questionTitle: questionId }).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    }
+
+    // 1) 取得或生成理想程式碼
+    let ideal = await IdealAnswer.findOne({
+      questionId: String(questionId),
+    });
+
+    if (!ideal || !ideal.code || ideal.language !== language) {
+      console.log(`生成新的理想 ${language} 程式碼...`);
+      const generated = await generateIdealCode(
+        questionText || "請根據題意撰寫程式碼",
+        language
+      );
+
+      ideal = await IdealAnswer.findOneAndUpdate(
+        { questionId: String(questionId) },
+        {
+          $set: {
+            code: generated.code,
+            language: language,
+            codeStructure: generated.structure,
+            modelUsed: "gemini-2.5-flash",
+            generatedAt: new Date(),
+          },
+          $setOnInsert: {
+            questionId: String(questionId),
+            flowSpec: {},
+            version: "v1",
+          },
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    // 2) 比對程式碼
+    const { diffs, scores } = compareCode(
+      ideal.codeStructure,
+      code,
+      language,
+      questionText
+    );
+    console.log("📈 Stage3 比對結果 scores:", scores);
+    console.log("📋 Stage3 比對結果 diffs:", JSON.stringify(diffs, null, 2));
+
+    // 3) 產生回饋
+    const feedback = await generateCodeFeedback(
+      questionText || "",
+      ideal,
+      code,
+      diffs,
+      scores,
+      language
+    );
+
+    // 4) 寫回 Submission
+    const update = {
+      $set: {
+        "stages.stage3.code": code,
+        "stages.stage3.language": language,
+        "stages.stage3.scores": scores,
+        "stages.stage3.diffs": diffs,
+        "stages.stage3.feedback": feedback,
+        "stages.stage3.updatedAt": new Date(),
+        studentName: studentDoc.name ?? null,
+        studentEmail: studentDoc.email?.toLowerCase() ?? null,
+      },
+      $setOnInsert: {
+        student: studentDoc._id,
+        questionId,
+        createdAt: new Date(),
+      },
+    };
+
+    const doc = await Submission.findOneAndUpdate(
+      { student: studentDoc._id, questionId },
+      update,
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
+  } catch (err) {
+    console.error("stage3/compare error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
