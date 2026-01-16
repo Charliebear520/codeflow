@@ -235,8 +235,7 @@ export async function generateCodeFeedback(
 
   const prompt = `你是一位非常簡潔的國中 ${langName} 程式設計助教。你的任務是根據「理想程式碼」和「學生程式碼」的比對結果，用繁體中文提供引導式建議。
 
-**題目**：
-${questionText}
+**題目**：${questionText}
 
 **理想程式碼（標準答案）**：
 ${ideal.code}
@@ -273,30 +272,138 @@ ${
     : ""
 }
 
-**輸出規則（必須嚴格遵守）**：
-1. **絕對不要**自己重新分析題目或給出完整答案。
-2. **只根據**上方的「發現的差異」來產生提示。
-3. **對比理想程式碼**，用引導式問句指出學生缺少了什麼，例如「是不是少了計算階乘的函數？」或「可以思考看看題目要求要輸出什麼」。
-4. **格式規範（極為重要）**：
-   - 絕對禁止使用任何符號：不可使用「-」、「•」、「*」、「1.」、「2.」等任何列表符號
-   - 使用完整的句子段落，每個建議寫成一段完整的話
-   - 建議之間用一個空行分隔
-   - 每個建議都是獨立的段落，不要編號或加符號
-5. **長度**：總字數嚴格控制在 150 字以內。
-6. **如果差異很少**：就說「做得很好！程式碼架構很完整。」
-7. **語言**：僅使用繁體中文。
+**⚠️ 絕對限制（違反將視為無效輸出）**：
+1. 總字數：**嚴格限制在 150 字以內**（包含標點符號）
+2. 格式：**絕對禁止**使用任何符號：-、•、*、1.、2.、3. 等
+3. 風格：每個建議寫成完整句子，用空行分隔，不編號
 
-請僅輸出建議文字，不要包含任何標題或額外說明。`;
+**輸出規則**：
+1. **絕對不要**自己重新分析題目或給出完整答案
+2. **只根據**上方的「發現的差異」來產生提示
+3. **對比理想程式碼**，用引導式問句指出學生缺少了什麼，例如「是不是少了計算階乘的函數？」
+4. **字數檢查**：完成後請自行確認總字數 ≤ 150 字
+5. **如果差異很少**：就說「做得很好！程式碼架構很完整。」（限 20 字內）
+6. **語言**：僅使用繁體中文
+
+請僅輸出建議文字，不要包含任何標題、字數統計或額外說明。`;
 
   try {
     const feedback = await generateContent(prompt);
-    return feedback;
+
+    // ========== 字數驗證與截斷 ==========
+    const charCount = feedback.length;
+    console.log(`📏 AI 回應字數: ${charCount} 字`);
+
+    let finalFeedback = feedback;
+    if (charCount > 150) {
+      console.warn(`⚠️ 超過限制！原始 ${charCount} 字，將截斷至 150 字`);
+      finalFeedback = feedback.substring(0, 147) + "...";
+      console.log(`✂️ 截斷後: ${finalFeedback.length} 字`);
+    }
+
+    // 移除任何意外的列表符號
+    finalFeedback = finalFeedback
+      .replace(/^[\-\•\*]\s*/gm, "") // 移除行首符號
+      .replace(/^\d+\.\s*/gm, "") // 移除數字編號
+      .replace(/\n{3,}/g, "\n\n"); // 統一空行為兩個換行
+
+    console.log("✅ 程式碼反饋字數:", finalFeedback.length, "字");
+    return finalFeedback;
   } catch (error) {
     console.error("生成程式碼反饋失敗:", error);
-    return `程式碼分析完成，總分為 ${scores.overall} 分。${
-      diffs.syntaxErrors.length > 0 ? "建議檢查語法問題。" : ""
-    }${diffs.logicErrors.length > 0 ? "建議改善程式邏輯。" : ""}${
-      diffs.runtimeWarnings.length > 0 ? "建議注意執行時的潛在問題。" : ""
-    }`;
+
+    const tips = [];
+    if (diffs.syntaxErrors.length > 0) {
+      tips.push("語法的部分可以再檢查一下");
+    }
+    if (diffs.logicErrors.length > 0) {
+      tips.push("是不是少了某些邏輯判斷");
+    }
+    if (diffs.runtimeWarnings.length > 0) {
+      tips.push("執行時可能會遇到一些問題");
+    }
+
+    if (tips.length === 0) {
+      return "做得很好！程式碼架構很完整。";
+    }
+
+    // 確保不超過 150 字
+    const scoreText = `程式碼分析完成總分為 ${scores.overall} 分`;
+    let tipsText = tips.slice(0, 2).join("\n\n"); // 最多兩個提示
+
+    return `${scoreText}\n\n${tipsText}`;
+  }
+}
+
+/**
+ * 生成程式碼檢查報告（≤150字）
+ * 用於「檢查」按鈕，列出具體問題點
+ */
+export async function generateCodeCheckReport(diffs, language = "python") {
+  const prompt = `你是 ${language} 程式教學專家。請根據以下程式碼比對結果，生成一份簡潔的檢查報告，列出學生作答中的具體問題點。
+
+比對結果：
+- 語法錯誤：${JSON.stringify(diffs.syntaxErrors || [])}
+- 邏輯錯誤：${JSON.stringify(diffs.logicErrors || [])}
+- 執行警告：${JSON.stringify(diffs.runtimeWarnings || [])}
+- 缺少功能：${JSON.stringify(diffs.missingFeatures || [])}
+- 缺少控制流：${JSON.stringify(diffs.missingControlFlow || [])}
+
+請生成格式如下（**每個問題類別獨立一行，類別之間用換行分隔**）：
+語法錯誤：第 5 行缺少冒號
+
+邏輯錯誤：條件判斷應使用 == 而非 =
+
+缺少功能：輸入驗證、錯誤處理
+
+要求：
+1. 只列出有問題的項目，沒問題的不要提及
+2. 使用自然語言描述具體問題
+3. **每個問題類別後面必須加上換行（\n）**
+4. 總字數：嚴格限制在 150 字以內
+5. 如果沒有任何問題，回覆：✅ 太棒了！程式碼沒有發現任何問題！`;
+
+  try {
+    const result = await generateContent(prompt);
+    let checkReport = result.trim();
+
+    // 驗證字數
+    const charCount = checkReport.length;
+    console.log("✅ 程式碼檢查報告字數:", charCount, "字");
+
+    // 強制截斷超過 150 字的內容
+    if (charCount > 150) {
+      console.warn("⚠️ 檢查報告超過 150 字，進行截斷");
+      checkReport = checkReport.substring(0, 147) + "...";
+    }
+
+    return checkReport;
+  } catch (error) {
+    console.error("生成程式碼檢查報告失敗:", error);
+
+    // 降級方案：使用簡單列表
+    const issues = [];
+    if (diffs.syntaxErrors?.length > 0) {
+      issues.push(`語法錯誤：${diffs.syntaxErrors.join("、")}`);
+    }
+    if (diffs.logicErrors?.length > 0) {
+      issues.push(`邏輯錯誤：${diffs.logicErrors.join("、")}`);
+    }
+    if (diffs.runtimeWarnings?.length > 0) {
+      issues.push(`執行警告：${diffs.runtimeWarnings.join("、")}`);
+    }
+    if (diffs.missingFeatures?.length > 0) {
+      issues.push(`缺少功能：${diffs.missingFeatures.join("、")}`);
+    }
+    if (diffs.missingControlFlow?.length > 0) {
+      issues.push(`缺少控制流：${diffs.missingControlFlow.join("、")}`);
+    }
+
+    if (issues.length === 0) {
+      return "✅ 太棒了！程式碼沒有發現任何問題！";
+    }
+
+    const report = issues.join("\n");
+    return report.length > 150 ? report.substring(0, 147) + "..." : report;
   }
 }

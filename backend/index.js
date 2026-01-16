@@ -34,16 +34,19 @@ import {
   normalizeFlowSpec,
   compareFlowSpecs,
   generateFeedbackText,
+  generateCheckReport,
 } from "./services/flowSpecService.js";
 import {
   generateIdealPseudocode,
   comparePseudocode,
   generatePseudocodeFeedback,
+  generatePseudocodeCheckReport,
 } from "./services/pseudocodeService.js";
 import {
   generateIdealCode,
   compareCode,
   generateCodeFeedback,
+  generateCodeCheckReport,
 } from "./services/codeService.js";
 import fsSync from "fs";
 
@@ -625,13 +628,24 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
       scores
     );
 
+    // 4.5) 產生檢查報告（用於「檢查」按鈕）
+    const checkReport = await generateCheckReport(diffs);
+
+    // 4.6) 計算百分制分數和完成狀態
+    const percentScore = scores.overall || 0;
+    const isCompleted = percentScore >= 70;
+
     // 5) 寫回 Submission（保留你現有 stage1 結構，擴充比對結果）
     const update = {
       $set: {
         "stages.stage1.flowSpec": studentSpec,
+        "stages.stage1.score": percentScore,
         "stages.stage1.scores": scores,
         "stages.stage1.diffs": diffs,
         "stages.stage1.feedback": feedback,
+        "stages.stage1.checkReport": checkReport,
+        "stages.stage1.completed": isCompleted,
+        "stages.stage1.feedbackLength": feedback.length,
         "stages.stage1.updatedAt": new Date(),
         idealVersion: ideal.version || "v1",
         studentName: studentDoc.name ?? null,
@@ -650,7 +664,14 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
       { new: true, upsert: true }
     );
 
-    res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
+    res.json({
+      success: true,
+      scores,
+      diffs,
+      feedback,
+      checkReport,
+      submissionId: doc._id,
+    });
   } catch (err) {
     console.error("stage1/compare error:", err);
     res.status(500).json({ success: false, error: err.message });
@@ -671,42 +692,119 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
 
     // 取得題目內容
     let questionText = "";
+    console.log("🔍 [Stage2 DEBUG] questionId:", questionId);
+    console.log(
+      "🔍 [Stage2 DEBUG] 是否為 ObjectId:",
+      mongoose.isValidObjectId(questionId)
+    );
+
     if (mongoose.isValidObjectId(questionId)) {
       const q = await Question.findById(questionId).lean();
+      console.log("🔍 [Stage2 DEBUG] 查詢結果 (by ID):", q);
       questionText = q?.description || q?.questionTitle || "";
     } else {
       const q = await Question.findOne({ questionTitle: questionId }).lean();
+      console.log("🔍 [Stage2 DEBUG] 查詢結果 (by Title):", q);
       questionText = q?.description || q?.questionTitle || "";
     }
+    console.log("🔍 [Stage2 DEBUG] 最終 questionText:", questionText);
 
     // 1) 取得或生成理想虛擬碼
     let ideal = await IdealAnswer.findOne({
       questionId: String(questionId),
     });
 
-    if (!ideal || !ideal.pseudocode) {
+    // 檢查是否需要重新生成：沒有理想答案、沒有虛擬碼、或虛擬碼包含錯誤訊息或 fallback 值
+    const needsRegenerationStage2 =
+      !ideal ||
+      !ideal.pseudocode ||
+      ideal.pseudocode.includes("錯誤") ||
+      ideal.pseudocode.includes("未提供") ||
+      ideal.pseudocode.includes("error") ||
+      ideal.pseudocode.includes("Error") ||
+      ideal.pseudocode.includes("根據題目生成的虛擬碼") || // fallback 值檢測
+      ideal.pseudocode.includes("請根據題意撰寫虛擬碼"); // fallback 值檢測
+
+    if (needsRegenerationStage2) {
       console.log("生成新的理想虛擬碼...");
+      console.log(
+        "原因:",
+        !ideal
+          ? "無理想答案"
+          : !ideal.pseudocode
+          ? "無虛擬碼"
+          : "虛擬碼包含錯誤訊息"
+      );
+
+      // 確保有有效的題目文字
+      if (!questionText || questionText === "請根據題意撰寫虛擬碼") {
+        console.warn(
+          "⚠️ questionText 無效或為 fallback 值，嘗試從 Question 資料表重新取得"
+        );
+        // 再次嘗試從資料庫取得題目
+        if (mongoose.isValidObjectId(questionId)) {
+          const q = await Question.findById(questionId).lean();
+          questionText = q?.description || q?.questionTitle || "";
+          console.log("從 Question (by ID) 取得 questionText:", questionText);
+        } else {
+          const q = await Question.findOne({
+            questionTitle: questionId,
+          }).lean();
+          questionText = q?.description || q?.questionTitle || "";
+          console.log(
+            "從 Question (by Title) 取得 questionText:",
+            questionText
+          );
+        }
+      }
+
+      // 最後檢查：如果 questionText 仍然無效，記錄警告但仍嘗試生成
+      if (!questionText || questionText === "請根據題意撰寫虛擬碼") {
+        console.error("❌ 無法取得有效的題目文字，AI 可能無法生成正確答案");
+      }
+
       const generated = await generateIdealPseudocode(
         questionText || "請根據題意撰寫虛擬碼"
       );
 
-      ideal = await IdealAnswer.findOneAndUpdate(
-        { questionId: String(questionId) },
-        {
-          $set: {
-            pseudocode: generated.pseudocode,
-            pseudocodeStructure: generated.structure,
-            modelUsed: "gemini-2.5-flash",
-            generatedAt: new Date(),
+      // 檢查生成結果是否有效
+      if (
+        generated.pseudocode &&
+        !generated.pseudocode.includes("錯誤") &&
+        !generated.pseudocode.includes("未提供")
+      ) {
+        ideal = await IdealAnswer.findOneAndUpdate(
+          { questionId: String(questionId) },
+          {
+            $set: {
+              pseudocode: generated.pseudocode,
+              pseudocodeStructure: generated.structure,
+              modelUsed: "gemini-2.5-flash",
+              generatedAt: new Date(),
+            },
+            $setOnInsert: {
+              questionId: String(questionId),
+              flowSpec: {},
+              version: "v1",
+            },
           },
-          $setOnInsert: {
-            questionId: String(questionId),
-            flowSpec: {},
-            version: "v1",
-          },
-        },
-        { upsert: true, new: true }
-      );
+          { upsert: true, new: true }
+        );
+        console.log("✅ 理想虛擬碼生成並儲存成功");
+      } else {
+        console.error("❌ AI 生成的虛擬碼包含錯誤訊息，使用基本結構繼續比對");
+        // 使用基本的 fallback 結構，不中斷流程
+        if (!ideal) {
+          ideal = {
+            pseudocodeStructure: {
+              variables: [],
+              conditions: [],
+              loops: [],
+              logicFlow: [],
+            },
+          };
+        }
+      }
     }
 
     // 2) 比對虛擬碼
@@ -727,13 +825,24 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
       scores
     );
 
+    // 3.5) 產生檢查報告（用於「檢查」按鈕）
+    const checkReport = await generatePseudocodeCheckReport(diffs);
+
+    // 3.6) 計算完成狀態（scores.overall 已經是 0-100）
+    const percentScore = scores.overall;
+    const isCompleted = percentScore >= 70;
+
     // 4) 寫回 Submission
     const update = {
       $set: {
         "stages.stage2.pseudocode": pseudocode,
+        "stages.stage2.score": percentScore,
         "stages.stage2.scores": scores,
         "stages.stage2.diffs": diffs,
         "stages.stage2.feedback": feedback,
+        "stages.stage2.checkReport": checkReport,
+        "stages.stage2.completed": isCompleted,
+        "stages.stage2.feedbackLength": feedback.length,
         "stages.stage2.updatedAt": new Date(),
         studentName: studentDoc.name ?? null,
         studentEmail: studentDoc.email?.toLowerCase() ?? null,
@@ -751,7 +860,14 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
       { new: true, upsert: true }
     );
 
-    res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
+    res.json({
+      success: true,
+      scores,
+      diffs,
+      feedback,
+      checkReport,
+      submissionId: doc._id,
+    });
   } catch (err) {
     console.error("stage2/compare error:", err);
     res.status(500).json({ success: false, error: err.message });
@@ -785,31 +901,102 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
       questionId: String(questionId),
     });
 
-    if (!ideal || !ideal.code || ideal.language !== language) {
+    // 檢查是否需要重新生成：沒有理想答案、沒有程式碼、語言不符、或程式碼包含錯誤訊息或 fallback 值
+    const needsRegenerationStage3 =
+      !ideal ||
+      !ideal.code ||
+      ideal.language !== language ||
+      ideal.code.includes("錯誤") ||
+      ideal.code.includes("未提供") ||
+      ideal.code.includes("error") ||
+      ideal.code.includes("Error") ||
+      ideal.code.includes("根據題目生成的程式碼") || // fallback 值檢測
+      ideal.code.includes("請根據題意撰寫程式碼"); // fallback 值檢測
+
+    if (needsRegenerationStage3) {
       console.log(`生成新的理想 ${language} 程式碼...`);
+      console.log(
+        "原因:",
+        !ideal
+          ? "無理想答案"
+          : !ideal.code
+          ? "無程式碼"
+          : ideal.language !== language
+          ? `語言不符(${ideal.language} vs ${language})`
+          : "程式碼包含錯誤訊息"
+      );
+
+      // 確保有有效的題目文字
+      if (!questionText || questionText === "請根據題意撰寫程式碼") {
+        console.warn(
+          "⚠️ questionText 無效或為 fallback 值，嘗試從 Question 資料表重新取得"
+        );
+        // 再次嘗試從資料庫取得題目
+        if (mongoose.isValidObjectId(questionId)) {
+          const q = await Question.findById(questionId).lean();
+          questionText = q?.description || q?.questionTitle || "";
+          console.log("從 Question (by ID) 取得 questionText:", questionText);
+        } else {
+          const q = await Question.findOne({
+            questionTitle: questionId,
+          }).lean();
+          questionText = q?.description || q?.questionTitle || "";
+          console.log(
+            "從 Question (by Title) 取得 questionText:",
+            questionText
+          );
+        }
+      }
+
+      // 最後檢查：如果 questionText 仍然無效，記錄警告但仍嘗試生成
+      if (!questionText || questionText === "請根據題意撰寫程式碼") {
+        console.error("❌ 無法取得有效的題目文字，AI 可能無法生成正確答案");
+      }
+
       const generated = await generateIdealCode(
         questionText || "請根據題意撰寫程式碼",
         language
       );
 
-      ideal = await IdealAnswer.findOneAndUpdate(
-        { questionId: String(questionId) },
-        {
-          $set: {
-            code: generated.code,
-            language: language,
-            codeStructure: generated.structure,
-            modelUsed: "gemini-2.5-flash",
-            generatedAt: new Date(),
+      // 檢查生成結果是否有效
+      if (
+        generated.code &&
+        !generated.code.includes("錯誤") &&
+        !generated.code.includes("未提供")
+      ) {
+        ideal = await IdealAnswer.findOneAndUpdate(
+          { questionId: String(questionId) },
+          {
+            $set: {
+              code: generated.code,
+              language: language,
+              codeStructure: generated.structure,
+              modelUsed: "gemini-2.5-flash",
+              generatedAt: new Date(),
+            },
+            $setOnInsert: {
+              questionId: String(questionId),
+              flowSpec: {},
+              version: "v1",
+            },
           },
-          $setOnInsert: {
-            questionId: String(questionId),
-            flowSpec: {},
-            version: "v1",
-          },
-        },
-        { upsert: true, new: true }
-      );
+          { upsert: true, new: true }
+        );
+        console.log(`✅ 理想 ${language} 程式碼生成並儲存成功`);
+      } else {
+        console.error("❌ AI 生成的程式碼包含錯誤訊息，使用基本結構繼續比對");
+        // 使用基本的 fallback 結構，不中斷流程
+        if (!ideal) {
+          ideal = {
+            codeStructure: {
+              functions: [],
+              variables: [],
+              controlFlow: [],
+              expectedOutput: "",
+            },
+          };
+        }
+      }
     }
 
     // 2) 比對程式碼
@@ -832,14 +1019,25 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
       language
     );
 
+    // 3.5) 產生檢查報告（用於「檢查」按鈕）
+    const checkReport = await generateCodeCheckReport(diffs, language);
+
+    // 3.6) 計算完成狀態（scores.overall 已經是 0-100）
+    const percentScore = scores.overall;
+    const isCompleted = percentScore >= 70;
+
     // 4) 寫回 Submission
     const update = {
       $set: {
         "stages.stage3.code": code,
         "stages.stage3.language": language,
+        "stages.stage3.score": percentScore,
         "stages.stage3.scores": scores,
         "stages.stage3.diffs": diffs,
         "stages.stage3.feedback": feedback,
+        "stages.stage3.checkReport": checkReport,
+        "stages.stage3.completed": isCompleted,
+        "stages.stage3.feedbackLength": feedback.length,
         "stages.stage3.updatedAt": new Date(),
         studentName: studentDoc.name ?? null,
         studentEmail: studentDoc.email?.toLowerCase() ?? null,
@@ -857,7 +1055,14 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
       { new: true, upsert: true }
     );
 
-    res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
+    res.json({
+      success: true,
+      scores,
+      diffs,
+      feedback,
+      checkReport,
+      submissionId: doc._id,
+    });
   } catch (err) {
     console.error("stage3/compare error:", err);
     res.status(500).json({ success: false, error: err.message });

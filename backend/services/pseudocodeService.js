@@ -173,8 +173,7 @@ export async function generatePseudocodeFeedback(
 ) {
   const prompt = `你是一位非常簡潔的國中程式設計助教。你的任務是根據「理想虛擬碼」和「學生虛擬碼」的比對結果，用繁體中文提供引導式建議。
 
-**題目**：
-${questionText}
+**題目**：${questionText}
 
 **理想虛擬碼（標準答案）**：
 ${ideal.pseudocode}
@@ -216,30 +215,138 @@ ${
     : ""
 }
 
-**輸出規則（必須嚴格遵守）**：
-1. **絕對不要**自己重新分析題目或給出完整答案。
-2. **只根據**上方的「發現的差異」來產生提示。
-3. **對比理想虛擬碼**，用引導式問句指出學生缺少了什麼，例如「是不是少了計算階乘的邏輯？」或「可以思考看看需要哪些變數來儲存結果」。
-4. **格式規範（極為重要）**：
-   - 絕對禁止使用任何符號：不可使用「-」、「•」、「*」、「1.」、「2.」等任何列表符號
-   - 使用完整的句子段落，每個建議寫成一段完整的話
-   - 建議之間用一個空行分隔
-   - 每個建議都是獨立的段落，不要編號或加符號
-5. **長度**：總字數嚴格控制在 150 字以內。
-6. **如果差異很少**：就說「做得很好！虛擬碼架構很完整。」
-7. **語言**：僅使用繁體中文。
+**⚠️ 絕對限制（違反將視為無效輸出）**：
+1. 總字數：**嚴格限制在 150 字以內**（包含標點符號）
+2. 格式：**絕對禁止**使用任何符號：-、•、*、1.、2.、3. 等
+3. 風格：每個建議寫成完整句子，用空行分隔，不編號
 
-請僅輸出建議文字，不要包含任何標題或額外說明。`;
+**輸出規則**：
+1. **絕對不要**自己重新分析題目或給出完整答案
+2. **只根據**上方的「發現的差異」來產生提示
+3. **對比理想虛擬碼**，用引導式問句指出學生缺少了什麼，例如「是不是少了計算階乘的邏輯？」
+4. **字數檢查**：完成後請自行確認總字數 ≤ 150 字
+5. **如果差異很少**：就說「做得很好！虛擬碼架構很完整。」（限 20 字內）
+6. **語言**：僅使用繁體中文
+
+請僅輸出建議文字，不要包含任何標題、字數統計或額外說明。`;
 
   try {
     const feedback = await generateContent(prompt);
-    return feedback;
+
+    // ========== 字數驗證與截斷 ==========
+    const charCount = feedback.length;
+    console.log(`📏 AI 回應字數: ${charCount} 字`);
+
+    let finalFeedback = feedback;
+    if (charCount > 150) {
+      console.warn(`⚠️ 超過限制！原始 ${charCount} 字，將截斷至 150 字`);
+      finalFeedback = feedback.substring(0, 147) + "...";
+      console.log(`✂️ 截斷後: ${finalFeedback.length} 字`);
+    }
+
+    // 移除任何意外的列表符號
+    finalFeedback = finalFeedback
+      .replace(/^[\-\•\*]\s*/gm, "") // 移除行首符號
+      .replace(/^\d+\.\s*/gm, "") // 移除數字編號
+      .replace(/\n{3,}/g, "\n\n"); // 統一空行為兩個換行
+
+    console.log("✅ 虛擬碼反饋字數:", finalFeedback.length, "字");
+    return finalFeedback;
   } catch (error) {
     console.error("生成虛擬碼反饋失敗:", error);
-    return `虛擬碼分析完成，總分為 ${scores.overall} 分。${
-      diffs.missingLogic.length > 0 ? "建議加強邏輯流程的完整性。" : ""
-    }${diffs.missingVariables.length > 0 ? "建議檢查變數的使用。" : ""}${
-      diffs.structureIssues.length > 0 ? "建議改善程式結構。" : ""
-    }`;
+
+    const tips = [];
+    if (diffs.missingLogic.length > 0) {
+      tips.push("可以思考看看邏輯流程是否完整");
+    }
+    if (diffs.missingVariables.length > 0) {
+      tips.push("是不是少了某些重要的變數");
+    }
+    if (diffs.structureIssues.length > 0) {
+      tips.push("虛擬碼的開頭結尾標記需要留意");
+    }
+
+    if (tips.length === 0) {
+      return "做得很好！虛擬碼架構很完整。";
+    }
+
+    // 確保不超過 150 字
+    const scoreText = `虛擬碼分析完成總分為 ${scores.overall} 分`;
+    let tipsText = tips.slice(0, 2).join("\n\n"); // 最多兩個提示
+
+    return `${scoreText}\n\n${tipsText}`;
+  }
+}
+
+/**
+ * 生成虛擬碼檢查報告（≤150字）
+ * 用於「檢查」按鈕，列出具體問題點
+ */
+export async function generatePseudocodeCheckReport(diffs) {
+  const prompt = `你是程式教學專家。請根據以下虛擬碼比對結果，生成一份簡潔的檢查報告，列出學生作答中的具體問題點。
+
+比對結果：
+- 缺少邏輯：${JSON.stringify(diffs.missingLogic || [])}
+- 錯誤條件：${JSON.stringify(diffs.incorrectConditions || [])}
+- 缺少變數：${JSON.stringify(diffs.missingVariables || [])}
+- 缺少迴圈：${JSON.stringify(diffs.missingLoops || [])}
+- 結構問題：${JSON.stringify(diffs.structureIssues || [])}
+
+請生成格式如下（**每個問題類別獨立一行，類別之間用換行分隔**）：
+缺少邏輯：輸入驗證、結果輸出
+
+錯誤條件：迴圈條件應為 < 而非 <=
+
+缺少變數：counter、sum
+
+要求：
+1. 只列出有問題的項目，沒問題的不要提及
+2. 使用自然語言描述具體問題
+3. **每個問題類別後面必須加上換行（\n）**
+4. 總字數：嚴格限制在 150 字以內
+5. 如果沒有任何問題，回覆：✅ 太棒了！虛擬碼沒有發現任何問題！`;
+
+  try {
+    const result = await generateContent(prompt);
+    let checkReport = result.trim();
+
+    // 驗證字數
+    const charCount = checkReport.length;
+    console.log("✅ 虛擬碼檢查報告字數:", charCount, "字");
+
+    // 強制截斷超過 150 字的內容
+    if (charCount > 150) {
+      console.warn("⚠️ 檢查報告超過 150 字，進行截斷");
+      checkReport = checkReport.substring(0, 147) + "...";
+    }
+
+    return checkReport;
+  } catch (error) {
+    console.error("生成虛擬碼檢查報告失敗:", error);
+
+    // 降級方案：使用簡單列表
+    const issues = [];
+    if (diffs.missingLogic?.length > 0) {
+      issues.push(`缺少邏輯：${diffs.missingLogic.join("、")}`);
+    }
+    if (diffs.incorrectConditions?.length > 0) {
+      issues.push(`錯誤條件：${diffs.incorrectConditions.join("、")}`);
+    }
+    if (diffs.missingVariables?.length > 0) {
+      issues.push(`缺少變數：${diffs.missingVariables.join("、")}`);
+    }
+    if (diffs.missingLoops?.length > 0) {
+      issues.push(`缺少迴圈：${diffs.missingLoops.join("、")}`);
+    }
+    if (diffs.structureIssues?.length > 0) {
+      issues.push(`結構問題：${diffs.structureIssues.join("、")}`);
+    }
+
+    if (issues.length === 0) {
+      return "✅ 太棒了！虛擬碼沒有發現任何問題！";
+    }
+
+    const report = issues.join("\n");
+    return report.length > 150 ? report.substring(0, 147) + "..." : report;
   }
 }

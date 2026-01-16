@@ -47,7 +47,9 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
 
   // *** 輔助函數：根據 stage 準備 payload ***
   const preparePayload = async (stageNum) => {
-    const basePayload = { questionId: question?.questionId || "Q001" };
+    // 直接使用固定的 questionId，不依賴 question prop
+    // 因為從 Stage2Page 和 Stage3Page 傳過來的 question 是字串而非對象
+    const basePayload = { questionId: "Q001" };
 
     if (stageNum === 1) {
       // Stage 1: 流程圖
@@ -212,116 +214,86 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
     return sections.join("\n\n");
   };
 
-  // *** 格式化檢查結果(數字列表) ***
+  // *** 格式化檢查結果摘要（簡潔版本，用於「檢查」按鈕） ***
   const formatCheckResult = (diffs, currentStage) => {
     if (!diffs) return "暫無分析資料";
 
-    let itemNumber = 1;
-    const items = [];
+    const sections = [];
 
     // Stage 1: 流程圖
     if (currentStage === 1) {
-      if (diffs.missingNodes && diffs.missingNodes.length > 0) {
-        diffs.missingNodes.forEach((node) => {
-          items.push(
-            `${itemNumber}. 缺少節點：**${node.type}**${
-              node.label ? ` - ${node.label}` : ""
-            }`
-          );
-          itemNumber++;
-        });
+      const missingNodesCount = diffs.missingNodes?.length || 0;
+      const missingEdgesCount = diffs.missingEdges?.length || 0;
+      const structureIssuesCount = diffs.structureIssues?.length || 0;
+      const logicIssuesCount = diffs.logicIssues?.length || 0;
+
+      if (structureIssuesCount > 0) {
+        sections.push(`**結構問題：** 發現 ${structureIssuesCount} 個問題`);
       }
-      if (diffs.missingEdges && diffs.missingEdges.length > 0) {
-        diffs.missingEdges.forEach((edge) => {
-          items.push(
-            `${itemNumber}. 缺少連線：${edge.from} → ${edge.to}${
-              edge.label ? ` (${edge.label})` : ""
-            }`
-          );
-          itemNumber++;
-        });
+      if (missingNodesCount > 0) {
+        sections.push(`**缺少節點：** ${missingNodesCount} 個必要節點`);
       }
-      if (diffs.structureIssues && diffs.structureIssues.length > 0) {
-        diffs.structureIssues.forEach((issue) => {
-          items.push(`${itemNumber}. 結構問題：${issue}`);
-          itemNumber++;
-        });
+      if (missingEdgesCount > 0) {
+        sections.push(`**缺少連線：** ${missingEdgesCount} 條必要連線`);
       }
-      if (diffs.logicIssues && diffs.logicIssues.length > 0) {
-        diffs.logicIssues.forEach((issue) => {
-          items.push(`${itemNumber}. 邏輯問題：${issue}`);
-          itemNumber++;
-        });
+      if (logicIssuesCount > 0) {
+        sections.push(`**邏輯問題：** 發現 ${logicIssuesCount} 個問題`);
       }
     }
     // Stage 2: 虛擬碼
     else if (currentStage === 2) {
-      if (diffs.missingLogic && diffs.missingLogic.length > 0) {
-        diffs.missingLogic.forEach((logic) => {
-          items.push(`${itemNumber}. ${logic}`);
-          itemNumber++;
-        });
+      const missingLogicCount = diffs.missingLogic?.length || 0;
+      const incorrectConditionsCount = diffs.incorrectConditions?.length || 0;
+      const missingVariablesCount = diffs.missingVariables?.length || 0;
+      const missingLoopsCount = diffs.missingLoops?.length || 0;
+      const structureIssuesCount = diffs.structureIssues?.length || 0;
+
+      if (structureIssuesCount > 0) {
+        sections.push(`**結構問題：** 發現 ${structureIssuesCount} 個問題`);
       }
-      if (diffs.incorrectConditions && diffs.incorrectConditions.length > 0) {
-        diffs.incorrectConditions.forEach((cond) => {
-          items.push(`${itemNumber}. 條件問題：${cond}`);
-          itemNumber++;
-        });
+      if (missingLogicCount > 0) {
+        sections.push(`**邏輯步驟：** 缺少 ${missingLogicCount} 個邏輯流程`);
       }
-      if (diffs.missingVariables && diffs.missingVariables.length > 0) {
-        diffs.missingVariables.forEach((v) => {
-          items.push(`${itemNumber}. 建議使用變數：${v}`);
-          itemNumber++;
-        });
+      if (incorrectConditionsCount > 0) {
+        sections.push(`**條件判斷：** 缺少 ${incorrectConditionsCount} 個條件`);
       }
-      if (diffs.missingLoops && diffs.missingLoops.length > 0) {
-        diffs.missingLoops.forEach((loop) => {
-          items.push(`${itemNumber}. 建議使用迴圈：${loop}`);
-          itemNumber++;
-        });
+      if (missingVariablesCount > 0) {
+        sections.push(
+          `**變數宣告：** 缺少 ${missingVariablesCount} 個必要變數`
+        );
       }
-      if (diffs.structureIssues && diffs.structureIssues.length > 0) {
-        diffs.structureIssues.forEach((issue) => {
-          items.push(`${itemNumber}. ${issue}`);
-          itemNumber++;
-        });
+      if (missingLoopsCount > 0) {
+        sections.push(`**迴圈結構：** 缺少 ${missingLoopsCount} 個迴圈`);
       }
     }
     // Stage 3: 程式碼
     else if (currentStage === 3) {
-      if (diffs.syntaxErrors && diffs.syntaxErrors.length > 0) {
-        diffs.syntaxErrors.forEach((err) => {
-          items.push(`${itemNumber}. 語法問題：${err}`);
-          itemNumber++;
-        });
+      const syntaxErrorsCount = diffs.syntaxErrors?.length || 0;
+      const logicErrorsCount = diffs.logicErrors?.length || 0;
+      const runtimeWarningsCount = diffs.runtimeWarnings?.length || 0;
+      const missingFeaturesCount = diffs.missingFeatures?.length || 0;
+      const missingControlFlowCount = diffs.missingControlFlow?.length || 0;
+
+      if (syntaxErrorsCount > 0) {
+        sections.push(`**語法問題：** 發現 ${syntaxErrorsCount} 個語法錯誤`);
       }
-      if (diffs.logicErrors && diffs.logicErrors.length > 0) {
-        diffs.logicErrors.forEach((err) => {
-          items.push(`${itemNumber}. ${err}`);
-          itemNumber++;
-        });
+      if (logicErrorsCount > 0) {
+        sections.push(`**邏輯問題：** 發現 ${logicErrorsCount} 個邏輯錯誤`);
       }
-      if (diffs.runtimeWarnings && diffs.runtimeWarnings.length > 0) {
-        diffs.runtimeWarnings.forEach((warn) => {
-          items.push(`${itemNumber}. 執行時警告：${warn}`);
-          itemNumber++;
-        });
+      if (runtimeWarningsCount > 0) {
+        sections.push(`**執行警告：** ${runtimeWarningsCount} 個潛在問題`);
       }
-      if (diffs.missingFeatures && diffs.missingFeatures.length > 0) {
-        diffs.missingFeatures.forEach((feature) => {
-          items.push(`${itemNumber}. ${feature}`);
-          itemNumber++;
-        });
+      if (missingFeaturesCount > 0) {
+        sections.push(`**缺少功能：** ${missingFeaturesCount} 個必要功能`);
       }
-      if (diffs.missingControlFlow && diffs.missingControlFlow.length > 0) {
-        diffs.missingControlFlow.forEach((cf) => {
-          items.push(`${itemNumber}. ${cf}`);
-          itemNumber++;
-        });
+      if (missingControlFlowCount > 0) {
+        sections.push(
+          `**控制流程：** 缺少 ${missingControlFlowCount} 個流程結構`
+        );
       }
     }
 
-    if (items.length === 0) {
+    if (sections.length === 0) {
       const contentType =
         currentStage === 1
           ? "流程圖"
@@ -331,7 +303,7 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
       return `✅ 太棒了！${contentType}沒有發現任何問題！`;
     }
 
-    return items.join("\n\n");
+    return sections.join("\n\n");
   };
 
   // *** 執行檢查並顯示 AI 建議 ***
@@ -397,9 +369,10 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
       const newHash = getContentHash(stage);
       setLastCheckHash(newHash);
 
-      // 顯示檢查結果（使用 data.diffs 結構化資料）
-      const formattedResult = formatCheckResult(data.diffs, stage);
-      const checkResultText = `## 檢查結果\n\n${formattedResult}\n\n---\n\n有任何問題都可以隨時問我喔！`;
+      // 顯示檢查結果（使用後端生成的 AI 檢查報告）
+      const checkResultText = `## 檢查結果\n\n${
+        data.checkReport || formatCheckResult(data.diffs, stage)
+      }\n\n---\n\n有任何問題都可以隨時問我喔！`;
 
       setMessages((prev) => [
         ...prev.slice(0, -1), // 移除「檢查中」訊息

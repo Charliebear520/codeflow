@@ -9,10 +9,13 @@ const stageSchema_1 = new Schema(
       edges: [Schema.Types.Mixed],
     },
     imageBase64: { type: String, default: null },
-    mode: { type: String, enum: ["upload", "editor"]},
+    mode: { type: String, enum: ["upload", "editor"] },
     completed: { type: Boolean, default: false },
-    score: { type: Number, default: null },
+    score: { type: Number, default: null }, // 總分 (0-100)
+    scores: { type: Schema.Types.Mixed }, // 詳細評分
+    diffs: { type: Schema.Types.Mixed }, // 差異資料
     feedback: { type: String, default: "" },
+    checkReport: { type: String, default: "" }, // 檢查報告
     updatedAt: { type: Date, default: null },
   },
   { _id: false }
@@ -22,8 +25,11 @@ const stageSchema_2 = new Schema(
   {
     pseudocode: { type: String, default: null },
     completed: { type: Boolean, default: false },
-    score: { type: Number, default: null },
+    score: { type: Number, default: null }, // 總分 (0-100)
+    scores: { type: Schema.Types.Mixed }, // 詳細評分
+    diffs: { type: Schema.Types.Mixed }, // 差異資料
     feedback: { type: String, default: "" },
+    checkReport: { type: String, default: "" }, // 檢查報告
     updatedAt: { type: Date, default: null },
   },
   { _id: false }
@@ -32,10 +38,17 @@ const stageSchema_2 = new Schema(
 const stageSchema_3 = new Schema(
   {
     code: { type: String, default: null },
-    language: { type: String, enum: ["python", "javascript", "c", null], default: null },
+    language: {
+      type: String,
+      enum: ["python", "javascript", "c", null],
+      default: null,
+    },
     completed: { type: Boolean, default: false },
-    score: { type: Number, default: null },
+    score: { type: Number, default: null }, // 總分 (0-100)
+    scores: { type: Schema.Types.Mixed }, // 詳細評分
+    diffs: { type: Schema.Types.Mixed }, // 差異資料
     feedback: { type: String, default: "" },
+    checkReport: { type: String, default: "" }, // 檢查報告
     updatedAt: { type: Date, default: null },
   },
   { _id: false }
@@ -43,8 +56,18 @@ const stageSchema_3 = new Schema(
 const submissionSchema = new Schema(
   {
     studentName: { type: String, required: true },
-    studentEmail: { type: String, required: true, lowercase: true, index: true },
-    student: { type: Schema.Types.ObjectId, ref: "Student", required: true, index: true },
+    studentEmail: {
+      type: String,
+      required: true,
+      lowercase: true,
+      index: true,
+    },
+    student: {
+      type: Schema.Types.ObjectId,
+      ref: "Student",
+      required: true,
+      index: true,
+    },
     questionId: { type: String, required: true, index: true },
 
     stages: {
@@ -57,6 +80,9 @@ const submissionSchema = new Schema(
 );
 
 // 一個學生對同一題只會有一筆作答紀錄
-submissionSchema.index({ student: 1, questionId: 1, "stages.stage2": 1, "stages.stage3": 1 }, { unique: true });
+submissionSchema.index(
+  { student: 1, questionId: 1, "stages.stage2": 1, "stages.stage3": 1 },
+  { unique: true }
+);
 
 export default mongoose.model("Submission", submissionSchema);
