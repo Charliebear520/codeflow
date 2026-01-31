@@ -1,56 +1,24 @@
+import React, { useState } from "react";
 import styles from "./StudentsRecordsCard.module.css";
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button, Tag } from 'antd';
 import { useState, useMemo } from "react";
 import StudentAnswerModal from "../StudentAnswerModal";
+import AISummaryModal from "../AISummaryModal/index.jsx";
 
+const StudentsRecordsCard = () => {
+ // 建立控制 AI 總結彈窗的狀態
+  const [isAIModalVisible, setIsAIModalVisible] = useState(false);
 
-function StageRow({ label, done, onView }) {
-  const Icon = done ? CheckOutlined : CloseOutlined;
-  return (
-    <div className={styles.checkbox}>
-      <div className={styles.homeworkText}>{label}</div>
-      <Icon className={done ? styles.CheckOutlined : styles.CloseOutlined} />
-      <Button
-        size="small"
-        className={styles.checkButton}
-        onClick={onView}
-        disabled={!done}
-      >
-        查看
-      </Button>
-    </div>
-  );
-}
+  const showAIModal = () => {
+    setIsAIModalVisible(true);
+  };
 
-const StudentsRecordsCard = ({ student, submission }) => {
-  const [openStage, setOpenStage] = useState(null); // 'stage1' | 'stage2' | 'stage3' | null
-  const s1 = submission?.stages?.stage1 || {};
-  const s2 = submission?.stages?.stage2 || {};
-  const s3 = submission?.stages?.stage3 || {};
+  const handleClose = () => {
+    setIsAIModalVisible(false);
+  };
 
-
-  // 若 completed 還沒寫入，改用「是否有內容」當備援
-  const stage1Done = !!(s1.completed || s1.imageBase64 || s1?.graph?.nodes?.length);
-  const stage2Done = !!(s2.completed || (s2.pseudocode && s2.pseudocode.trim()));
-  const stage3Done = !!(s3.completed || (s3.code && s3.code.trim()));
-
-  // 這邊是completed=true才能查看學生作答紀錄
-  // const stage1Done = !!s1.completed;
-  // const stage2Done = !!s2.completed;
-  // const stage3Done = !!s3.completed;
-
-  const meta = useMemo(
-    () => [
-      { key: "stage1", label: "階段一", done: stage1Done },
-      { key: "stage2", label: "階段二", done: stage2Done },
-      { key: "stage3", label: "階段三", done: stage3Done },
-    ],
-    [stage1Done, stage2Done, stage3Done]
-  );
-  console.log("student:", student);
-  console.log("submission:", submission);
-  return (
+    return (
     <div className={styles.card}>
       <div className={styles.substance}>
         <div className={styles.studentName}>
@@ -82,14 +50,18 @@ const StudentsRecordsCard = ({ student, submission }) => {
         <div className={styles.checkbox}>
           <div className={styles.homeworkText}>階段三</div>
           <CheckOutlined className={styles.CheckOutlined} />
-          <StudentAnswerModal className={styles.checkButton} />
-        </div> */}
-        <Button className={styles.aiButton}>AI總結</Button>
-        <StudentAnswerModal
-          openStage={openStage}
-          onClose={() => setOpenStage(null)}
-          submission={submission}
-          student={student}
+          <StudentAnswerModal className={styles.checkButton}/>
+        </div>
+        {/* AI 總結按鈕：加入 onClick 事件 */}
+        <Button className={styles.aiButton} onClick={showAIModal}>
+          AI總結
+        </Button>
+
+        {/* 引入 AI 總結彈窗元件 */}
+        <AISummaryModal 
+          isVisible={isAIModalVisible} 
+          onClose={handleClose} 
+          studentName="學生 A - 01" // 可以根據 props 傳遞不同學生姓名
         />
       </div>
     </div>

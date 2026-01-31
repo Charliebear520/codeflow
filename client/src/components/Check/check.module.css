@@ -91,10 +91,17 @@
 
 .bubbleLeft {
   background-color: #eff3fd;
-  padding: 12px 16px;
-  border-radius: 2px 16px 16px 16px; /* 左上角稍尖 */
+  padding: 12px 16px 12px 28px; /* 🌟 將左側 padding 從 16px 增加到 28px */
+  border-radius: 2px 16px 16px 16px;
   max-width: 75%;
   color: #333;
+  /* 確保長文字會換行 */
+  word-break: break-word; 
+}
+
+.bubbleLeft ul, .bubbleLeft ol {
+  margin: 8px 0;
+  padding-left: 0; /* 清除瀏覽器預設的 40px padding */
 }
 
 /* 右側訊息（使用者） */
