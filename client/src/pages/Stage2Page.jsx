@@ -8,6 +8,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { resetCheck, setStageFeedback } from "../redux/slices/checkSlice";
+import { EditorProvider } from "../contexts/EditorContext";
 
 import styles from "./Stage2Page.module.css";
 
@@ -62,40 +63,44 @@ export default function Stage2Page() {
   const spans = getColumnSpans();
 
   return (
-    <div className={styles.stage2Container}>
-      <Row>
-        <Col span={spans.left}>
-          <TopicStage2
-            question={question}
-            setQuestion={setQuestion}
-            currentStage={currentStage}
-            setCurrentStage={setCurrentStage}
-          />
-        </Col>
-        <Col span={spans.center} className={styles.centerbackground}>
-          <OnlineCoding
-            question={question}
-            currentStage={currentStage}
-            onFeedback={(fb) => {
-              setFeedback(fb);
-              dispatch(setStageFeedback({ stage: 2, feedback: fb }));
-            }}
-            onChecking={setIsChecking}
-            isExpanded={isExpanded}
-            onToggleExpand={handleToggleExpand}
-            onTutorClick={handleTutorClick}
-          />
-        </Col>
-        {!isExpanded && (
-          <Col span={spans.right} className={styles.fadeIn}>
-            <Check
-              feedback={feedback}
-              isChecking={isChecking}
+    <EditorProvider>
+      <div className={styles.stage2Container}>
+        <Row>
+          <Col span={spans.left}>
+            <TopicStage2
+              question={question}
+              setQuestion={setQuestion}
+              currentStage={currentStage}
+              setCurrentStage={setCurrentStage}
+            />
+          </Col>
+          <Col span={spans.center} className={styles.centerbackground}>
+            <OnlineCoding
+              question={question}
+              currentStage={currentStage}
+              onFeedback={(fb) => {
+                setFeedback(fb);
+                dispatch(setStageFeedback({ stage: 2, feedback: fb }));
+              }}
+              onChecking={setIsChecking}
+              isExpanded={isExpanded}
+              onToggleExpand={handleToggleExpand}
               onTutorClick={handleTutorClick}
             />
           </Col>
-        )}
-      </Row>
-    </div>
+          {!isExpanded && (
+            <Col span={spans.right} className={styles.fadeIn}>
+              <Check
+                feedback={feedback}
+                isChecking={isChecking}
+                onTutorClick={handleTutorClick}
+                stage={2}
+                question={question}
+              />
+            </Col>
+          )}
+        </Row>
+      </div>
+    </EditorProvider>
   );
 }

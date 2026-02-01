@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { resetCheck, setStageFeedback } from "../redux/slices/checkSlice";
+import { EditorProvider } from "../contexts/EditorContext";
 
 export default function Stage3Page() {
   // 題目從 localStorage 取得，若無則用預設
@@ -40,36 +41,40 @@ export default function Stage3Page() {
   }, [savedStage3Feedback]);
 
   return (
-    <div>
-      <Row>
-        <Col span={6}>
-          <TopicStage3
-            question={question}
-            currentStage={currentStage}
-            setCurrentStage={setCurrentStage}
-          />
-        </Col>
-        <Col span={12}>
-          <OnlineCoding
-            question={question}
-            onFeedback={(fb) => {
-              setFeedback(fb);
-              dispatch(setStageFeedback({ stage: 3, feedback: fb }));
-            }}
-            onChecking={setIsChecking}
-            isExpanded={false}
-            onToggleExpand={() => {}}
-            onTutorClick={handleTutorClick}
-          />
-        </Col>
-        <Col span={6}>
-          <Check
-            feedback={feedback}
-            isChecking={isChecking}
-            onTutorClick={handleTutorClick}
-          />
-        </Col>
-      </Row>
-    </div>
+    <EditorProvider>
+      <div>
+        <Row>
+          <Col span={6}>
+            <TopicStage3
+              question={question}
+              currentStage={currentStage}
+              setCurrentStage={setCurrentStage}
+            />
+          </Col>
+          <Col span={12}>
+            <OnlineCoding
+              question={question}
+              onFeedback={(fb) => {
+                setFeedback(fb);
+                dispatch(setStageFeedback({ stage: 3, feedback: fb }));
+              }}
+              onChecking={setIsChecking}
+              isExpanded={false}
+              onToggleExpand={() => {}}
+              onTutorClick={handleTutorClick}
+            />
+          </Col>
+          <Col span={6}>
+            <Check
+              feedback={feedback}
+              isChecking={isChecking}
+              onTutorClick={handleTutorClick}
+              stage={3}
+              question={question}
+            />
+          </Col>
+        </Row>
+      </div>
+    </EditorProvider>
   );
 }

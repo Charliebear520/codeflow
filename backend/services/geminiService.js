@@ -21,13 +21,37 @@ const getGenAI = () => {
   return genAI;
 };
 
+// 匯出 getGenAI 供其他服務使用
+export { getGenAI };
+
+/**
+ * 通用的 Gemini 內容生成函數
+ * @param {string} prompt - 提示詞
+ * @param {string} modelName - 模型名稱，預設為 "gemini-2.5-flash"
+ * @returns {Promise<string>} - 生成的文字內容
+ */
+export const generateContent = async (
+  prompt,
+  modelName = "gemini-2.5-flash"
+) => {
+  try {
+    const model = getGenAI().getGenerativeModel({ model: modelName });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("Error in generateContent:", error);
+    throw error;
+  }
+};
+
 // 第一階段：生成流程圖題目
 export const generateFlowchartQuestion = async () => {
   try {
     console.log("Generating flowchart question...");
 
     // 使用 gemini模型
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "Gemini 2.5 Flash" });
 
     const prompt = `你是一位專業的中文教育題目生成器，請**嚴格遵守**以下要求。
 
@@ -63,8 +87,8 @@ export const generateFlowchartHint = async (question, hintLevel) => {
   try {
     console.log(`Generating flowchart hint... Level: ${hintLevel}`);
 
-    // 使用 gemini-2.0-flash 模型
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    // 使用 Gemini 2.5 Flash 模型
+    const model = getGenAI().getGenerativeModel({ model: "Gemini 2.5 Flash" });
 
     // 根據不同層級生成不同的提示
     const promptBase = `基於以下流程圖題目：「${question}」
@@ -144,7 +168,7 @@ export const checkFlowchart = async (imageData, question) => {
       throw new Error("No image data provided");
     }
 
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getGenAI().getGenerativeModel({ model: "Gemini 2.5 Flash" });
 
     const prompt = `
 你是一位非常簡潔的國中程式設計助教。請根據這張流程圖圖片，針對下方題目，用繁體中文提供 3-5 點簡短的引導式建議。
@@ -184,7 +208,7 @@ export const checkFlowchart = async (imageData, question) => {
 
 // 第二階段：生成PseudoCode
 export const generatePseudoCode = async (prompt) => {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "Gemini 2.5 Flash" });
   const result = await model.generateContent(prompt);
   const response = await result.response;
   let text = response.text();
@@ -205,27 +229,49 @@ export const generatePseudoCode = async (prompt) => {
 // 第二階段：檢查PseudoCode
 export const checkPseudoCode = async (question, userPseudoCode) => {
   try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
-    const prompt = `你是一位專業的繁體中文程式教學助教。請**嚴格遵守**以下要求
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const prompt = `你是一位非常簡潔的國中程式設計助教。請幫學生檢查虛擬碼並提供簡短的引導式建議。
 
-    **檢查資料：**確認學生所撰寫的虛擬碼（pseudocode）與題目的差異。
-    **核心任務：**生成修改建議給學生，使學生能夠確認錯誤或問題並改進其虛擬碼。
-    **語言要求：**必須且只能使用**繁體中文**。
----
 題目：${question}
----
+
 學生虛擬碼：
 ${userPseudoCode}
----
-請依下列格式回覆：
-1. 邏輯正確性：[簡要評語]
-2. 語意完整性：[簡要評語]
-3. 改進建議：[具體建議]
 
-請勿直接給出完整答案，請以引導為主。`;
+**⚠️ 絕對限制（違反將視為無效輸出）**：
+1. 總字數：**嚴格限制在 150 字以內**（包含標點符號）
+2. 格式：**絕對禁止**使用任何符號：-、•、*、1.、2.、3. 等
+3. 風格：每個建議寫成完整句子，用空行分隔，不編號
+
+**輸出規則**：
+1. **絕對不要**給出完整答案或重新撰寫虛擬碼
+2. 用引導式問句指出可能的問題，例如「是不是少了...？」或「可以思考看看...」
+3. **字數檢查**：完成後請自行確認總字數 ≤ 150 字
+4. **如果寫得很好**：就說「做得很好！虛擬碼架構很完整。」（限 20 字內）
+5. **語言**：僅使用繁體中文
+
+請僅輸出建議文字，不要包含任何標題、字數統計或額外說明。`;
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text().trim();
+    let feedback = response.text().trim();
+
+    // ========== 字數驗證與截斷 ==========
+    const charCount = feedback.length;
+    console.log(`📏 checkPseudoCode AI 回應字數: ${charCount} 字`);
+
+    if (charCount > 150) {
+      console.warn(`⚠️ 超過限制！原始 ${charCount} 字，將截斷至 150 字`);
+      feedback = feedback.substring(0, 147) + "...";
+      console.log(`✂️ 截斷後: ${feedback.length} 字`);
+    }
+
+    // 移除任何意外的列表符號
+    feedback = feedback
+      .replace(/^[\-\•\*]\s*/gm, "") // 移除行首符號
+      .replace(/^\d+\.\s*/gm, "") // 移除數字編號
+      .replace(/\n{3,}/g, "\n\n"); // 統一空行為兩個換行
+
+    console.log("✅ checkPseudoCode 最終反饋字數:", feedback.length, "字");
+    return feedback;
   } catch (error) {
     console.error("Error checking pseudocode:", error);
     throw new Error(`Gemini API pseudocode check error: ${error.message}`);
@@ -235,28 +281,56 @@ ${userPseudoCode}
 // 第三階段：檢查Code
 export const checkCode = async (question, code, language) => {
   try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
-    const prompt = `你是一位專業的繁體中文程式教學助教。請**嚴格遵守**以下要求
+    const model = getGenAI().getGenerativeModel({ model: "Gemini 2.5 Flash" });
+    const languageMap = {
+      python: "Python",
+      javascript: "JavaScript",
+      c: "C",
+    };
+    const langName = languageMap[language] || language;
 
-    **檢查資料：**確認學生所撰寫的程式碼的語法、邏輯與結構。
-    **核心任務：**生成修改建議給學生，使學生能夠確認錯誤或問題並改進其程式碼。
-    **語言要求：**必須且只能使用**繁體中文**。
+    const prompt = `你是一位非常簡潔的國中 ${langName} 程式設計助教。請幫學生檢查程式碼並提供簡短的引導式建議。
 
----
 題目：${question}
----
-學生程式碼（語言：${language}）：
-${code}
----
-請依下列格式回覆：
-1. 語法正確性：[簡要評語]
-2. 邏輯完整性：[簡要評語]
-3. 改進建議：[具體建議]
 
-請勿直接給出完整答案，請以引導為主。`;
+學生程式碼（語言：${langName}）：
+${code}
+
+**⚠️ 絕對限制（違反將視為無效輸出）**：
+1. 總字數：**嚴格限制在 150 字以內**（包含標點符號）
+2. 格式：**絕對禁止**使用任何符號：-、•、*、1.、2.、3. 等
+3. 風格：每個建議寫成完整句子，用空行分隔，不編號
+
+**輸出規則**：
+1. **絕對不要**給出完整答案或重新撰寫程式碼
+2. 用引導式問句指出可能的問題，例如「是不是少了...？」或「可以思考看看...」
+3. **字數檢查**：完成後請自行確認總字數 ≤ 150 字
+4. **如果寫得很好**：就說「做得很好！程式碼架構很完整。」（限 20 字內）
+5. **語言**：僅使用繁體中文
+
+請僅輸出建議文字，不要包含任何標題、字數統計或額外說明。`;
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text().trim();
+    let feedback = response.text().trim();
+
+    // ========== 字數驗證與截斷 ==========
+    const charCount = feedback.length;
+    console.log(`📏 checkCode AI 回應字數: ${charCount} 字`);
+
+    if (charCount > 150) {
+      console.warn(`⚠️ 超過限制！原始 ${charCount} 字，將截斷至 150 字`);
+      feedback = feedback.substring(0, 147) + "...";
+      console.log(`✂️ 截斷後: ${feedback.length} 字`);
+    }
+
+    // 移除任何意外的列表符號
+    feedback = feedback
+      .replace(/^[\-\•\*]\s*/gm, "") // 移除行首符號
+      .replace(/^\d+\.\s*/gm, "") // 移除數字編號
+      .replace(/\n{3,}/g, "\n\n"); // 統一空行為兩個換行
+
+    console.log("✅ checkCode 最終反饋字數:", feedback.length, "字");
+    return feedback;
   } catch (error) {
     console.error("Error checking code:", error);
     throw new Error(`Gemini API code check error: ${error.message}`);

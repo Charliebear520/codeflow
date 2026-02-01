@@ -214,11 +214,11 @@ function compareFlowSpecs(ideal, student) {
   };
 
   const scores = {
-    structure: Number(structureScore.toFixed(2)),
-    nodes: Number(nodesCoverage.toFixed(2)),
-    edges: Number(edgesCoverage.toFixed(2)),
-    logic: Number(logicScore.toFixed(2)),
-    total: Number(total.toFixed(2)),
+    structure: Math.round(structureScore * 100),
+    nodes: Math.round(nodesCoverage * 100),
+    edges: Math.round(edgesCoverage * 100),
+    logic: Math.round(logicScore * 100),
+    overall: Math.round(total * 100),
   };
 
   return { diffs, scores };
@@ -273,7 +273,7 @@ function mapEditorGraphToFlowSpec(graph = {}, synonyms = DEFAULT_SYNONYMS) {
 
 // 產生理想答案（交由 AI 輸出 JSON，並做基本清洗）
 async function generateIdealFlowSpec(questionText) {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
   const prompt = `
 你是一位流程圖教學助教。請針對題目用 JSON 結構輸出理想流程（嚴格輸出 JSON，不要任何多餘文字）。
 
@@ -309,7 +309,7 @@ ${questionText}
 
 // 自圖片解析學生流程圖（Vision 模型）
 async function parseStudentFlowSpecFromImage(imageBase64, questionText) {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
   const prompt = `
 你是流程圖解析器。請解析圖片中的流程圖，輸出 JSON（節點與連線），標準化決策分支為 yes/no，不要任何多餘文字。若無法判讀，適度推論。
 
@@ -339,49 +339,173 @@ async function parseStudentFlowSpecFromImage(imageBase64, questionText) {
 
 // 產生回饋（AI 優先，失敗則 fallback 模板）
 async function generateFeedbackText(question, ideal, student, diffs, scores) {
+  console.log("🔍 ========== generateFeedbackText DEBUG 開始 ==========");
+  console.log("📥 輸入參數:");
+  console.log("  - diffs:", JSON.stringify(diffs, null, 2));
+  console.log("  - scores:", JSON.stringify(scores, null, 2));
+
   try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
-    const prompt = `
-你是一位非常簡潔的國中程式設計助教。你的任務是根據現有的「比對差異」和「分數」，只用繁體中文提供 3-5 點簡短的引導式建議。
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `你是一位非常簡潔的國中程式設計助教。你的任務是根據現有的「比對差異」和「分數」，只用繁體中文提供簡短的引導式建議。
 
 **輸入資訊**：
 - 比對差異：${JSON.stringify(diffs, null, 2)}
 - 分數：${JSON.stringify(scores, null, 2)}
 
-**輸出規則 (必須嚴格遵守)**：
-1.  **絕對不要** 自己重新分析題目或給出完整答案。
-2.  **只根據** 上方提供的「比對差異」來產生提示。
-3.  **風格**：引導式問句，例如「是不是少了...？」或「可以思考看看...」。
-4.  **格式**：條列式，3-5 點。
-5.  **長度**：總字數嚴格控制在 150 字以內。
-6.  **如果「比對差異」很少或沒有問題**：就說「做得很好，架構很完整！可以再檢查看看細節喔。」
-7.  **語言**：僅使用繁體中文。
+**⚠️ 絕對限制（違反將視為無效輸出）**：
+1. 總字數：**嚴格限制在 150 字以內**（包含標點符號）
+2. 格式：**絕對禁止**使用任何符號：-、•、*、1.、2.、3. 等
+3. 風格：每個建議寫成完整句子，用空行分隔，不編號
 
-請僅輸出建議文字，不要包含任何標題或額外說明。
-`;
+**輸出規則**：
+1. **絕對不要**自己重新分析題目或給出完整答案
+2. **只根據**上方提供的「比對差異」來產生提示
+3. **風格**：引導式問句，例如「是不是少了...？」或「可以思考看看...」
+4. **字數檢查**：完成後請自行確認總字數 ≤ 150 字
+5. **如果差異很少**：就說「做得很好，架構很完整！可以再檢查看看細節喔。」（限 30 字內）
+6. **語言**：僅使用繁體中文
+
+請僅輸出建議文字，不要包含任何標題、字數統計或額外說明。`;
+
+    console.log("📤 發送給 AI 的 Prompt:");
+    console.log("=".repeat(80));
+    console.log(prompt);
+    console.log("=".repeat(80));
+
     const result = await model.generateContent(prompt);
-    return (await result.response).text().trim();
-  } catch {
-    // Fallback：用規則式差異產出簡易回饋
+    let feedback = (await result.response).text().trim();
+
+    // ========== 字數驗證與截斷 ==========
+    const charCount = feedback.length;
+    console.log(`📏 AI 回應字數: ${charCount} 字`);
+
+    if (charCount > 150) {
+      console.warn(`⚠️ 超過限制！原始 ${charCount} 字，將截斷至 150 字`);
+      feedback = feedback.substring(0, 147) + "...";
+      console.log(`✂️ 截斷後: ${feedback.length} 字`);
+    }
+
+    // 移除任何意外的列表符號
+    feedback = feedback
+      .replace(/^[\-\•\*]\s*/gm, "") // 移除行首符號
+      .replace(/^\d+\.\s*/gm, "") // 移除數字編號
+      .replace(/\n{3,}/g, "\n\n"); // 統一空行為兩個換行
+
+    console.log("📨 AI 最終反饋:", feedback);
+    console.log("✅ 字數:", feedback.length, "字");
+    console.log("========== generateFeedbackText 完成 ==========\n");
+
+    return feedback;
+  } catch (error) {
+    // Fallback:用規則式差異產出簡易回饋
+    console.log("\n");
+    console.log("=".repeat(80));
+    console.log("❌ GEMINI API 調用失敗!");
+    console.log("=".repeat(80));
+    console.log("錯誤類型:", error?.name || "未知");
+    console.log("錯誤訊息:", error?.message || "無訊息");
+    console.log("錯誤堆疊:", error?.stack || "無堆疊");
+    console.log("=".repeat(80));
+    console.log("⚠️ 使用 Fallback 模板回應\n");
+
     const tips = [];
     if (diffs.structureIssues?.length) {
-      tips.push(`流程圖的開始和結束都放好了嗎？可以檢查看看喔。`);
+      tips.push(`流程圖的開始和結束都放好了嗎?可以檢查看看喔`);
     }
     if (diffs.missingNodes?.length) {
-      tips.push(`好像少了一些關鍵步驟，試著想想看少了哪些動作？`);
+      tips.push(`好像少了一些關鍵步驟,試著想想看少了哪些動作`);
     }
     if (diffs.missingEdges?.length) {
-      tips.push("箭頭都連對了嗎？檢查一下是不是有漏掉的連線。");
+      tips.push("箭頭都連對了嗎?檢查一下是不是有漏掉的連線");
     }
     if (diffs.logicIssues?.length) {
-      tips.push(`決策節點（菱形）的「是/否」分支是不是都清楚標示了呢？`);
+      tips.push(`決策節點(菱形)的「是/否」分支是不是都清楚標示了呢`);
     }
     if (tips.length === 0) {
-      return "做得很好，架構很完整！可以再檢查看看細節喔。";
+      tips.push("看起來做得很不錯喔,再仔細檢查一下細節");
     }
-    return `你的分數是：${Math.round(
-      scores.total * 100
-    )} 分。\n\n這裡有些小提示，希望能幫助你：\n- ${tips.join("\n- ")}`;
+
+    // 完全移除列表符號,使用段落格式
+    const scoreText = `你的分數是 ${Math.round(scores.total * 100)} 分`;
+    const tipsText = tips.join("\n\n"); // 用空行分隔,不加任何符號
+    return `${scoreText}\n\n這裡有些小提示,希望能幫助你\n\n${tipsText}`;
+  }
+}
+
+/**
+ * 生成流程圖檢查報告（≤150字）
+ * 用於「檢查」按鈕，列出具體問題點
+ */
+async function generateCheckReport(diffs) {
+  const ai = getGenAI();
+  const model = ai.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+
+  const prompt = `你是程式教學專家。請根據以下流程圖比對結果，生成一份簡潔的檢查報告，列出學生作答中的具體問題點。
+
+比對結果：
+- 缺少節點：${JSON.stringify(diffs.missingNodes || [])}
+- 缺少連線：${JSON.stringify(diffs.missingEdges || [])}
+- 結構問題：${JSON.stringify(diffs.structureIssues || [])}
+- 邏輯問題：${JSON.stringify(diffs.logicIssues || [])}
+
+請生成格式如下（**每個問題類別獨立一行，類別之間用換行分隔**）：
+缺少節點：開始、結束節點
+
+缺少連線：判斷節點缺少是或否兩條連線
+
+邏輯問題：連線需要標註是或否
+
+要求：
+1. 只列出有問題的項目，沒問題的不要提及
+2. 使用自然語言描述具體問題
+3. **每個問題類別後面必須加上換行（\n）**
+4. 總字數：嚴格限制在 150 字以內
+5. 如果沒有任何問題，回覆：✅ 太棒了！流程圖沒有發現任何問題！`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    let checkReport = response.text().trim();
+
+    // 驗證字數
+    const charCount = checkReport.length;
+    console.log("✅ 流程圖檢查報告字數:", charCount, "字");
+
+    // 強制截斷超過 150 字的內容
+    if (charCount > 150) {
+      console.warn("⚠️ 檢查報告超過 150 字，進行截斷");
+      checkReport = checkReport.substring(0, 147) + "...";
+    }
+
+    return checkReport;
+  } catch (error) {
+    console.error("生成流程圖檢查報告失敗:", error);
+
+    // 降級方案：使用簡單列表
+    const issues = [];
+    if (diffs.missingNodes?.length > 0) {
+      issues.push(
+        `缺少節點：${diffs.missingNodes
+          .map((n) => n.label || n.type)
+          .join("、")}`
+      );
+    }
+    if (diffs.missingEdges?.length > 0) {
+      issues.push(`缺少連線：${diffs.missingEdges.length} 條必要連線`);
+    }
+    if (diffs.structureIssues?.length > 0) {
+      issues.push(`結構問題：${diffs.structureIssues.join("、")}`);
+    }
+    if (diffs.logicIssues?.length > 0) {
+      issues.push(`邏輯問題：${diffs.logicIssues.join("、")}`);
+    }
+
+    if (issues.length === 0) {
+      return "✅ 太棒了！流程圖沒有發現任何問題！";
+    }
+
+    const report = issues.join("\n");
+    return report.length > 150 ? report.substring(0, 147) + "..." : report;
   }
 }
 
@@ -394,5 +518,6 @@ export {
   generateIdealFlowSpec,
   parseStudentFlowSpecFromImage,
   generateFeedbackText,
+  generateCheckReport,
   summarizeFlowSpec,
 };
