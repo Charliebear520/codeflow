@@ -43,6 +43,11 @@ const initialState = {
     2: null,
     3: null,
   },
+  // 新增：完整比對結果（用於新的檢查流程）
+  scores: null,
+  diffs: null,
+  feedback: null,
+  submissionId: null,
   isChecking: false,
   error: null,
 };
@@ -51,8 +56,21 @@ const checkSlice = createSlice({
   name: "check",
   initialState,
   reducers: {
+    // 新增：設定完整的檢查結果（對應新的比對 API）
+    setCheckResult: (state, action) => {
+      state.scores = action.payload.scores;
+      state.diffs = action.payload.diffs;
+      state.feedback = action.payload.feedback;
+      state.submissionId = action.payload.submissionId;
+      state.isChecking = false;
+      state.error = null;
+    },
     resetCheck: (state) => {
       state.byStage = { 1: null, 2: null, 3: null };
+      state.scores = null;
+      state.diffs = null;
+      state.feedback = null;
+      state.submissionId = null;
       state.isChecking = false;
       state.error = null;
     },
@@ -89,5 +107,6 @@ const checkSlice = createSlice({
   },
 });
 
-export const { resetCheck, resetStage, setStageFeedback } = checkSlice.actions;
+export const { setCheckResult, resetCheck, resetStage, setStageFeedback } =
+  checkSlice.actions;
 export default checkSlice.reducer;

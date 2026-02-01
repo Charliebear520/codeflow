@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button, App, Spin, Splitter, Popover } from "antd";
 import {
   ArrowsAltOutlined,
@@ -71,13 +71,15 @@ const OnlineCoding = ({
   const [runResult, setRunResult] = useState(null); // { stdout, stderr }
   const [runLoading, setRunLoading] = useState(false);
   const [language, setLanguage] = useState("python");
+  const [saving, setSaving] = useState(false); // 新增：檢查/儲存中的狀態，避免多次點擊與 ReferenceError
   const [terminalOutput, setTerminalOutput] = useState([]); // 終端機輸出歷史
   const [terminalInput, setTerminalInput] = useState(""); // 當前輸入
   const [isTerminalActive, setIsTerminalActive] = useState(false); // 終端機是否活躍
   const [processId, setProcessId] = useState(null); // 當前執行的程序ID
+  const flowRef = useRef(null); //取得現在時間，儲存作答時間用的
+  const lastTickRef = useRef(Date.now());
 
   // 新增：儲存中 flag，避免重複點擊 (修正 saving 未定義錯誤)
-  const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const { getToken } = useAuth(); //額外加入
   const API_BASE = import.meta.env.VITE_API_BASE; //額外加入
@@ -147,7 +149,7 @@ const OnlineCoding = ({
   const handleCheck = async () => {
     if (!code || !question) {
       antdMessage.info("請先輸入程式碼與確認題目");
-      return;
+      return false;
     }
     setChecking(true);
     if (onChecking) onChecking(true);
@@ -345,6 +347,13 @@ const OnlineCoding = ({
     ]);
   };
   const HandleSave = async () => {
+    const token = await getToken();
+    let payload = { questionId: "Q001", completed: false };
+    const now = Date.now();
+    const deltaSec = Math.max(0, Math.floor((now - (lastTickRef.current || now)) / 1000));
+    lastTickRef.current = now;
+    payload.durationDeltaSec = deltaSec;
+
     if (saving) return; // 防止重複點擊
     setSaving(true);
     setApiError("");
@@ -410,23 +419,31 @@ const OnlineCoding = ({
         console.log("[HandleSave] 儲存第三階段資料...");
         saveRes = await fetch(`/api/submissions/stage3`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             questionId,
             code,
             language,
             completed: false,
+            durationDeltaSec: deltaSec,
           }),
         });
       } else {
         console.log("[HandleSave] 儲存第二階段資料...");
         saveRes = await fetch(`/api/submissions/stage2`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             questionId,
             pseudocode: code,
             completed: false,
+            durationDeltaSec: deltaSec,
           }),
         });
       }
@@ -635,7 +652,7 @@ const OnlineCoding = ({
                     color: "#FFFFFF",
                     border: "none",
                   }}
-                  onClick={() => {}}
+                  onClick={() => { }}
                 >
                   詢問沐芙助教
                 </Button>
@@ -747,10 +764,10 @@ const OnlineCoding = ({
                               item.type === "error"
                                 ? "#ff6b6b"
                                 : item.type === "input"
-                                ? "#4CAF50"
-                                : item.type === "system"
-                                ? "#FFA726"
-                                : "rgb(0 0 0)",
+                                  ? "#4CAF50"
+                                  : item.type === "system"
+                                    ? "#FFA726"
+                                    : "rgb(0 0 0)",
                             whiteSpace: "pre-wrap",
                             wordWrap: "break-word",
                           }}

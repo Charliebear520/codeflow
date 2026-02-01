@@ -28,6 +28,7 @@ const Answer = ({ onChecking }) => {
     dbData: {},
   });
   const flowRef = useRef(null);
+  const lastTickRef = useRef(Date.now());
   const dispatch = useDispatch();
   const [fileList, setFileList] = useState([]);
   const { message } = App.useApp(); // 使用 App 的 message API
@@ -37,7 +38,19 @@ const Answer = ({ onChecking }) => {
     try {
       setChecking(true);
       if (onChecking) onChecking(true);
+
+      if (!isSignedIn) {
+        message.error("請先登入");
+        return;
+      }
+
+      // 準備 payload
+      let payload = {
+        questionId: "Q001", // TODO: 改為動態傳入的題目 ID
+      };
+
       if (activeKey === "1") {
+        // 上傳流程圖模式
         if (fileList.length === 0) {
           message.error("請先上傳流程圖");
           return;
@@ -49,36 +62,72 @@ const Answer = ({ onChecking }) => {
           return;
         }
 
-        const resultAction = await dispatch(
-          checkFlowchart({ imageData: base64Image, stage: 1 })
-        );
-
-        if (checkFlowchart.fulfilled.match(resultAction)) {
-          message.success("檢查完成");
-        } else {
-          throw new Error(resultAction.error.message);
-        }
+        payload.imageBase64 = base64Image.startsWith("data:")
+          ? base64Image.split(",")[1]
+          : base64Image;
       } else if (activeKey === "2") {
-        const flowElement = document.querySelector(".react-flow");
-        if (!flowElement) {
-          message.error("找不到流程圖元素");
+        // 線上製作模式
+        if (!flowRef.current?.exportGraph) {
+          message.error("流程圖元件尚未載入");
           return;
         }
 
-        const dataUrl = await toPng(flowElement, {
-          backgroundColor: "#ffffff",
-          pixelRatio: 2,
-        });
+        const { nodes, edges } = flowRef.current.exportGraph();
+        const hasData = (nodes?.length || 0) + (edges?.length || 0) > 0;
 
-        const base64Image = dataUrl.split(",")[1];
-        const resultAction = await dispatch(checkFlowchart(base64Image));
+        if (!hasData) {
+          message.error("請先繪製流程圖");
+          return;
+        }
 
-        if (checkFlowchart.fulfilled.match(resultAction)) {
-          message.success("檢查完成");
-        } else {
-          throw new Error(resultAction.error.message);
+        payload.graph = { nodes, edges };
+
+        // 也生成圖片以便記錄
+        const flowElement = document.querySelector(".react-flow");
+        if (flowElement) {
+          const dataUrl = await toPng(flowElement, {
+            backgroundColor: "#ffffff",
+            pixelRatio: 2,
+          });
+          payload.imageBase64 = dataUrl.split(",")[1];
         }
       }
+
+      // 呼叫完整的比對 API
+      const token = await getToken();
+      const res = await fetch(
+        `http://localhost:5000/api/submissions/stage1/compare`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+
+      console.log("📊 收到的 API 回應:", data);
+
+      // 將結果儲存到 Redux（讓 Check 元件顯示）
+      dispatch({
+        type: "check/setCheckResult",
+        payload: {
+          scores: data.scores,
+          diffs: data.diffs,
+          feedback: data.feedback,
+          submissionId: data.submissionId,
+        },
+      });
+
+      console.log("✅ 已更新 Redux state");
+      message.success("檢查完成！已產生詳細回饋");
     } catch (error) {
       console.error("檢查過程發生錯誤:", error);
       message.error(error.message || "檢查過程發生錯誤");
@@ -89,6 +138,7 @@ const Answer = ({ onChecking }) => {
   };
 
   const handleReset = () => {
+    console.log("🧹 執行清空操作");
     if (activeKey === "1") {
       setFileList([]);
     } else if (activeKey === "2") {
@@ -97,6 +147,7 @@ const Answer = ({ onChecking }) => {
       }
     }
     dispatch(resetCheck());
+    console.log("✅ 已清空 Redux state");
   };
 
   const items = [
@@ -125,12 +176,13 @@ const Answer = ({ onChecking }) => {
   ];
   const handleSave = async () => {
     try {
-      if (!isSignedIn) {
-        message.error("請先登入");
-        return;
-      }
+      if (!isSignedIn) { message.error("請先登入"); return; }
 
       let payload = { questionId: "Q001", completed: false };
+      const now = Date.now();
+      const deltaSec = Math.max(0, Math.floor((now - (lastTickRef.current || now)) / 1000));
+      lastTickRef.current = now;
+      payload.durationDeltaSec = deltaSec;
 
       if (activeKey === "1") {
         // 上傳流程圖
@@ -151,10 +203,7 @@ const Answer = ({ onChecking }) => {
         }
         const { nodes, edges } = flowRef.current.exportGraph();
         const hasData = (nodes?.length || 0) + (edges?.length || 0) > 0;
-        if (!hasData) {
-          message.error("還沒有流程圖可以儲存");
-          return;
-        }
+        if (!hasData) { message.error("還沒有流程圖可以儲存"); return; }
 
         const flowElement = document.querySelector(".react-flow");
         if (!flowElement) {
@@ -170,10 +219,7 @@ const Answer = ({ onChecking }) => {
         payload.mode = "editor";
         // ...existing code...
         console.log("送出前 payload：", payload);
-        console.log(
-          "imageBase64 長度：",
-          payload.imageBase64 ? payload.imageBase64.length : "null"
-        );
+        console.log("imageBase64 長度：", payload.imageBase64 ? payload.imageBase64.length : "null");
         // ...existing code...
       } else {
         message.error("未知的分頁");
@@ -190,8 +236,7 @@ const Answer = ({ onChecking }) => {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok || !data.success)
-        throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
 
       message.success("已儲存第一階段的作答");
     } catch (err) {

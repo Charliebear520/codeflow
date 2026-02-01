@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import os from "os";
+import path from "path";
 // import ImageKit from "imagekit"; // 暫時註解掉以避免導入問題
 // 移除靜態導入，改為動態導入以避免初始化問題
 // import {
@@ -19,14 +21,20 @@ import {
 } from "@clerk/express"; // 暫時禁用以避免導入問題
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
-
 const execAsync = promisify(exec);
 import mongoose from "mongoose";
 import Question from "./models/Question.js"; // ← 後端才可以 import
 import Student from "./models/Student.js";
 import Submission from "./models/Submission.js";
-import os from "os";
-import path from "path";
+import IdealAnswer from "./models/IdealAnswer.js";
+import {
+  generateIdealFlowSpec,
+  parseStudentFlowSpecFromImage,
+  mapEditorGraphToFlowSpec,
+  normalizeFlowSpec,
+  compareFlowSpecs,
+  generateFeedbackText,
+} from "./services/flowSpecService.js";
 import fsSync from "fs";
 
 // 動態導入Gemini服務的輔助函數
@@ -183,8 +191,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 暫時禁用後端Clerk中間件，只保留前端認證保護
-// app.use(clerkMiddleware());
+// 啟用 Clerk 中間件以支援 getAuth()
+app.use(clerkMiddleware());
 
 // 資料表連接 - 移到前面
 const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/codeflow";
@@ -216,6 +224,13 @@ mongoose
 // });
 
 // 小工具：確保 Student 存在並同步 name/email
+const ADMIN_EMAILS_SET = new Set(
+  (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
+
 async function ensureStudent(userId) {
   const u = await clerkClient.users.getUser(userId);
   const fullName =
@@ -229,16 +244,25 @@ async function ensureStudent(userId) {
     u.emailAddresses?.[0]?.emailAddress ||
     null;
 
-  const update = { $setOnInsert: { userId } };
-  const toSet = {};
-  if (fullName) toSet.name = fullName;
-  if (email) toSet.email = email.toLowerCase();
-  if (Object.keys(toSet).length) update.$set = toSet;
+  //role：在白名單就是 teacher，否則 student
+  const emailLower = email ? email.toLowerCase() : null;
+  const role =
+    emailLower && ADMIN_EMAILS_SET.has(emailLower) ? "teacher" : "student";
 
-  return Student.findOneAndUpdate({ userId }, update, {
-    new: true,
-    upsert: true,
-  });
+  // upsert：第一次寫入 userId；之後每次登入都同步 name/email/role（若有變）
+  const setOnInsert = { userId };
+  const set = {};
+  if (fullName) set.name = fullName;
+  if (emailLower) set.email = emailLower;
+  set.role = role; // 總是以最新角色覆蓋（例如把某帳號升為 teacher）
+
+  const doc = await Student.findOneAndUpdate(
+    { userId },
+    { $setOnInsert: setOnInsert, $set: set },
+    { new: true, upsert: true }
+  );
+
+  return doc;
 }
 
 // 小工具：Promise 版 exec + existsSync
@@ -267,11 +291,11 @@ async function pickCCompiler() {
   try {
     await execp("gcc --version");
     return "gcc";
-  } catch {}
+  } catch { }
   try {
     await execp("clang --version");
     return "clang";
-  } catch {}
+  } catch { }
   // 3) 常見安裝路徑（可命中就用）
   const candidates = [
     "C:\\msys64\\ucrt64\\bin\\gcc.exe",
@@ -287,67 +311,86 @@ async function pickCCompiler() {
     const { stdout } = await execp("xcrun --find clang");
     const p = stdout.trim();
     if (p && exists(p)) return p;
-  } catch {}
+  } catch { }
 
   return null;
 }
 
-// 取得當前登入學生基本資料（若無則自動建立）
+// 取得當前登入使用者基本資料（若無則自動建立）
 app.get("/api/me", requireAuth(), async (req, res) => {
+  console.log("Auth header =", req.headers.authorization || "(none)");
   try {
-    const { userId } = req.auth;
+    const { userId } = req.auth();
+    console.log("ADMIN_EMAILS=", process.env.ADMIN_EMAILS);
 
-    // 從 Clerk 取使用者資料
+    // 1) 從 Clerk 拉使用者資料
     const u = await clerkClient.users.getUser(userId);
+
     const fullName =
       u.fullName ||
       [u.firstName, u.lastName].filter(Boolean).join(" ") ||
       u.username ||
       u.primaryEmailAddress?.emailAddress ||
       "";
-    const email =
+
+    const emailRaw =
       u.primaryEmailAddress?.emailAddress ||
       u.emailAddresses?.[0]?.emailAddress ||
       null;
 
-    // 只 $set 有值的欄位，避免把 name 設成 undefined
-    const update = { $setOnInsert: { userId } };
-    const toSet = {};
-    if (fullName) toSet.name = fullName;
-    if (email) toSet.email = email.toLowerCase();
-    if (Object.keys(toSet).length) update.$set = toSet;
+    const email = emailRaw ? emailRaw.toLowerCase() : null;
+    console.log("User:", { userId, fullName, email });
 
-    // upsert + 回傳最新
-    const student = await Student.findOneAndUpdate({ userId }, update, {
-      new: true,
-      upsert: true,
-    });
+    // 2) 角色判斷：在白名單就是 teacher，否則 student
+    const role = email && ADMIN_EMAILS_SET.has(email) ? "teacher" : "student";
+    console.log("Determined role:", role);
 
-    res.json({ success: true, student });
+    // 3) upsert：第一次建立；之後每次同步 name/email/role
+    const doc = await Student.findOneAndUpdate(
+      { userId },
+      {
+        $setOnInsert: { userId },
+        $set: {
+          ...(fullName ? { name: fullName } : {}),
+          ...(email ? { email } : {}),
+          role, // 總是以最新角色覆蓋（便於升級/降級）
+        },
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, me: doc });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 教師角色
+// 教師角色 - Express 中間件包裝器處理 async
 function requireTeacher(req, res, next) {
-  try {
-    const auth = getAuth(req) || {};
-    const userId = auth.userId;
-    const orgRole = auth.orgRole;
+  (async () => {
+    try {
+      const auth = getAuth(req) || {};
+      const userId = auth.userId;
 
-    if (!userId) {
+      if (!userId) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
+
+      // 從資料庫查詢使用者角色
+      const student = await Student.findOne({ userId }).lean();
+
+      if (student && student.role === "teacher") {
+        return next();
+      }
+
+      return res
+        .status(403)
+        .json({ success: false, error: "Forbidden - Teacher role required" });
+    } catch (e) {
+      console.error("requireTeacher error:", e);
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
-
-    if (orgRole === "teacher" || orgRole === "org:admin") {
-      return next();
-    }
-
-    return res.status(403).json({ success: false, error: "Forbidden" });
-  } catch (e) {
-    return res.status(401).json({ success: false, error: "Unauthorized" });
-  }
+  })();
 }
 
 app.get("/api/upload", (req, res) => {
@@ -425,6 +468,182 @@ app.post("/api/check-flowchart", async (req, res) => {
     res.json({ result });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 產生/更新理想答案（教師）
+app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
+  try {
+    const { questionId, questionText } = req.body || {};
+    if (!questionId && !questionText) {
+      return res
+        .status(400)
+        .json({ success: false, error: "需提供 questionId 或 questionText" });
+    }
+
+    // 取得題目文字：優先 body.questionText，其次從 Question 資料表讀取
+    let qText = (questionText || "").trim();
+    if (!qText && questionId) {
+      // questionId 可能是 ObjectId 或你們自訂字串，先以 ObjectId 嘗試，失敗再用 questionTitle 比對
+      if (mongoose.isValidObjectId(questionId)) {
+        const doc = await Question.findById(questionId).lean();
+        qText = doc?.description || doc?.questionTitle || "";
+      }
+      if (!qText) {
+        const docByTitle = await Question.findOne({
+          questionTitle: questionId,
+        }).lean();
+        qText = docByTitle?.description || docByTitle?.questionTitle || "";
+      }
+    }
+    if (!qText) {
+      return res
+        .status(400)
+        .json({ success: false, error: "找不到題目內容，請提供 questionText" });
+    }
+
+    const flowSpec = await generateIdealFlowSpec(qText);
+    const saved = await IdealAnswer.findOneAndUpdate(
+      { questionId: String(questionId || "UNKNOWN") },
+      {
+        $set: {
+          flowSpec,
+          version: "v1",
+          modelUsed: "gemini-2.0-flash",
+          generatedAt: new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json({ success: true, data: saved });
+  } catch (err) {
+    console.error("ideal/flow/generate error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 取得理想答案
+app.get("/api/ideal/flow/:questionId", async (req, res) => {
+  try {
+    const doc = await IdealAnswer.findOne({
+      questionId: String(req.params.questionId),
+    }).lean();
+    if (!doc)
+      return res
+        .status(404)
+        .json({ success: false, error: "ideal answer not found" });
+    res.json({ success: true, data: doc });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Stage1 比對：解析 -> 比對 -> 產生回饋（需登入）
+app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const studentDoc = await ensureStudent(userId);
+
+    const { questionId, imageBase64, graph } = req.body || {};
+    if (!questionId)
+      return res.status(400).json({ success: false, error: "questionId 必填" });
+
+    // 取得題目內容（給 Vision/回饋參考，沒抓到也不阻擋）
+    let questionText = "";
+    if (mongoose.isValidObjectId(questionId)) {
+      const q = await Question.findById(questionId).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    } else {
+      const q = await Question.findOne({ questionTitle: questionId }).lean();
+      questionText = q?.description || q?.questionTitle || "";
+    }
+
+    // 1) 取得或生成理想答案
+    let ideal = await IdealAnswer.findOne({
+      questionId: String(questionId),
+    }).lean();
+    if (!ideal) {
+      const generated = await generateIdealFlowSpec(
+        questionText || "請根據題意繪製流程圖"
+      );
+      ideal = await IdealAnswer.create({
+        questionId: String(questionId),
+        flowSpec: generated,
+        version: "v1",
+        modelUsed: "gemini-2.0-flash",
+        generatedAt: new Date(),
+      });
+    }
+    const idealSpec = normalizeFlowSpec(ideal.flowSpec);
+    console.log("🎯 理想答案 idealSpec:", JSON.stringify(idealSpec, null, 2));
+
+    // 2) 解析學生答案
+    let studentSpec;
+    if (graph && (graph.nodes?.length || 0) + (graph.edges?.length || 0) > 0) {
+      console.log("📊 原始 graph 資料:", JSON.stringify(graph, null, 2));
+      studentSpec = mapEditorGraphToFlowSpec(graph);
+      console.log(
+        "✅ 正規化後的 studentSpec:",
+        JSON.stringify(studentSpec, null, 2)
+      );
+    } else if (imageBase64) {
+      const base64 = imageBase64.startsWith("data:")
+        ? imageBase64.split(",")[1]
+        : imageBase64;
+      studentSpec = await parseStudentFlowSpecFromImage(
+        base64,
+        questionText || ""
+      );
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, error: "需提供 graph 或 imageBase64" });
+    }
+
+    // 3) 比對
+    const { diffs, scores } = compareFlowSpecs(idealSpec, studentSpec);
+    console.log("📈 比對結果 scores:", scores);
+    console.log("📋 比對結果 diffs:", JSON.stringify(diffs, null, 2));
+
+    // 4) 產生回饋
+    const feedback = await generateFeedbackText(
+      questionText || "",
+      idealSpec,
+      studentSpec,
+      diffs,
+      scores
+    );
+
+    // 5) 寫回 Submission（保留你現有 stage1 結構，擴充比對結果）
+    const update = {
+      $set: {
+        "stages.stage1.flowSpec": studentSpec,
+        "stages.stage1.scores": scores,
+        "stages.stage1.diffs": diffs,
+        "stages.stage1.feedback": feedback,
+        "stages.stage1.updatedAt": new Date(),
+        idealVersion: ideal.version || "v1",
+        studentName: studentDoc.name ?? null,
+        studentEmail: studentDoc.email?.toLowerCase() ?? null,
+      },
+      $setOnInsert: {
+        student: studentDoc._id,
+        questionId,
+        createdAt: new Date(),
+      },
+    };
+
+    const doc = await Submission.findOneAndUpdate(
+      { student: studentDoc._id, questionId },
+      update,
+      { new: true, upsert: true }
+    );
+
+    res.json({ success: true, scores, diffs, feedback, submissionId: doc._id });
+  } catch (err) {
+    console.error("stage1/compare error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -669,15 +888,15 @@ app.post("/api/run-code", async (req, res) => {
     try {
       await execFilep("python3", ["--version"]);
       return "python3";
-    } catch {}
+    } catch { }
     try {
       await execFilep("python", ["--version"]);
       return "python";
-    } catch {}
+    } catch { }
     try {
       await execFilep("py", ["-3", "--version"]);
       return "py";
-    } catch {}
+    } catch { }
     return null;
   }
 
@@ -686,11 +905,11 @@ app.post("/api/run-code", async (req, res) => {
     try {
       await execFilep("gcc", ["--version"]);
       return "gcc";
-    } catch {}
+    } catch { }
     try {
       await execFilep("clang", ["--version"]);
       return "clang";
-    } catch {}
+    } catch { }
     const candidates = [
       "C:\\msys64\\ucrt64\\bin\\gcc.exe",
       "C:\\msys64\\mingw64\\bin\\gcc.exe",
@@ -703,7 +922,7 @@ app.post("/api/run-code", async (req, res) => {
       const { stdout } = await execFilep("xcrun", ["--find", "clang"]);
       const p = stdout.trim();
       if (p && exists(p)) return p;
-    } catch {}
+    } catch { }
     return null;
   }
   // ===============================================
@@ -726,7 +945,7 @@ app.post("/api/run-code", async (req, res) => {
 
       const PY = await pickPython();
       if (!PY) {
-        await fs.unlink(filepath).catch(() => {});
+        await fs.unlink(filepath).catch(() => { });
         return res.status(400).json({
           success: false,
           error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）",
@@ -741,7 +960,7 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         }
       );
-      await fs.unlink(filepath).catch(() => {});
+      await fs.unlink(filepath).catch(() => { });
       return res.json({ success: true, stdout, stderr });
     } else if (language === "javascript") {
       filename = `${id}.js`;
@@ -752,7 +971,7 @@ app.post("/api/run-code", async (req, res) => {
         timeout: 3000,
         maxBuffer: 1024 * 200,
       });
-      await fs.unlink(filepath).catch(() => {});
+      await fs.unlink(filepath).catch(() => { });
       return res.json({ success: true, stdout, stderr });
     } else if (language === "c") {
       filename = `${id}.c`;
@@ -761,7 +980,7 @@ app.post("/api/run-code", async (req, res) => {
 
       const CC = await pickCCompiler();
       if (!CC) {
-        await fs.unlink(filepath).catch(() => {});
+        await fs.unlink(filepath).catch(() => { });
         return res.status(400).json({
           success: false,
           error:
@@ -779,7 +998,7 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         });
       } catch (e) {
-        await fs.unlink(filepath).catch(() => {});
+        await fs.unlink(filepath).catch(() => { });
         const stderrMsg =
           (e.stderr && e.stderr.toString()) ||
           e.err?.message ||
@@ -816,15 +1035,15 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         });
         await Promise.all([
-          fs.unlink(filepath).catch(() => {}),
-          fs.unlink(exePath).catch(() => {}),
+          fs.unlink(filepath).catch(() => { }),
+          fs.unlink(exePath).catch(() => { }),
         ]);
         console.log("CC =", process.env.CC || "auto");
         return res.json({ success: true, stdout, stderr });
       } catch (e) {
         await Promise.all([
-          fs.unlink(filepath).catch(() => {}),
-          fs.unlink(exePath).catch(() => {}),
+          fs.unlink(filepath).catch(() => { }),
+          fs.unlink(exePath).catch(() => { }),
         ]);
         return res.json({
           success: false,
@@ -845,7 +1064,7 @@ app.post("/api/run-code", async (req, res) => {
     // 萬一哪裡 throw，盡量清掉暫存檔
     const del = cleanupFiles.length ? cleanupFiles : filepath ? [filepath] : [];
     if (del.length)
-      await Promise.all(del.map((f) => fs.unlink(f).catch(() => {})));
+      await Promise.all(del.map((f) => fs.unlink(f).catch(() => { })));
     res
       .status(500)
       .json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
@@ -959,14 +1178,14 @@ app.post("/api/run-code-interactive", async (req, res) => {
     childProcess.on("close", (code) => {
       activeProcesses.delete(processId);
       // 清理檔案
-      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     });
 
     childProcess.on("error", (error) => {
       console.error(`Process error for ${processId}:`, error);
       activeProcesses.delete(processId);
       // 清理檔案
-      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     });
 
     // 存儲程序引用
@@ -986,7 +1205,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
       if (!isProcessRunning) {
         activeProcesses.delete(processId);
         // 清理檔案
-        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
       }
 
       res.json({
@@ -1005,7 +1224,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
 
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     }
     res.status(500).json({
       success: false,
@@ -1112,7 +1331,7 @@ app.post("/api/stop-process", async (req, res) => {
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
       const fs = await import("fs/promises");
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
     }
 
     // 從活躍程序列表中移除
@@ -1161,13 +1380,36 @@ app.get("/test", (req, res) => {
 
 // 教師後台資料：僅教師可訪問
 app.get("/api/admin/submissions", requireTeacher, async (req, res) => {
-  try {
-    // 範例：回傳最近題目（實際可換為作答紀錄）
-    const latest = await Question.find({}).sort({ createdAt: -1 }).limit(10);
-    res.json({ success: true, items: latest });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  // try {
+  //   // 範例：回傳最近題目（實際可換為作答紀錄）
+  //   const latest = await Question.find({}).sort({ createdAt: -1 }).limit(10);
+  //   res.json({ success: true, items: latest });
+  //   console.log("latest:", latest);
+  // } catch (err) {
+  //   res.status(500).json({ success: false, error: err.message });
+  // }
+  const { studentId, questionId, stage, page = 1, pageSize = 20 } = req.query;
+  const filter = {};
+  if (studentId) filter.student = studentId;
+  if (questionId && questionId !== "all") filter.questionId = questionId;
+  if (stage && ["stage1", "stage2", "stage3"].includes(stage)) {
+    filter[`stages.${stage}.completed`] = true;
   }
+  const skip = (Number(page) - 1) * Number(pageSize);
+  const items = await Submission.find(filter)
+    .populate("student", "name email className") //從"mongoose.model("Student", studentSchema)"中，讀取學生的資料(姓名、信箱、班級)
+    .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(Number(pageSize))
+    .lean();
+  const total = await Submission.countDocuments(filter);
+  res.json({
+    success: true,
+    items,
+    total,
+    page: Number(page),
+    pageSize: Number(pageSize),
+  });
 });
 
 // AI錯誤解釋功能的API端点
@@ -1331,11 +1573,11 @@ app.get("/api/questions", async (req, res) => {
 
     const filter = q
       ? {
-          $or: [
-            { questionTitle: new RegExp(q, "i") },
-            { description: new RegExp(q, "i") },
-          ],
-        }
+        $or: [
+          { questionTitle: new RegExp(q, "i") },
+          { description: new RegExp(q, "i") },
+        ],
+      }
       : {};
 
     const [total, items] = await Promise.all([
@@ -1377,8 +1619,11 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       imageBase64,
       completed = false,
       mode,
+      durationDeltaSec = 0,
     } = req.body || {};
     console.log("收到 req.body：", req.body);
+
+    const student = await ensureStudent(userId);
 
     if (!questionId)
       return res.status(400).json({ success: false, error: "questionId 必填" });
@@ -1387,30 +1632,34 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
         .status(400)
         .json({ success: false, error: "需提供 graph 或 imageBase64 其一" });
 
-    const student = await ensureStudent(userId);
-
-    // 只在有值時才帶入
-    const stage1 = {
-      ...(graph ? { graph } : {}),
-      ...(imageBase64 ? { imageBase64 } : {}),
-      mode: mode || null,
-      completed,
-      updatedAt: new Date(),
+    const delta = Number.isFinite(Number(durationDeltaSec))
+      ? Math.max(0, Math.floor(Number(durationDeltaSec)))
+      : 0;
+    const setFields = {
+      "stages.stage1.mode": mode || null,
+      "stages.stage1.completed": !!completed,
+      "stages.stage1.updatedAt": new Date(),
+      studentName: student.name ?? null,
+      studentEmail: student.email?.toLowerCase() ?? null,
     };
 
-    console.log("儲存前 stage1：", stage1);
+    // 只在有值時才帶入
+    if (graph) setFields["stages.stage1.graph"] = graph;
+    if (imageBase64) setFields["stages.stage1.imageBase64"] = imageBase64;
+
+    console.log("儲存前 setFields：", setFields);
 
     const update = {
-      $set: {
-        "stages.stage1": stage1,
-        studentName: student.name ?? null,
-        studentEmail: student.email?.toLowerCase() ?? null,
-      },
+      $set: setFields,
       $setOnInsert: {
         student: student._id,
         questionId,
       },
+      $inc: {
+        "stages.stage1.durationSec": delta, // 原子累加
+      },
     };
+
 
     console.log("儲存前 update：", JSON.stringify(update, null, 2));
 
@@ -1419,7 +1668,7 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       update,
       { new: true, upsert: true }
     );
-    res.status(201).json({ success: true, submissionId: doc._id });
+    res.status(201).json({ success: true, submissionId: doc._id, durationSec: doc?.stages?.stage1?.durationSec ?? 0, });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1434,35 +1683,62 @@ app.get("/api/submissions/stage1", async (req, res) => {
   }
 });
 
-app.post("/api/submissions/stage2", async (req, res) => {
+app.post("/api/submissions/stage2", requireAuth(), async (req, res) => {
   try {
     console.log("stage2 req.body:", req.body);
 
-    const { questionId, pseudocode, completed } = req.body;
+    const { userId } = req.auth();
+    const student = await ensureStudent(userId);
+
+    const { questionId, pseudocode, completed, durationDeltaSec = 0 } = req.body;
 
     // log 查詢條件
     console.log("stage2 findOneAndUpdate filter:", { questionId });
 
-    // log 更新內容
-    const updateObj = {
-      $set: {
-        "stages.stage2.pseudocode": pseudocode,
-        "stages.stage2.completed": completed,
-        "stages.stage2.updatedAt": new Date(),
-      },
+    const delta = Number.isFinite(Number(durationDeltaSec))
+      ? Math.max(0, Math.floor(Number(durationDeltaSec)))
+      : 0;
+
+    // 只在有值時才 set，避免覆寫成 undefined/null
+    const setFields = {
+      "stages.stage2.completed": !!completed,
+      "stages.stage2.updatedAt": new Date(),
+      studentName: student.name ?? null,
+      studentEmail: student.email?.toLowerCase() ?? null,
     };
+    if (typeof pseudocode === "string") {
+      setFields["stages.stage2.pseudocode"] = pseudocode;
+    }
+
+    const updateObj = {
+      $set: setFields,
+      $setOnInsert: {
+        student: student._id,
+        questionId,
+      },
+      $inc: {
+        "stages.stage2.durationSec": delta,
+      }
+    };
+
+
+    // log 更新內容
     console.log("stage2 updateObj:", updateObj);
 
     // 執行更新
     const newSubmission = await Submission.findOneAndUpdate(
-      { questionId },
+      { student: student._id, questionId },
       updateObj,
       { upsert: true, new: true }
     );
-
+    // const doc = await Submission.findOneAndUpdate(
+    //   { student: student._id, questionId },
+    //   update,
+    //   { new: true, upsert: true }
+    // );
     console.log("stage2 newSubmission:", newSubmission);
 
-    res.json({ success: true, data: newSubmission });
+    res.json({ success: true, data: newSubmission, durationSec: newSubmission?.stages?.stage2?.durationSec ?? 0, });
   } catch (err) {
     console.error("Error saving stage2:", err);
     res.status(500).json({ success: false, error: "伺服器錯誤" });
@@ -1477,62 +1753,74 @@ app.get("/api/submissions/stage2", async (req, res) => {
   }
 });
 
-app.post("/api/submissions/stage3", async (req, res) => {
+app.post("/api/submissions/stage3", requireAuth(), async (req, res) => {
   try {
-    console.log("stage3 req.body:", JSON.stringify(req.body));
-    // 取 student 優先順序：clerk middleware -> body -> undefined
-    const userId = req.auth?.userId ?? null;
-    let studentId = req.body?.student ?? null;
+    console.log("stage3 req.body:", req.body);
 
-    if (userId && !studentId) {
-      // ensureStudent 回傳 mongoose doc
-      const studentDoc = await ensureStudent(userId);
-      studentId = studentDoc?._id?.toString();
-      console.log("stage3 resolved studentId from clerk:", studentId);
-    }
+    const { userId } = req.auth();
+    const student = await ensureStudent(userId);
 
-    if (!req.body?.questionId) {
+    const { questionId, code, language, completed, durationDeltaSec = 0 } = req.body;
+
+    if (!questionId) {
       return res.status(400).json({ success: false, error: "questionId 必填" });
     }
 
-    // 用 questionId + studentId 作為 filter（若沒有 studentId 則只用 questionId）
-    const filter = { questionId: req.body.questionId };
-    if (studentId) filter.student = studentId;
+    // log 查詢條件
+    console.log("stage3 findOneAndUpdate filter:", { student: student._id, questionId });
 
-    const update = {
-      $set: {
-        "stages.stage3.code": req.body.code ?? null,
-        "stages.stage3.language": req.body.language ?? null,
-        "stages.stage3.completed": !!req.body.completed,
-        "stages.stage3.updatedAt": new Date(),
-      },
+    const delta = Number.isFinite(Number(durationDeltaSec))
+      ? Math.max(0, Math.floor(Number(durationDeltaSec)))
+      : 0;
+
+    // 只在有值時才 set，避免覆寫成 undefined/null
+    const setFields = {
+      "stages.stage3.completed": !!completed,
+      "stages.stage3.updatedAt": new Date(),
+      studentName: student.name ?? null,
+      studentEmail: student.email?.toLowerCase() ?? null,
+    };
+
+    if (typeof code === "string") {
+      setFields["stages.stage3.code"] = code;
+    }
+    if (typeof language === "string") {
+      setFields["stages.stage3.language"] = language;
+    }
+
+    const updateObj = {
+      $set: setFields,
       $setOnInsert: {
-        questionId: req.body.questionId,
-        ...(studentId ? { student: studentId } : {}),
-        createdAt: new Date(),
+        student: student._id,
+        questionId,
+      },
+      $inc: {
+        "stages.stage3.durationSec": delta,
       },
     };
 
-    console.log("stage3 filter:", JSON.stringify(filter));
-    console.log("stage3 update:", JSON.stringify(update, null, 2));
+    // log 更新內容
+    console.log("stage3 updateObj:", updateObj);
 
-    const newSubmission = await Submission.findOneAndUpdate(filter, update, {
-      upsert: true,
-      new: true,
-    });
-
-    console.log("stage3 upsert result _id:", newSubmission?._id?.toString());
-    console.log(
-      "stage3 upsert result stages.stage3:",
-      JSON.stringify(newSubmission?.stages?.stage3)
+    const newSubmission = await Submission.findOneAndUpdate(
+      { student: student._id, questionId },
+      updateObj,
+      { upsert: true, new: true }
     );
 
-    return res.json({ success: true, data: newSubmission });
+    console.log("stage3 newSubmission:", newSubmission);
+
+    return res.json({
+      success: true,
+      data: newSubmission,
+      durationSec: newSubmission?.stages?.stage3?.durationSec ?? 0,
+    });
   } catch (err) {
     console.error("Error saving stage3:", err);
     return res.status(500).json({ success: false, error: "伺服器錯誤" });
   }
 });
+
 app.get("/api/submissions/stage3", async (req, res) => {
   try {
     const submissions = await Submission.find({});
