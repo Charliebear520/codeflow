@@ -18,7 +18,7 @@ const stageSchema_1 = new Schema(
     checkReport: { type: String, default: "" }, // 檢查報告
     updatedAt: { type: Date, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const stageSchema_2 = new Schema(
@@ -32,7 +32,7 @@ const stageSchema_2 = new Schema(
     checkReport: { type: String, default: "" }, // 檢查報告
     updatedAt: { type: Date, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const stageSchema_3 = new Schema(
@@ -51,7 +51,7 @@ const stageSchema_3 = new Schema(
     checkReport: { type: String, default: "" }, // 檢查報告
     updatedAt: { type: Date, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 const submissionSchema = new Schema(
   {
@@ -75,14 +75,32 @@ const submissionSchema = new Schema(
       stage2: stageSchema_2,
       stage3: stageSchema_3,
     },
+
+    // 綜合學習報告（當前版本）
+    currentSummary: {
+      summary: { type: String, default: null },
+      generatedAt: { type: Date, default: null },
+      totalScore: { type: Number, default: null },
+      completedStages: { type: Number, default: null },
+    },
+
+    // 報告歷史版本（最多保存 10 筆）
+    summaryHistory: [
+      {
+        summary: { type: String, required: true },
+        generatedAt: { type: Date, required: true },
+        totalScore: { type: Number, required: true },
+        completedStages: { type: Number, required: true },
+      },
+    ],
   },
-  { timestamps: true, minimize: false }
+  { timestamps: true, minimize: false },
 );
 
 // 一個學生對同一題只會有一筆作答紀錄
 submissionSchema.index(
   { student: 1, questionId: 1, "stages.stage2": 1, "stages.stage3": 1 },
-  { unique: true }
+  { unique: true },
 );
 
 export default mongoose.model("Submission", submissionSchema);

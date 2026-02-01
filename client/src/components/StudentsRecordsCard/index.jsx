@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import styles from "./StudentsRecordsCard.module.css";
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { Button, Tag } from 'antd';
-import { useState, useMemo } from "react";
+import { Button } from 'antd'; 
 import StudentAnswerModal from "../StudentAnswerModal";
 import AISummaryModal from "../AISummaryModal/index.jsx";
 
@@ -21,31 +20,16 @@ const StudentsRecordsCard = () => {
     return (
     <div className={styles.card}>
       <div className={styles.substance}>
-        <div className={styles.studentName}>
-          {student?.name || student?.email || "未命名學生"}{" "}
-          {/* {submission?.questionId && (
-            <Tag color="blue" style={{ marginLeft: 8 }}>
-              {submission.questionId}
-            </Tag>
-          )} */}
-        </div>
-        {meta.map((m) => (
-          <StageRow
-            key={m.key}
-            label={m.label}
-            done={m.done}
-            onView={() => setOpenStage(m.key)}
-          />
-        ))}
-        {/* <div className={styles.checkbox}>
+        <div className={styles.studentName}>學生</div>
+        <div className={styles.checkbox}>
           <div className={styles.homeworkText}>階段一</div>
           <CheckOutlined className={styles.CheckOutlined} />
-          <StudentAnswerModal className={styles.checkButton} />
+          <StudentAnswerModal className={styles.checkButton}/>
         </div>
         <div className={styles.checkbox}>
           <div className={styles.homeworkText}>階段二</div>
           <CloseOutlined className={styles.CloseOutlined} />
-          <StudentAnswerModal className={styles.checkButton} />
+          <StudentAnswerModal className={styles.checkButton}/>
         </div>
         <div className={styles.checkbox}>
           <div className={styles.homeworkText}>階段三</div>

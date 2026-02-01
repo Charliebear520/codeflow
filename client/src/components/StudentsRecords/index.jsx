@@ -1,4 +1,4 @@
-import { DownOutlined } from '@ant-design/icons';
+import { DownOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { Row, Col, Select, App, Spin, Empty } from "antd";
@@ -6,11 +6,9 @@ import styles from "./StudentsRecords.module.css";
 import StudentsRecordsCard from "../StudentsRecordsCard";
 
 const subjects = [
-  { key: 'all', label: '全部' },
-  { key: 'Q001', label: '示範題 Q001' },
+  { key: "all", label: "全部" },
+  { key: "Q001", label: "示範題 Q001" },
 ];
-
-
 
 const StudentsRecords = () => {
   const { message } = App.useApp();
@@ -60,7 +58,7 @@ const StudentsRecords = () => {
     const arr = [];
     for (const { student, submissions } of map.values()) {
       const latest = submissions.sort(
-        (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
+        (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
       )[0];
       arr.push({ student, submission: latest });
     }
@@ -94,18 +92,12 @@ const StudentsRecords = () => {
         <Row gutter={[16, 16]}>
           {cards.map(({ student, submission }, index) => (
             <Col span={6} key={index}>
-              <StudentsRecordsCard
-                student={student}
-                submission={submission}
-              />
+              <StudentsRecordsCard student={student} submission={submission} />
             </Col>
           ))}
           {cards.map(({ student, submission }, index) => (
             <Col span={6} key={index}>
-              <StudentsRecordsCard
-                student={student}
-                submission={submission}
-              />
+              <StudentsRecordsCard student={student} submission={submission} />
             </Col>
           ))}
         </Row>
