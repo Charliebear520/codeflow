@@ -3,6 +3,7 @@ import { Col, Row, Button, Modal, Spin, App, List, Tag } from "antd";
 import Topic from "../components/Topic";
 import Answer from "../components/Answer";
 import Check from "../components/Check";
+import { EditorProvider } from "../contexts/EditorContext";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { useAuth } from "@clerk/clerk-react";
@@ -133,196 +134,203 @@ const Home = () => {
 
   return (
     <App>
-      <div style={{ position: "relative", minHeight: "100vh" }}>
-        <Row>
-          <Col span={6}>
-            <Topic />
-          </Col>
-          <Col span={12}>
-            <Answer onChecking={setIsChecking} />
-          </Col>
-          <Col span={6}>
-            <Check
-              onTutorClick={handleTutorClick}
-              isChecking={isChecking}
-              stage={1}
-            />
-          </Col>
-        </Row>
+      <EditorProvider>
+        <div style={{ position: "relative", minHeight: "100vh" }}>
+          <Row>
+            <Col span={6}>
+              <Topic />
+            </Col>
+            <Col span={12}>
+              <Answer onChecking={setIsChecking} />
+            </Col>
+            <Col span={6}>
+              <Check
+                onTutorClick={handleTutorClick}
+                isChecking={isChecking}
+                stage={1}
+              />
+            </Col>
+          </Row>
 
-        {/* 學生整體作答結果統整按鈕 */}
-        <div
-          style={{
-            position: "fixed",
-            bottom: "40px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 1000,
-          }}
-        >
-          <Button
+          {/* 學生整體作答結果統整按鈕 */}
+          <div
             style={{
-              height: "36px",
-              fontSize: "16px",
-              backgroundColor: "#375bd3",
-              color: "#FFFFFF",
+              position: "fixed",
+              bottom: "40px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 1000,
             }}
-            onClick={() => handleShowSummary()}
           >
-            學生整體作答結果統整
-          </Button>
-        </div>
-
-        {/* 整體總結 Modal */}
-        <Modal
-          open={showSummaryModal}
-          onCancel={() => setShowSummaryModal(false)}
-          footer={() => [
-            <Button key="close" onClick={() => setShowSummaryModal(false)}>
-              關閉
-            </Button>,
             <Button
-              key="regenerate"
-              type="primary"
-              loading={isRegenerating}
-              onClick={handleRegenerate}
-            >
-              重新生成報告
-            </Button>,
-            <Button
-              key="history"
-              disabled={!summaryData?.hasHistory}
-              onClick={handleShowHistory}
-            >
-              查看歷史紀錄
-            </Button>,
-          ]}
-          centered
-          width="calc(50% + 60px)"
-          styles={{ body: { padding: "30px" } }}
-          maskClosable={true}
-        >
-          <Spin spinning={loadingSummary}>
-            <div style={{ minHeight: "400px" }}>
-              <h2 style={{ marginBottom: "20px", textAlign: "center" }}>
-                學生整體作答結果統整
-              </h2>
-              {summaryData ? (
-                <>
-                  <ReactMarkdown>{summaryData.summary}</ReactMarkdown>
-                  {summaryData.generatedAt && (
-                    <div
-                      style={{
-                        marginTop: "20px",
-                        paddingTop: "15px",
-                        borderTop: "1px solid #e8e8e8",
-                        fontSize: "12px",
-                        color: "#999",
-                        textAlign: "right",
-                      }}
-                    >
-                      生成時間：{formatTime(summaryData.generatedAt)}{" "}
-                      {summaryData.isFromCache ? (
-                        <Tag color="green">使用快取</Tag>
-                      ) : (
-                        <Tag color="blue">剛生成</Tag>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p style={{ textAlign: "center", color: "#999" }}>載入中...</p>
-              )}
-            </div>
-          </Spin>
-        </Modal>
-
-        {/* 歷史紀錄 Modal */}
-        <Modal
-          open={showHistoryModal}
-          onCancel={() => {
-            setShowHistoryModal(false);
-            setSelectedHistory(null);
-          }}
-          title="報告歷史紀錄"
-          width={700}
-          footer={() => [
-            <Button
-              key="close"
-              onClick={() => {
-                setShowHistoryModal(false);
-                setSelectedHistory(null);
+              style={{
+                height: "36px",
+                fontSize: "16px",
+                backgroundColor: "#375bd3",
+                color: "#FFFFFF",
               }}
+              onClick={() => handleShowSummary()}
             >
-              關閉
-            </Button>,
-          ]}
-        >
-          {historyData.length === 0 ? (
-            <div
-              style={{ textAlign: "center", padding: "40px", color: "#999" }}
-            >
-              尚無歷史紀錄
-            </div>
-          ) : (
-            <List
-              dataSource={historyData}
-              renderItem={(item, index) => (
-                <List.Item
-                  key={index}
-                  style={{
-                    cursor: "pointer",
-                    backgroundColor:
-                      selectedHistory === index ? "#f0f5ff" : "transparent",
-                  }}
-                  onClick={() =>
-                    setSelectedHistory(selectedHistory === index ? null : index)
-                  }
-                >
-                  <List.Item.Meta
-                    title={
-                      <div>
-                        <span>{formatTime(item.generatedAt)}</span>
-                        <Tag
-                          color="blue"
-                          style={{ marginLeft: "10px", float: "right" }}
-                        >
-                          分數：{item.totalScore}/100
-                        </Tag>
-                        <Tag
-                          color="green"
-                          style={{ marginLeft: "5px", float: "right" }}
-                        >
-                          完成：{item.completedStages}/3 階段
-                        </Tag>
+              學生整體作答結果統整
+            </Button>
+          </div>
+
+          {/* 整體總結 Modal */}
+          <Modal
+            open={showSummaryModal}
+            onCancel={() => setShowSummaryModal(false)}
+            footer={() => [
+              <Button key="close" onClick={() => setShowSummaryModal(false)}>
+                關閉
+              </Button>,
+              <Button
+                key="regenerate"
+                type="primary"
+                loading={isRegenerating}
+                onClick={handleRegenerate}
+              >
+                重新生成報告
+              </Button>,
+              <Button
+                key="history"
+                disabled={!summaryData?.hasHistory}
+                onClick={handleShowHistory}
+              >
+                查看歷史紀錄
+              </Button>,
+            ]}
+            centered
+            width="calc(50% + 60px)"
+            styles={{ body: { padding: "30px" } }}
+            maskClosable={true}
+          >
+            <Spin spinning={loadingSummary}>
+              <div style={{ minHeight: "400px" }}>
+                <h2 style={{ marginBottom: "20px", textAlign: "center" }}>
+                  學生整體作答結果統整
+                </h2>
+                {summaryData ? (
+                  <>
+                    <ReactMarkdown>{summaryData.summary}</ReactMarkdown>
+                    {summaryData.generatedAt && (
+                      <div
+                        style={{
+                          marginTop: "20px",
+                          paddingTop: "15px",
+                          borderTop: "1px solid #e8e8e8",
+                          fontSize: "12px",
+                          color: "#999",
+                          textAlign: "right",
+                        }}
+                      >
+                        生成時間：{formatTime(summaryData.generatedAt)}{" "}
+                        {summaryData.isFromCache ? (
+                          <Tag color="green">使用快取</Tag>
+                        ) : (
+                          <Tag color="blue">剛生成</Tag>
+                        )}
                       </div>
-                    }
-                    description={
-                      selectedHistory === index ? (
-                        <div
-                          style={{
-                            marginTop: "15px",
-                            padding: "15px",
-                            backgroundColor: "#fff",
-                            border: "1px solid #e8e8e8",
-                            borderRadius: "4px",
-                          }}
-                        >
-                          <ReactMarkdown>{item.summary}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <span style={{ color: "#999" }}>點擊查看報告內容</span>
+                    )}
+                  </>
+                ) : (
+                  <p style={{ textAlign: "center", color: "#999" }}>
+                    載入中...
+                  </p>
+                )}
+              </div>
+            </Spin>
+          </Modal>
+
+          {/* 歷史紀錄 Modal */}
+          <Modal
+            open={showHistoryModal}
+            onCancel={() => {
+              setShowHistoryModal(false);
+              setSelectedHistory(null);
+            }}
+            title="報告歷史紀錄"
+            width={700}
+            footer={() => [
+              <Button
+                key="close"
+                onClick={() => {
+                  setShowHistoryModal(false);
+                  setSelectedHistory(null);
+                }}
+              >
+                關閉
+              </Button>,
+            ]}
+          >
+            {historyData.length === 0 ? (
+              <div
+                style={{ textAlign: "center", padding: "40px", color: "#999" }}
+              >
+                尚無歷史紀錄
+              </div>
+            ) : (
+              <List
+                dataSource={historyData}
+                renderItem={(item, index) => (
+                  <List.Item
+                    key={index}
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor:
+                        selectedHistory === index ? "#f0f5ff" : "transparent",
+                    }}
+                    onClick={() =>
+                      setSelectedHistory(
+                        selectedHistory === index ? null : index,
                       )
                     }
-                  />
-                </List.Item>
-              )}
-            />
-          )}
-        </Modal>
+                  >
+                    <List.Item.Meta
+                      title={
+                        <div>
+                          <span>{formatTime(item.generatedAt)}</span>
+                          <Tag
+                            color="blue"
+                            style={{ marginLeft: "10px", float: "right" }}
+                          >
+                            分數：{item.totalScore}/100
+                          </Tag>
+                          <Tag
+                            color="green"
+                            style={{ marginLeft: "5px", float: "right" }}
+                          >
+                            完成：{item.completedStages}/3 階段
+                          </Tag>
+                        </div>
+                      }
+                      description={
+                        selectedHistory === index ? (
+                          <div
+                            style={{
+                              marginTop: "15px",
+                              padding: "15px",
+                              backgroundColor: "#fff",
+                              border: "1px solid #e8e8e8",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            <ReactMarkdown>{item.summary}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          <span style={{ color: "#999" }}>
+                            點擊查看報告內容
+                          </span>
+                        )
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            )}
+          </Modal>
 
-        {/* 原本的導頁功能先隱藏 */}
-        {/* 
+          {/* 原本的導頁功能先隱藏 */}
+          {/* 
       <button
         style={{ position: "fixed", bottom: 20, right: 20 }}
         onClick={() => navigate("/add-question")}
@@ -331,7 +339,7 @@ const Home = () => {
       </button>
       */}
 
-        {/* 測試按鈕暫時隱藏
+          {/* 測試按鈕暫時隱藏
       {<button
         style={{
           position: "fixed",
@@ -352,7 +360,8 @@ const Home = () => {
         前往StageList頁面（測試用）
       </button>
       */}
-      </div>
+        </div>
+      </EditorProvider>
     </App>
   );
 };

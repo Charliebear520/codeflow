@@ -189,6 +189,16 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
+// 只在開發環境放寬 CSP，避免 Chrome DevTools / localhost 相關請求被擋
+if (process.env.NODE_ENV !== "production") {
+  app.use((req, res, next) => {
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; connect-src 'self' http://localhost:5000 http://127.0.0.1:5000 http://localhost:5173 http://127.0.0.1:5173 https://clients2.google.com;",
+    );
+    next();
+  });
+}
 app.use(express.json({ limit: "50mb" })); // 讓 JSON 進來變成 req.body
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -305,11 +315,11 @@ async function pickCCompiler() {
   try {
     await execp("gcc --version");
     return "gcc";
-  } catch { }
+  } catch {}
   try {
     await execp("clang --version");
     return "clang";
-  } catch { }
+  } catch {}
   // 3) 常見安裝路徑（可命中就用）
   const candidates = [
     "C:\\msys64\\ucrt64\\bin\\gcc.exe",
@@ -325,7 +335,7 @@ async function pickCCompiler() {
     const { stdout } = await execp("xcrun --find clang");
     const p = stdout.trim();
     if (p && exists(p)) return p;
-  } catch { }
+  } catch {}
 
   return null;
 }
@@ -465,9 +475,9 @@ app.post("/api/generate-hint", requireAuth(), async (req, res) => {
     await mongoose.model("Submission").findOneAndUpdate(
       { student: student._id, questionId }, // 找這個學生 + 這題
       {
-        $inc: { helpCount: 1 } // 每點一次提示就 +1
+        $inc: { helpCount: 1 }, // 每點一次提示就 +1
       },
-      { upsert: true } // 如果沒有這筆資料就自動建立
+      { upsert: true }, // 如果沒有這筆資料就自動建立
     );
 
     // ✅ 5. 呼叫 Gemini 生成提示
@@ -475,7 +485,7 @@ app.post("/api/generate-hint", requireAuth(), async (req, res) => {
     const geminiServices = await loadGeminiServices();
     const hint = await geminiServices.generateFlowchartHint(
       question,
-      hintLevel
+      hintLevel,
     );
 
     // ✅ 6. 回傳提示給前端
@@ -483,7 +493,6 @@ app.post("/api/generate-hint", requireAuth(), async (req, res) => {
       success: true,
       hint,
     });
-
   } catch (error) {
     console.error("Error generating hint:", error);
 
@@ -493,7 +502,6 @@ app.post("/api/generate-hint", requireAuth(), async (req, res) => {
     });
   }
 });
-
 
 // 修改：接收題目參數的流程圖檢查端點
 app.post("/api/check-flowchart", async (req, res) => {
@@ -584,7 +592,7 @@ app.get("/api/ideal/flow/:questionId", async (req, res) => {
 // Stage1 比對：解析 -> 比對 -> 產生回饋（需登入）
 app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
   try {
-    const { userId } = req.auth;
+    const { userId } = req.auth();
     const studentDoc = await ensureStudent(userId);
 
     const { questionId, imageBase64, graph } = req.body || {};
@@ -710,7 +718,7 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
 // Stage 2: 虛擬碼檢查端點
 app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
   try {
-    const { userId } = req.auth;
+    const { userId } = req.auth();
     const studentDoc = await ensureStudent(userId);
 
     const { questionId, pseudocode } = req.body || {};
@@ -906,7 +914,7 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
 // Stage 3: 程式碼檢查端點
 app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
   try {
-    const { userId } = req.auth;
+    const { userId } = req.auth();
     const studentDoc = await ensureStudent(userId);
 
     const { questionId, code, language = "python" } = req.body || {};
@@ -1104,7 +1112,7 @@ app.post(
   requireAuth(),
   async (req, res) => {
     try {
-      const { userId } = req.auth;
+      const { userId } = req.auth();
       const studentDoc = await ensureStudent(userId);
       const { questionId, regenerate = false } = req.body || {};
 
@@ -1274,7 +1282,7 @@ app.get(
   requireAuth(),
   async (req, res) => {
     try {
-      const { userId } = req.auth;
+      const { userId } = req.auth();
       const studentDoc = await ensureStudent(userId);
       const { questionId } = req.query;
 
@@ -1551,15 +1559,15 @@ app.post("/api/run-code", async (req, res) => {
     try {
       await execFilep("python3", ["--version"]);
       return "python3";
-    } catch { }
+    } catch {}
     try {
       await execFilep("python", ["--version"]);
       return "python";
-    } catch { }
+    } catch {}
     try {
       await execFilep("py", ["-3", "--version"]);
       return "py";
-    } catch { }
+    } catch {}
     return null;
   }
 
@@ -1568,11 +1576,11 @@ app.post("/api/run-code", async (req, res) => {
     try {
       await execFilep("gcc", ["--version"]);
       return "gcc";
-    } catch { }
+    } catch {}
     try {
       await execFilep("clang", ["--version"]);
       return "clang";
-    } catch { }
+    } catch {}
     const candidates = [
       "C:\\msys64\\ucrt64\\bin\\gcc.exe",
       "C:\\msys64\\mingw64\\bin\\gcc.exe",
@@ -1585,7 +1593,7 @@ app.post("/api/run-code", async (req, res) => {
       const { stdout } = await execFilep("xcrun", ["--find", "clang"]);
       const p = stdout.trim();
       if (p && exists(p)) return p;
-    } catch { }
+    } catch {}
     return null;
   }
   // ===============================================
@@ -1608,7 +1616,7 @@ app.post("/api/run-code", async (req, res) => {
 
       const PY = await pickPython();
       if (!PY) {
-        await fs.unlink(filepath).catch(() => { });
+        await fs.unlink(filepath).catch(() => {});
         return res.status(400).json({
           success: false,
           error: "後端未安裝 Python（請安裝 python3 或在 .env 設 PYTHON_BIN）",
@@ -1623,7 +1631,7 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         },
       );
-      await fs.unlink(filepath).catch(() => { });
+      await fs.unlink(filepath).catch(() => {});
       return res.json({ success: true, stdout, stderr });
     } else if (language === "javascript") {
       filename = `${id}.js`;
@@ -1634,7 +1642,7 @@ app.post("/api/run-code", async (req, res) => {
         timeout: 3000,
         maxBuffer: 1024 * 200,
       });
-      await fs.unlink(filepath).catch(() => { });
+      await fs.unlink(filepath).catch(() => {});
       return res.json({ success: true, stdout, stderr });
     } else if (language === "c") {
       filename = `${id}.c`;
@@ -1643,7 +1651,7 @@ app.post("/api/run-code", async (req, res) => {
 
       const CC = await pickCCompiler();
       if (!CC) {
-        await fs.unlink(filepath).catch(() => { });
+        await fs.unlink(filepath).catch(() => {});
         return res.status(400).json({
           success: false,
           error:
@@ -1661,7 +1669,7 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         });
       } catch (e) {
-        await fs.unlink(filepath).catch(() => { });
+        await fs.unlink(filepath).catch(() => {});
         const stderrMsg =
           (e.stderr && e.stderr.toString()) ||
           e.err?.message ||
@@ -1698,15 +1706,15 @@ app.post("/api/run-code", async (req, res) => {
           maxBuffer: 1024 * 200,
         });
         await Promise.all([
-          fs.unlink(filepath).catch(() => { }),
-          fs.unlink(exePath).catch(() => { }),
+          fs.unlink(filepath).catch(() => {}),
+          fs.unlink(exePath).catch(() => {}),
         ]);
         console.log("CC =", process.env.CC || "auto");
         return res.json({ success: true, stdout, stderr });
       } catch (e) {
         await Promise.all([
-          fs.unlink(filepath).catch(() => { }),
-          fs.unlink(exePath).catch(() => { }),
+          fs.unlink(filepath).catch(() => {}),
+          fs.unlink(exePath).catch(() => {}),
         ]);
         return res.json({
           success: false,
@@ -1727,7 +1735,7 @@ app.post("/api/run-code", async (req, res) => {
     // 萬一哪裡 throw，盡量清掉暫存檔
     const del = cleanupFiles.length ? cleanupFiles : filepath ? [filepath] : [];
     if (del.length)
-      await Promise.all(del.map((f) => fs.unlink(f).catch(() => { })));
+      await Promise.all(del.map((f) => fs.unlink(f).catch(() => {})));
     res
       .status(500)
       .json({ success: false, error: "執行程式時發生錯誤: " + String(err) });
@@ -1841,14 +1849,14 @@ app.post("/api/run-code-interactive", async (req, res) => {
     childProcess.on("close", (code) => {
       activeProcesses.delete(processId);
       // 清理檔案
-      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     });
 
     childProcess.on("error", (error) => {
       console.error(`Process error for ${processId}:`, error);
       activeProcesses.delete(processId);
       // 清理檔案
-      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+      Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     });
 
     // 存儲程序引用
@@ -1868,7 +1876,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
       if (!isProcessRunning) {
         activeProcesses.delete(processId);
         // 清理檔案
-        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+        Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
       }
 
       res.json({
@@ -1887,7 +1895,7 @@ app.post("/api/run-code-interactive", async (req, res) => {
 
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     }
     res.status(500).json({
       success: false,
@@ -1994,7 +2002,7 @@ app.post("/api/stop-process", async (req, res) => {
     // 清理檔案
     if (cleanupFiles && cleanupFiles.length) {
       const fs = await import("fs/promises");
-      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => { })));
+      await Promise.all(cleanupFiles.map((f) => fs.unlink(f).catch(() => {})));
     }
 
     // 從活躍程序列表中移除
@@ -2030,19 +2038,18 @@ app.post("/api/check-code", requireAuth(), async (req, res) => {
     await mongoose.model("Submission").findOneAndUpdate(
       { student: student._id, questionId },
       {
-        $inc: { 
-          attemptCount: 1
+        $inc: {
+          attemptCount: 1,
           // chatCount: 1
-        }
+        },
       },
-      { upsert: true }
+      { upsert: true },
     );
 
     const geminiServices = await loadGeminiServices();
     const feedback = await geminiServices.checkCode(question, code, language);
 
     res.json({ success: true, feedback });
-
   } catch (error) {
     console.error("check-code error:", error);
     res.status(500).json({
@@ -2051,7 +2058,6 @@ app.post("/api/check-code", requireAuth(), async (req, res) => {
     });
   }
 });
-
 
 // 添加一個簡單的測試路由
 app.get("/test", (req, res) => {
@@ -2242,11 +2248,11 @@ app.get("/api/questions", async (req, res) => {
 
     const filter = q
       ? {
-        $or: [
-          { questionTitle: new RegExp(q, "i") },
-          { description: new RegExp(q, "i") },
-        ],
-      }
+          $or: [
+            { questionTitle: new RegExp(q, "i") },
+            { description: new RegExp(q, "i") },
+          ],
+        }
       : {};
 
     const [total, items] = await Promise.all([
@@ -2281,7 +2287,7 @@ app.get("/api/questions/:id", async (req, res) => {
 //儲存 stage1 的流程圖
 app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
   try {
-    const { userId } = req.auth;
+    const { userId } = req.auth();
     const {
       questionId,
       graph,
@@ -2329,7 +2335,6 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       },
     };
 
-
     console.log("儲存前 update：", JSON.stringify(update, null, 2));
 
     const doc = await Submission.findOneAndUpdate(
@@ -2337,7 +2342,11 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
       update,
       { new: true, upsert: true },
     );
-    res.status(201).json({ success: true, submissionId: doc._id, durationSec: doc?.stages?.stage1?.durationSec ?? 0, });
+    res.status(201).json({
+      success: true,
+      submissionId: doc._id,
+      durationSec: doc?.stages?.stage1?.durationSec ?? 0,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -2412,7 +2421,7 @@ app.post("/api/submissions/stage2", requireAuth(), async (req, res) => {
     const newSubmission = await Submission.findOneAndUpdate(
       { student: student._id, questionId },
       updateObj,
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     res.json({
@@ -2420,7 +2429,6 @@ app.post("/api/submissions/stage2", requireAuth(), async (req, res) => {
       data: newSubmission,
       durationSec: newSubmission?.stages?.stage2?.durationSec ?? 0,
     });
-
   } catch (err) {
     console.error("Error saving stage2:", err);
     res.status(500).json({ success: false, error: "伺服器錯誤" });
@@ -2501,7 +2509,7 @@ app.post("/api/submissions/stage3", requireAuth(), async (req, res) => {
     const newSubmission = await Submission.findOneAndUpdate(
       { student: student._id, questionId },
       updateObj,
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     res.json({
@@ -2509,13 +2517,11 @@ app.post("/api/submissions/stage3", requireAuth(), async (req, res) => {
       data: newSubmission,
       durationSec: newSubmission?.stages?.stage3?.durationSec ?? 0,
     });
-
   } catch (err) {
     console.error("Error saving stage3:", err);
     res.status(500).json({ success: false, error: "伺服器錯誤" });
   }
 });
-
 
 app.get("/api/submissions/stage3", async (req, res) => {
   try {
@@ -2572,29 +2578,29 @@ app.post("/api/chat", async (req, res) => {
 
     // 4. ✅ 關鍵修正：依照階段動態存入資料庫
     // 假設前端傳來的 stage 是 "stage1", "stage2" 或 "stage3"
-    const stageKey = stage || "stage1"; 
-    
+    const stageKey = stage || "stage1";
+
     await mongoose.model("Submission").findOneAndUpdate(
       { student: student._id, questionId },
-      { 
-        $inc: { 
-          [`stages.${stageKey}.chatCount`]: 1 // 增加對應階段的對話次數
+      {
+        $inc: {
+          [`stages.${stageKey}.chatCount`]: 1, // 增加對應階段的對話次數
         },
         $push: {
-          [`stages.${stageKey}.chatHistory`]: { // 存入對話紀錄，次數才會正確計算
+          [`stages.${stageKey}.chatHistory`]: {
+            // 存入對話紀錄，次數才會正確計算
             role: "user",
             message: prompt,
             answer: text,
-            timestamp: new Date()
-          }
-        }
+            timestamp: new Date(),
+          },
+        },
       },
-      { upsert: true }
+      { upsert: true },
     );
 
     // 5. 回傳給前端
     res.json({ success: true, result: text });
-    
   } catch (error) {
     console.error("Gemini Chat Error:", error);
     res.status(500).json({
@@ -2613,7 +2619,7 @@ app.get("/api/submissions/summary/:studentId", async (req, res) => {
     // ✅ 修正 1：用正確欄位 student
     const submission = await mongoose
       .model("Submission")
-      .findOne({ student: new mongoose.Types.ObjectId(studentId), })
+      .findOne({ student: new mongoose.Types.ObjectId(studentId) })
       .sort({ updatedAt: -1 });
 
     if (!submission) {
@@ -2681,9 +2687,7 @@ app.get("/api/submissions/summary/:studentId", async (req, res) => {
     res.json({ success: true, data: summaryData });
   } catch (error) {
     console.error("Summary API Error:", error);
-    res
-      .status(500)
-      .json({ success: false, error: "伺服器處理總結資料時出錯" });
+    res.status(500).json({ success: false, error: "伺服器處理總結資料時出錯" });
   }
 });
 
@@ -2696,11 +2700,11 @@ app.get("/api/test-insert", async (req, res) => {
     stages: {
       stage1: { durationSec: 120 },
       stage2: { durationSec: 300 },
-      stage3: { durationSec: 600 }
+      stage3: { durationSec: 600 },
     },
     attemptCount: 2,
     chatCount: 5,
-    helpCount: 1
+    helpCount: 1,
   });
 
   res.json(newData);
@@ -2711,10 +2715,9 @@ app.get("/api/debug-submissions", async (req, res) => {
   const data = await mongoose.model("Submission").find();
   res.json({
     count: data.length,
-    data
+    data,
   });
 });
-
 
 // 啟動服務器 - 適配Vercel無服務器函數
 console.log(

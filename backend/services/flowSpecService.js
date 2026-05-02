@@ -14,7 +14,7 @@ function getGenAI() {
 }
 
 // 預設權重與同義詞(可放 DB 讓教師自訂)
-const DEFAULT_SCORING = { structure: 0.3, nodes: 0.3, edges: 0.2, logic: 0.2 };
+const DEFAULT_SCORING = { structure: 0.25, nodes: 0.25, edges: 0.25, logic: 0.25 };
 const DEFAULT_SYNONYMS = {
   start: ["開始", "起點", "start", "start node"],
   end: ["結束", "終點", "end", "end node", "finish"],
