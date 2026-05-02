@@ -79,6 +79,25 @@ if (process.env.NODE_ENV !== "production") {
 const port = process.env.PORT || 3000;
 const app = express();
 
+// 檢查 Clerk 和 Gemini 初始化狀態
+app.get("/api/status", (req, res) => {
+  res.json({
+    status: "ok",
+    clerk: {
+      available: !!clerkClient,
+      type: typeof clerkClient,
+      clerkSecretKey: !!process.env.CLERK_SECRET_KEY,
+      clerkPublishableKey: !!process.env.CLERK_PUBLISHABLE_KEY,
+    },
+    gemini: {
+      apiKey: !!process.env.GEMINI_API_KEY,
+    },
+    mongodb: {
+      connected: mongoose.connection.readyState === 1,
+    },
+  });
+});
+
 // 檢查端點
 app.get("/health", (req, res) => {
   res.json({
@@ -344,8 +363,13 @@ async function pickCCompiler() {
 app.get("/api/me", requireAuth(), async (req, res) => {
   console.log("Auth header =", req.headers.authorization || "(none)");
   try {
+    // 防御性檢查
+    if (!clerkClient) {
+      console.error("[/api/me] clerkClient 不可用!");
+      throw new Error("clerkClient 未初始化。檢查 CLERK_SECRET_KEY 環境變量");
+    }
+
     const { userId } = req.auth();
-    console.log("ADMIN_EMAILS=", process.env.ADMIN_EMAILS);
 
     // 1) 從 Clerk 拉使用者資料
     const u = await clerkClient.users.getUser(userId);
@@ -363,11 +387,9 @@ app.get("/api/me", requireAuth(), async (req, res) => {
       null;
 
     const email = emailRaw ? emailRaw.toLowerCase() : null;
-    console.log("User:", { userId, fullName, email });
 
     // 2) 角色判斷：在白名單就是 teacher，否則 student
     const role = email && ADMIN_EMAILS_SET.has(email) ? "teacher" : "student";
-    console.log("Determined role:", role);
 
     // 3) upsert：第一次建立；之後每次同步 name/email/role
     const doc = await Student.findOneAndUpdate(
@@ -385,7 +407,9 @@ app.get("/api/me", requireAuth(), async (req, res) => {
 
     res.json({ success: true, me: doc });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res
+      .status(500)
+      .json({ success: false, error: err.message });
   }
 });
 
@@ -737,14 +761,11 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
 
     if (mongoose.isValidObjectId(questionId)) {
       const q = await Question.findById(questionId).lean();
-      console.log("🔍 [Stage2 DEBUG] 查詢結果 (by ID):", q);
       questionText = q?.description || q?.questionTitle || "";
     } else {
       const q = await Question.findOne({ questionTitle: questionId }).lean();
-      console.log("🔍 [Stage2 DEBUG] 查詢結果 (by Title):", q);
       questionText = q?.description || q?.questionTitle || "";
     }
-    console.log("🔍 [Stage2 DEBUG] 最終 questionText:", questionText);
 
     // 1) 取得或生成理想虛擬碼
     let ideal = await IdealAnswer.findOne({
@@ -1454,24 +1475,12 @@ app.post("/api/generate-pseudocode", async (req, res) => {
 
 題目：${question}`;
 
-    console.log(
-      "[generate-pseudocode] Calling Gemini API for pseudocode generation...",
-    );
-    console.log("[generate-pseudocode] Prompt:", prompt);
-
     const geminiServices = await loadGeminiServices();
-    console.log("[generate-pseudocode] Gemini services loaded successfully");
 
     try {
       const result = await geminiServices.generatePseudoCode(prompt);
-      console.log(
-        "[generate-pseudocode] Pseudocode generation successful:",
-        result,
-      );
       res.json(result);
     } catch (geminiError) {
-      console.error("[generate-pseudocode] Gemini API error:", geminiError);
-      console.error("[generate-pseudocode] Error stack:", geminiError.stack);
       // 返回一個默認的響應，避免完全失敗
       const fallbackResult = {
         pseudoCode: [
@@ -1482,15 +1491,9 @@ app.post("/api/generate-pseudocode", async (req, res) => {
         ],
         answers: ["if", "print", "else", "print"],
       };
-      console.log(
-        "[generate-pseudocode] Using fallback result:",
-        fallbackResult,
-      );
       res.json(fallbackResult);
     }
   } catch (err) {
-    console.error("[generate-pseudocode] Pseudocode generation error:", err);
-    console.error("[generate-pseudocode] Error stack:", err.stack);
     res.status(500).json({
       success: false,
       error: err.message,

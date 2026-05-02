@@ -157,20 +157,6 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   const handleInputChange = (e) => setInputValue(e.target.value);
 
   const handleCheck = async () => {
-    // ⚠️ [偵測代碼 #2-擴展] 檢查 setters 是否真的可用
-    console.log("🔍 [handleCheck] 驗證 setters 可用性...");
-    try {
-      if (typeof setAttemptCount !== "function") {
-        throw new Error("❌ setAttemptCount 不是函數！");
-      }
-      if (typeof setHelpCount !== "function") {
-        throw new Error("❌ setHelpCount 不是函數！");
-      }
-      console.log("✅ setters 驗證通過，準備執行檢查...");
-    } catch (err) {
-      console.error("❌ setters 驗證失敗:", err);
-      throw err;
-    }
 
     if (isTyping) return;
     setAttemptCount((prev) => prev + 1);
@@ -196,37 +182,6 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-
-      // ⚠️ [偵測代碼 #3-擴展] 詳細的 scores 數據驗證
-      console.log("📊 API 回應的 scores 詳細驗證:");
-      if (data.scores) {
-        const expectedFields = ["overall", "structure", "nodes", "edges"];
-        const presentFields = expectedFields.filter((f) =>
-          data.scores.hasOwnProperty(f),
-        );
-        const missingFields = expectedFields.filter(
-          (f) => !data.scores.hasOwnProperty(f),
-        );
-
-        console.log("  ✅ 存在的欄位:", presentFields);
-        if (missingFields.length > 0) {
-          console.warn("  ⚠️ 缺少的欄位:", missingFields);
-        }
-
-        console.log("  數值檢查:", {
-          overall: `${data.scores.overall} (預期: 0-100 範圍)`,
-          structure: `${data.scores.structure} (預期: 0-100 範圍)`,
-          nodes: `${data.scores.nodes} (預期: 0-100 範圍)`,
-          edges: `${data.scores.edges} (預期: 0-100 範圍)`,
-        });
-
-        // 檢查值是否在合理範圍內
-        if (data.scores.overall < 0 || data.scores.overall > 100) {
-          console.warn(
-            `⚠️ scores.overall (${data.scores.overall}) 超出範圍 [0, 100]`,
-          );
-        }
-      }
 
       if (!res.ok || !data.success) throw new Error(data.error || "檢查失敗");
       dispatch({ type: "check/setCheckResult", payload: data });
@@ -447,7 +402,7 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
                     type="primary"
                     disabled={isTyping}
                     onClick={() => {
-                      setHelpCount((prev) => prev + 1); // ✅ 求助次數
+                      setHelpCount((prev) => prev + 1);
                       handleSend("接下來我該做什麼？");
                     }}
                     style={{
