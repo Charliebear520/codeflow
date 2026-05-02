@@ -14,7 +14,12 @@ function getGenAI() {
 }
 
 // 預設權重與同義詞(可放 DB 讓教師自訂)
-const DEFAULT_SCORING = { structure: 0.25, nodes: 0.25, edges: 0.25, logic: 0.25 };
+const DEFAULT_SCORING = {
+  structure: 0.25,
+  nodes: 0.25,
+  edges: 0.25,
+  logic: 0.25,
+};
 const DEFAULT_SYNONYMS = {
   start: ["開始", "起點", "start", "start node"],
   end: ["結束", "終點", "end", "end node", "finish"],
@@ -84,9 +89,9 @@ function compareFlowSpecs(ideal, student) {
   const mustTypes = new Set(
     (ideal.nodes || [])
       .filter(
-        (n) => n.required || ["start", "end", "decision"].includes(n.type)
+        (n) => n.required || ["start", "end", "decision"].includes(n.type),
       )
-      .map((n) => n.type)
+      .map((n) => n.type),
   );
 
   const studentTypes = new Set((student.nodes || []).map((n) => n.type));
@@ -101,8 +106,8 @@ function compareFlowSpecs(ideal, student) {
   const missingNodes = requiredNodes.filter(
     (rn) =>
       !(student.nodes || []).some(
-        (sn) => sn.type === rn.type && sn.label === rn.label
-      )
+        (sn) => sn.type === rn.type && sn.label === rn.label,
+      ),
   );
 
   const nodesCoverage =
@@ -119,17 +124,17 @@ function compareFlowSpecs(ideal, student) {
   for (const idealNode of ideal.nodes || []) {
     // 找第一個相同 type 且尚未使用的學生節點
     const matchingStudent = (student.nodes || []).find(
-      (sn) => sn.type === idealNode.type && !usedStudentIds.has(sn.id)
+      (sn) => sn.type === idealNode.type && !usedStudentIds.has(sn.id),
     );
     if (matchingStudent) {
       idMapping[idealNode.id] = matchingStudent.id;
       usedStudentIds.add(matchingStudent.id);
       console.log(
-        `  ✅ 映射: ${idealNode.id} (${idealNode.type}, "${idealNode.label}") → ${matchingStudent.id} (${matchingStudent.type}, "${matchingStudent.label}")`
+        `  ✅ 映射: ${idealNode.id} (${idealNode.type}, "${idealNode.label}") → ${matchingStudent.id} (${matchingStudent.type}, "${matchingStudent.label}")`,
       );
     } else {
       console.log(
-        `  ⚠️ 找不到匹配節點: ${idealNode.id} (${idealNode.type}, "${idealNode.label}")`
+        `  ⚠️ 找不到匹配節點: ${idealNode.id} (${idealNode.type}, "${idealNode.label}")`,
       );
     }
   }
@@ -139,7 +144,7 @@ function compareFlowSpecs(ideal, student) {
   const requiredEdges = (ideal.edges || []).filter((e) => e.required);
   console.log(
     "🔗 必要的邊(requiredEdges):",
-    JSON.stringify(requiredEdges, null, 2)
+    JSON.stringify(requiredEdges, null, 2),
   );
   console.log("🔗 學生的所有邊:", JSON.stringify(student.edges, null, 2));
 
@@ -156,12 +161,12 @@ function compareFlowSpecs(ideal, student) {
       console.log(`    映射後: ${mappedFrom} → ${mappedTo}`);
       console.log(`    學生邊 ${se.from} → ${se.to} (${se.label || "無標籤"})`);
       console.log(
-        `    from匹配:${fromMatch}, to匹配:${toMatch}, label匹配:${labelMatch}`
+        `    from匹配:${fromMatch}, to匹配:${toMatch}, label匹配:${labelMatch}`,
       );
       return fromMatch && toMatch && labelMatch;
     });
     console.log(
-      `  必要邊 ${re.from} → ${re.to} ${found ? "✅找到" : "❌缺少"}`
+      `  必要邊 ${re.from} → ${re.to} ${found ? "✅找到" : "❌缺少"}`,
     );
     return !found;
   });
@@ -179,7 +184,7 @@ function compareFlowSpecs(ideal, student) {
     studentEdgesByFrom[e.from].push(e);
   });
   const decisionNodes = (student.nodes || []).filter(
-    (n) => n.type === "decision"
+    (n) => n.type === "decision",
   );
   const logicIssues = [];
   decisionNodes.forEach((d) => {
@@ -488,7 +493,7 @@ async function generateCheckReport(diffs) {
       issues.push(
         `缺少節點：${diffs.missingNodes
           .map((n) => n.label || n.type)
-          .join("、")}`
+          .join("、")}`,
       );
     }
     if (diffs.missingEdges?.length > 0) {
