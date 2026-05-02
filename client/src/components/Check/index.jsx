@@ -39,48 +39,6 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   const { content, language, setChatCount, setHelpCount, setAttemptCount } =
     useEditor();
 
-  // ⚠️ [偵測代碼 #1-擴展] 詳細的 EditorContext 初始化診斷
-  useEffect(() => {
-    console.group("🔍 EditorContext 初始化診斷");
-    try {
-      const contextValue = {
-        content,
-        language,
-        setChatCount,
-        setHelpCount,
-        setAttemptCount,
-      };
-
-      const hasAllSetters =
-        typeof setAttemptCount === "function" &&
-        typeof setHelpCount === "function" &&
-        typeof setChatCount === "function";
-
-      if (!hasAllSetters) {
-        console.error("❌ EditorContext 初始化失敗！", {
-          hasSetAttemptCount: typeof setAttemptCount === "function",
-          hasSetHelpCount: typeof setHelpCount === "function",
-          hasChatCount: typeof setChatCount === "function",
-          context: contextValue,
-        });
-        console.error("💡 可能的原因：Check 組件未被 EditorProvider 包裝");
-      } else {
-        console.log("✅ EditorContext 初始化成功", {
-          hasAllSetters,
-          componentName: "Check",
-        });
-        console.log("✅ 可用的 setters:", {
-          setAttemptCount: "✓ 函數",
-          setHelpCount: "✓ 函數",
-          setChatCount: "✓ 函數",
-        });
-      }
-    } catch (err) {
-      console.error("❌ EditorContext 診斷出錯:", err);
-    }
-    console.groupEnd();
-  }, [setAttemptCount, setHelpCount, setChatCount]);
-
   // 從 Redux 取得資料
   const byStage = useSelector((state) => state.check.byStage);
   const currentQuestion = useSelector((state) => state.question?.content);
@@ -157,7 +115,6 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   const handleInputChange = (e) => setInputValue(e.target.value);
 
   const handleCheck = async () => {
-
     if (isTyping) return;
     setAttemptCount((prev) => prev + 1);
     setMessages((prev) => [

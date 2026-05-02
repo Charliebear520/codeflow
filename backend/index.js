@@ -407,9 +407,7 @@ app.get("/api/me", requireAuth(), async (req, res) => {
 
     res.json({ success: true, me: doc });
   } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
