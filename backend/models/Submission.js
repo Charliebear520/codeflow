@@ -73,11 +73,23 @@ const submissionSchema = new Schema(
     },
     questionId: { type: String, required: true, index: true },
 
+    // attemptCount: { type: Number, default: 0 },
+    // chatCount: { type: Number, default: 0 },
+    // helpCount: { type: Number, default: 0 },
+
     stages: {
       stage1: stageSchema_1,
       stage2: stageSchema_2,
       stage3: stageSchema_3,
     },
+
+    /*
+  ✅ 行為追蹤欄位（新增）
+    */
+    attemptCount: { type: Number, default: 0 }, // 嘗試次數（按檢查）
+    helpCount: { type: Number, default: 0 },    // 求助次數（按提示）
+    hintCount: { type: Number, default: 0 },    // 看提示次數（可選）
+    chatCount: { type: Number, default: 0 },    // 與 AI 聊天次數
 
     // 綜合學習報告（當前版本）
     currentSummary: {

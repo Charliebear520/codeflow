@@ -438,7 +438,8 @@ async function generateFeedbackText(question, ideal, student, diffs, scores) {
  */
 async function generateCheckReport(diffs) {
   const ai = getGenAI();
-  const model = ai.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+  // 與其他服務統一，改用已支援的模型名稱
+  const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `你是程式教學專家。請根據以下流程圖比對結果，生成一份簡潔的檢查報告，列出學生作答中的具體問題點。
 

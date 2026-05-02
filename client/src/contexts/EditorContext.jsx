@@ -16,13 +16,25 @@ export const EditorProvider = ({ children }) => {
   const [content, setContent] = useState("");
   const [language, setLanguage] = useState("python");
 
+  // 統計 state
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [chatCount, setChatCount] = useState(0);
+  const [helpCount, setHelpCount] = useState(0);
+
   const value = {
     stage,
     content,
     language,
+    attemptCount,
+    setAttemptCount,
+    chatCount,
+    setChatCount,
+    helpCount,
+    setHelpCount,
     updateContent: setContent,
     updateStage: setStage,
     updateLanguage: setLanguage,
+  
   };
 
   return (

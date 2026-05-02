@@ -429,14 +429,24 @@ app.get("/api/generate-question", async (req, res) => {
 });
 
 // 新增：生成流程圖提示的API端點
-app.post("/api/generate-hint", async (req, res) => {
+// 新增：生成提示 + 記錄求助次數
+app.post("/api/generate-hint", requireAuth(), async (req, res) => {
   try {
-    const { question, hintLevel } = req.body;
+    // ✅ 1. 從前端取得資料（一定要有 questionId）
+    const { question, hintLevel, questionId } = req.body;
 
+    // ✅ 2. 基本檢查
     if (!question) {
       return res.status(400).json({
         success: false,
         error: "未提供題目",
+      });
+    }
+
+    if (!questionId) {
+      return res.status(400).json({
+        success: false,
+        error: "缺少 questionId",
       });
     }
 
@@ -447,25 +457,43 @@ app.post("/api/generate-hint", async (req, res) => {
       });
     }
 
+    // ✅ 3. 取得登入學生資訊
+    const { userId } = req.auth();
+    const student = await ensureStudent(userId);
+
+    // ✅ 4. ⭐ 關鍵：記錄「求助次數」
+    await mongoose.model("Submission").findOneAndUpdate(
+      { student: student._id, questionId }, // 找這個學生 + 這題
+      {
+        $inc: { helpCount: 1 } // 每點一次提示就 +1
+      },
+      { upsert: true } // 如果沒有這筆資料就自動建立
+    );
+
+    // ✅ 5. 呼叫 Gemini 生成提示
     console.log(`Generating hint for level ${hintLevel}...`);
     const geminiServices = await loadGeminiServices();
     const hint = await geminiServices.generateFlowchartHint(
       question,
-      hintLevel,
+      hintLevel
     );
 
+    // ✅ 6. 回傳提示給前端
     res.json({
       success: true,
       hint,
     });
+
   } catch (error) {
     console.error("Error generating hint:", error);
+
     res.status(500).json({
       success: false,
       error: `生成提示時發生錯誤: ${error.message}`,
     });
   }
 });
+
 
 // 修改：接收題目參數的流程圖檢查端點
 app.post("/api/check-flowchart", async (req, res) => {
@@ -1984,26 +2012,46 @@ app.post("/api/stop-process", async (req, res) => {
   }
 });
 
-// 新增：檢查第三階段程式碼的 API 端點
-app.post("/api/check-code", async (req, res) => {
+app.post("/api/check-code", requireAuth(), async (req, res) => {
   try {
-    const { question, code, language } = req.body;
-    if (!question || !code || !language) {
+    const { question, code, language, questionId } = req.body;
+
+    if (!question || !code || !language || !questionId) {
       return res.status(400).json({
         success: false,
-        error: "缺少題目、程式碼或語言參數",
+        error: "缺少必要參數",
       });
     }
+
+    const { userId } = req.auth();
+    const student = await ensureStudent(userId);
+
+    // ✅ 記錄行為（先記再算 AI 也可以）
+    await mongoose.model("Submission").findOneAndUpdate(
+      { student: student._id, questionId },
+      {
+        $inc: { 
+          attemptCount: 1
+          // chatCount: 1
+        }
+      },
+      { upsert: true }
+    );
+
     const geminiServices = await loadGeminiServices();
     const feedback = await geminiServices.checkCode(question, code, language);
+
     res.json({ success: true, feedback });
+
   } catch (error) {
+    console.error("check-code error:", error);
     res.status(500).json({
       success: false,
       error: error.message,
     });
   }
 });
+
 
 // 添加一個簡單的測試路由
 app.get("/test", (req, res) => {
@@ -2311,60 +2359,74 @@ app.post("/api/submissions/stage2", requireAuth(), async (req, res) => {
     const { userId } = req.auth();
     const student = await ensureStudent(userId);
 
-    const { questionId, pseudocode, completed, durationDeltaSec = 0 } = req.body;
+    const {
+      questionId,
+      pseudocode,
+      completed,
+      durationDeltaSec = 0,
 
-    // log 查詢條件
-    console.log("stage2 findOneAndUpdate filter:", { questionId });
+      // ⭐ 新增：從前端帶進來
+      attemptDelta = 0,
+      chatDelta = 0,
+      helpDelta = 0,
+    } = req.body;
 
     const delta = Number.isFinite(Number(durationDeltaSec))
       ? Math.max(0, Math.floor(Number(durationDeltaSec)))
       : 0;
 
-    // 只在有值時才 set，避免覆寫成 undefined/null
+    // ✅ 要寫入的欄位
     const setFields = {
       "stages.stage2.completed": !!completed,
       "stages.stage2.updatedAt": new Date(),
+
       studentName: student.name ?? null,
       studentEmail: student.email?.toLowerCase() ?? null,
     };
+
     if (typeof pseudocode === "string") {
       setFields["stages.stage2.pseudocode"] = pseudocode;
     }
 
+    // ✅ 關鍵：所有統計都在這裡累加
     const updateObj = {
       $set: setFields,
+
       $setOnInsert: {
         student: student._id,
         questionId,
       },
+
       $inc: {
         "stages.stage2.durationSec": delta,
-      }
+
+        // ⭐ 新增統計
+        "stages.stage2.attempts": attemptDelta,
+        "stages.stage2.chatCount": chatDelta,
+        "stages.stage2.helpCount": helpDelta,
+      },
     };
 
-
-    // log 更新內容
     console.log("stage2 updateObj:", updateObj);
 
-    // 執行更新
     const newSubmission = await Submission.findOneAndUpdate(
       { student: student._id, questionId },
       updateObj,
-      { upsert: true, new: true },
+      { upsert: true, new: true }
     );
-    // const doc = await Submission.findOneAndUpdate(
-    //   { student: student._id, questionId },
-    //   update,
-    //   { new: true, upsert: true }
-    // );
-    console.log("stage2 newSubmission:", newSubmission);
 
-    res.json({ success: true, data: newSubmission, durationSec: newSubmission?.stages?.stage2?.durationSec ?? 0, });
+    res.json({
+      success: true,
+      data: newSubmission,
+      durationSec: newSubmission?.stages?.stage2?.durationSec ?? 0,
+    });
+
   } catch (err) {
     console.error("Error saving stage2:", err);
     res.status(500).json({ success: false, error: "伺服器錯誤" });
   }
 });
+
 app.get("/api/submissions/stage2", async (req, res) => {
   try {
     const submissions = await Submission.find({});
@@ -2381,23 +2443,28 @@ app.post("/api/submissions/stage3", requireAuth(), async (req, res) => {
     const { userId } = req.auth();
     const student = await ensureStudent(userId);
 
-    const { questionId, code, language, completed, durationDeltaSec = 0 } = req.body;
+    const {
+      questionId,
+      code,
+      language,
+      completed,
+      durationDeltaSec = 0,
 
-    if (!questionId) {
-      return res.status(400).json({ success: false, error: "questionId 必填" });
-    }
+      // ⭐ 新增
+      attemptDelta = 0,
+      chatDelta = 0,
+      helpDelta = 0,
+    } = req.body;
 
-    // log 查詢條件
-    console.log("stage3 findOneAndUpdate filter:", { student: student._id, questionId });
-
+    // ⏱️ 時間處理
     const delta = Number.isFinite(Number(durationDeltaSec))
       ? Math.max(0, Math.floor(Number(durationDeltaSec)))
       : 0;
 
-    // 只在有值時才 set，避免覆寫成 undefined/null
     const setFields = {
       "stages.stage3.completed": !!completed,
       "stages.stage3.updatedAt": new Date(),
+
       studentName: student.name ?? null,
       studentEmail: student.email?.toLowerCase() ?? null,
     };
@@ -2405,49 +2472,50 @@ app.post("/api/submissions/stage3", requireAuth(), async (req, res) => {
     if (typeof code === "string") {
       setFields["stages.stage3.code"] = code;
     }
-    if (typeof language === "string") {
+
+    if (language) {
       setFields["stages.stage3.language"] = language;
     }
 
     const updateObj = {
       $set: setFields,
+
       $setOnInsert: {
         student: student._id,
         questionId,
       },
+
       $inc: {
+        // ⏱️ 時間
         "stages.stage3.durationSec": delta,
+
+        // ⭐⭐ 這三個才是 AI 分析關鍵 ⭐⭐
+        "stages.stage3.attempts": attemptDelta,
+        "stages.stage3.chatCount": chatDelta,
+        "stages.stage3.helpCount": helpDelta,
       },
     };
 
-    // log 更新內容
     console.log("stage3 updateObj:", updateObj);
 
-const newSubmission = await Submission.findOneAndUpdate(
-      { student: student._id, questionId }, // 使用目前的查詢條件
-      updateObj,                           // 使用目前的更新物件
+    const newSubmission = await Submission.findOneAndUpdate(
+      { student: student._id, questionId },
+      updateObj,
       { upsert: true, new: true }
     );
 
-    // 加入來自 QA-system 的除錯 Log，方便追蹤資料
-    console.log("stage3 upsert result _id:", newSubmission?._id?.toString());
-    console.log(
-      "stage3 upsert result stages.stage3:",
-      JSON.stringify(newSubmission?.stages?.stage3)
-    );
-
-    console.log("stage3 newSubmission:", newSubmission);
-
-    return res.json({
+    res.json({
       success: true,
       data: newSubmission,
       durationSec: newSubmission?.stages?.stage3?.durationSec ?? 0,
     });
+
   } catch (err) {
     console.error("Error saving stage3:", err);
-    return res.status(500).json({ success: false, error: "伺服器錯誤" });
+    res.status(500).json({ success: false, error: "伺服器錯誤" });
   }
 });
+
 
 app.get("/api/submissions/stage3", async (req, res) => {
   try {
@@ -2471,21 +2539,20 @@ app.get("/api/submissions/stage3", async (req, res) => {
 // 新增：通用的助教對話 API 端點
 app.post("/api/chat", async (req, res) => {
   try {
-    const { prompt, stage, currentData, question } = req.body;
+    const { prompt, stage, currentData, question, questionId } = req.body;
+    const student = req.user;
 
     // 1. 取得已經封裝好的 Gemini 服務
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
-
-    // 檢查 API KEY 是否存在
     if (!process.env.GEMINI_API_KEY) {
-      throw new Error("Missing GEMINI_API_KEY in .env file");
+      throw new Error("Missing GEMINI_API_KEY");
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // 💡 確保這裡的模型名稱與你 geminiService.js 裡的一致
-    const model = genAI.getGenerativeModel({ model: "Gemini 2.5 Flash" });
+    // 💡 修正模型名稱為官方標準格式，例如 gemini-1.5-flash
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // 2. 設定 AI 的說話人格與背景資訊
+    // 2. 設定 AI 的說話人格
     const systemInstruction = `
       你是一位親切的程式助教「沐芙」，正在引導學生學習程式邏輯。
       當前階段：${stage || "未提供"}
@@ -2503,17 +2570,151 @@ app.post("/api/chat", async (req, res) => {
     const response = await result.response;
     const text = response.text();
 
-    // 4. 回傳給前端
-    res.json({ success: true, result: text }); // 💡 確保回傳格式包含 success: true
+    // 4. ✅ 關鍵修正：依照階段動態存入資料庫
+    // 假設前端傳來的 stage 是 "stage1", "stage2" 或 "stage3"
+    const stageKey = stage || "stage1"; 
+    
+    await mongoose.model("Submission").findOneAndUpdate(
+      { student: student._id, questionId },
+      { 
+        $inc: { 
+          [`stages.${stageKey}.chatCount`]: 1 // 增加對應階段的對話次數
+        },
+        $push: {
+          [`stages.${stageKey}.chatHistory`]: { // 存入對話紀錄，次數才會正確計算
+            role: "user",
+            message: prompt,
+            answer: text,
+            timestamp: new Date()
+          }
+        }
+      },
+      { upsert: true }
+    );
+
+    // 5. 回傳給前端
+    res.json({ success: true, result: text });
+    
   } catch (error) {
-    console.error("Gemini Chat Error 詳細錯誤:", error);
+    console.error("Gemini Chat Error:", error);
     res.status(500).json({
       success: false,
-      error: "AI 助教目前忙線中，請檢查後端終端機報錯訊息。",
+      error: "AI 助教目前忙線中",
       details: error.message,
     });
   }
 });
+
+// 新增：取得學生提交紀錄總結的 API 端點
+app.get("/api/submissions/summary/:studentId", async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // ✅ 修正 1：用正確欄位 student
+    const submission = await mongoose
+      .model("Submission")
+      .findOne({ student: new mongoose.Types.ObjectId(studentId), })
+      .sort({ updatedAt: -1 });
+
+    if (!submission) {
+      return res
+        .status(404)
+        .json({ success: false, message: "找不到該學生的提交紀錄" });
+    }
+
+    /*
+      ✅ 修正 2：後端直接計算總秒數
+    */
+    const stage1Sec = submission.stages?.stage1?.durationSec || 0;
+    const stage2Sec = submission.stages?.stage2?.durationSec || 0;
+    const stage3Sec = submission.stages?.stage3?.durationSec || 0;
+
+    const totalDurationSec = stage1Sec + stage2Sec + stage3Sec;
+
+    let aiSummaryText = submission.aiSummary;
+
+    /*
+      ✅ 修正 3：安全包裝 Gemini
+    */
+    if (!aiSummaryText) {
+      try {
+        const { GoogleGenerativeAI } = await import("@google/generative-ai");
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.5-flash",
+        });
+
+        const prompt = `
+        請根據以下學生的解題數據，寫一段 50 字以內的老師觀點分析：
+        - 第一階段耗時：${stage1Sec} 秒
+        - 第二階段耗時：${stage2Sec} 秒
+        - 第三階段耗時：${stage3Sec} 秒
+        - 總嘗試次數：${submission.attemptCount || 0} 次
+        - 最後的錯誤訊息：${submission.lastError || "無"}
+        `;
+
+        const result = await model.generateContent(prompt);
+        aiSummaryText = result.response.text();
+
+        submission.aiSummary = aiSummaryText;
+        await submission.save();
+      } catch (aiError) {
+        console.error("Gemini Error:", aiError);
+        aiSummaryText = "AI 分析暫時無法產生";
+      }
+    }
+
+    /*
+      ✅ 整合回傳資料
+    */
+    const summaryData = {
+      stages: submission.stages,
+      totalDurationSec, // ← 現在是真的算出來
+      chatCount: submission.chatCount || 0,
+      attemptCount: submission.attemptCount || 0,
+      helpCount: submission.helpCount || 0,
+      aiSummary: aiSummaryText,
+      lastError: submission.lastError || "目前無語法錯誤紀錄",
+      status: totalDurationSec < 3600 ? "表現優異" : "需多加練習",
+    };
+
+    res.json({ success: true, data: summaryData });
+  } catch (error) {
+    console.error("Summary API Error:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "伺服器處理總結資料時出錯" });
+  }
+});
+
+// 新增：測試資料插入的端點
+app.get("/api/test-insert", async (req, res) => {
+  const Submission = mongoose.model("Submission");
+
+  const newData = await Submission.create({
+    student: new mongoose.Types.ObjectId(),
+    stages: {
+      stage1: { durationSec: 120 },
+      stage2: { durationSec: 300 },
+      stage3: { durationSec: 600 }
+    },
+    attemptCount: 2,
+    chatCount: 5,
+    helpCount: 1
+  });
+
+  res.json(newData);
+});
+
+// 新增：列出所有提交紀錄的端點（僅供測試使用，實際應加上認證與分頁）
+app.get("/api/debug-submissions", async (req, res) => {
+  const data = await mongoose.model("Submission").find();
+  res.json({
+    count: data.length,
+    data
+  });
+});
+
 
 // 啟動服務器 - 適配Vercel無服務器函數
 console.log(

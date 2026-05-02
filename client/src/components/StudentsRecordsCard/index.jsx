@@ -87,6 +87,7 @@ const StudentsRecordsCard = ({ student, submission }) => {
         <AISummaryModal 
           isVisible={isAIModalVisible} 
           onClose={handleCloseAIModal} 
+          studentId={student?._id}
           studentName={student?.name || "學生01"} 
         />
       </div>

@@ -5,7 +5,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: start;
-  padding: 10px 10px;
+  padding: 5px 5px;
   box-sizing: border-box;
   /* background-color: blanchedalmond; */
 }
@@ -13,10 +13,12 @@
   font-size: 17px;
   font-weight: 800;
   color: #223687;
+  line-height: 32px;
+  /* background-color: aqua; */
 }
 .DropDownMenu {
   width: 100%;
-  height: 30px;
+  /* height: 30px; */
   padding: 20px;
   margin-bottom: 30px;
   /* background-color: blueviolet; */

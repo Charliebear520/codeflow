@@ -70,7 +70,7 @@ const StudentsRecords = () => {
     <div className={styles.container}>
       <div className={styles.DropDownMenu}>
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-          <Col span={2}>
+          <Col>
             <p className={styles.subjectTitle}>選擇題目:</p>
           </Col>
           <Col span={4}>
@@ -90,7 +90,7 @@ const StudentsRecords = () => {
       ) : cards.length === 0 ? (
         <Empty description="沒有資料" />
       ) : (
-        <Row gutter={[16, 16]}>
+        <div gutter={[16, 16]}>
           {cards.map(({ student, submission }, index) => (
             <Col span={6} key={index}>
               <StudentsRecordsCard student={student} submission={submission} />
@@ -101,7 +101,7 @@ const StudentsRecords = () => {
               <StudentsRecordsCard student={student} submission={submission} />
             </Col>
           ))}
-        </Row>
+        </div>
       )}
     </div>
   );

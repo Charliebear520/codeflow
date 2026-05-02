@@ -26,7 +26,7 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   const dispatch = useDispatch();
 
   // 從 EditorContext 取得當前階段的內容
-  const { content, language } = useEditor();
+ const { content, language, setChatCount, setHelpCount, setAttemptCount } = useEditor();
 
   // 從 Redux 取得資料
   const byStage = useSelector((state) => state.check.byStage);
@@ -94,6 +94,7 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
 
   const handleCheck = async () => {
     if (isTyping) return;
+    setAttemptCount(prev => prev + 1);
     setMessages((prev) => [...prev, { sender: "user", text: "請幫我檢查目前的邏輯是否正確" }]);
     setIsTyping(true);
     try {
@@ -124,25 +125,35 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   const handleSend = async (textOverride = null) => {
     const textToSend = (typeof textOverride === "string" ? textOverride : inputValue).trim();
     if (textToSend === "" || isTyping) return;
-    if (textToSend.includes("接下來")) {
-        // 這裡可以選擇調用 handleCheck 或 原有的接下來邏輯
-        handleCheck(); 
-        return;
-    }
+
+    // if (textToSend.includes("接下來")) {
+    //     handleCheck(); 
+    //     return;
+    // }
+
+    // 只有「正常聊天」才算 chat
+    setChatCount(prev => prev + 1);
+
     setMessages((prev) => [...prev, { sender: "user", text: textToSend }]);
     setInputValue("");
     setIsTyping(true);
+
     try {
       const response = await fetch("http://localhost:5000/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: textToSend, stage, currentData: stageResult, question }),
       });
+
       const data = await response.json();
+
       setMessages((prev) => [...prev, { sender: "assistant", text: data.result || "無法回覆" }]);
+
     } catch (error) {
       setMessages((prev) => [...prev, { sender: "assistant", text: "❌ 服務故障" }]);
-    } finally { setIsTyping(false); }
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleKeyPress = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } };
@@ -210,8 +221,17 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
 
               <div className={styles.chatArea}>
                 <div className={styles.actionButtons}>
-                  <Button type="primary" disabled={isTyping} onClick={handleCheck} style={{ backgroundColor: "#b2c8ff", color: "#223687", borderRadius: "10px", border: "none" }}>檢查</Button>
-                  <Button type="primary" disabled={isTyping} onClick={() => handleSend("接下來我該做什麼？")} style={{ backgroundColor: "#b2c8ff", color: "#223687", borderRadius: "10px", border: "none" }}>接下來該怎麼做</Button>
+                  <Button type="primary" disabled={isTyping} 
+                    onClick={handleCheck} 
+                    style={{ backgroundColor: "#b2c8ff", color: "#223687", borderRadius: "10px", border: "none" }}>
+                    檢查</Button>
+                  <Button type="primary" disabled={isTyping} 
+                    onClick={() => {
+                        setHelpCount(prev => prev + 1); // ✅ 求助次數
+                        handleSend("接下來我該做什麼？");
+                      }}
+                    style={{ backgroundColor: "#b2c8ff", color: "#223687", borderRadius: "10px", border: "none" }}>
+                    接下來該怎麼做</Button>
                 </div>
                 <Flex align="flex-end" gap={8} style={{ marginTop: '12px' }}>
                   <TextArea placeholder="詢問助教..." autoSize={{ minRows: 1, maxRows: 4 }} value={inputValue} onChange={handleInputChange} onPressEnter={handleKeyPress} disabled={isTyping} style={{ flexGrow: 1 }} />

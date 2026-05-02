@@ -1,5 +1,6 @@
 /* AISummaryModal.module.css */
 
+/* 確保 X 軸文字不會被切掉 */
 .modalContent {
   padding: 10px;
   font-family: "Microsoft JhengHei", sans-serif;
@@ -87,13 +88,13 @@
 
 /* 圖表佔位 */
 .chartArea {
-  height: 200px;
-  background: #f9f9f9;
+  width: 100%;
+  height: 250px; /* 稍微增加高度讓圖表更好看 */
+  background: #fdfdfd;
   border-radius: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed #ccc;
+  padding: 10px;
+  border: 1px solid #f0f0f0; /* 將虛線改為細實線，較專業 */
+  margin-top: 10px;
 }
 
 /* 右側欄位 */

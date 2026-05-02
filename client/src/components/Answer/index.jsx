@@ -247,15 +247,6 @@ const Answer = ({ onChecking }) => {
 
   const extraButtons = (
     <div style={{ display: "flex", gap: "8px" }}>
-      <Button
-        type="primary"
-        onClick={handleCheck}
-        className={styles.checkButton}
-        loading={checking}
-        disabled={checking}
-      >
-        檢查
-      </Button>
       <Button type="primary" className={styles.uploadButton}>
         上傳
       </Button>

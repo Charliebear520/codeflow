@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Button, App, Spin, Splitter, Popover } from "antd";
+import { Button, App, Spin, Splitter, Popover, Modal } from "antd";
 import {
   ArrowsAltOutlined,
   ShrinkOutlined,
@@ -83,6 +83,7 @@ const OnlineCoding = ({
 
   // 新增：儲存中 flag，避免重複點擊 (修正 saving 未定義錯誤)
   const [checking, setChecking] = useState(false);
+
   const { getToken } = useAuth(); //額外加入
   const API_BASE = import.meta.env.VITE_API_BASE; //額外加入
 
@@ -164,6 +165,7 @@ const OnlineCoding = ({
   }, [question]);
 
   const handleCheck = async () => {
+    setAttemptCount(prev => prev + 1);
     if (!code || !question) {
       antdMessage.info("請先輸入程式碼與確認題目");
       return false;
@@ -177,7 +179,7 @@ const OnlineCoding = ({
         const res = await fetch("/api/check-code", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question, code, language }),
+          body: JSON.stringify({ question, code, language, questionId: "Q001" }),
         });
         const data = await res.json();
         if (data.success) {
@@ -363,77 +365,124 @@ const OnlineCoding = ({
       { type: "system", content: "程式執行已停止" },
     ]);
   };
-  const HandleSave = async () => {
+  
+  //新增「Modal 控制 state」
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const handleSaveStage2 = async () => {
+    try {
+      const token = await getToken();
+
+      if (!code) {
+        antdMessage.error("請先輸入 pseudocode");
+        return;
+      }
+
+      const now = Date.now();
+      const deltaSec = Math.max(
+        0,
+        Math.floor((now - (lastTickRef.current || now)) / 1000)
+      );
+      lastTickRef.current = now;
+
+      const res = await fetch("/api/submissions/stage2", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          questionId: "Q001",
+          pseudocode: code,
+          completed: false,
+          durationDeltaSec: deltaSec,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error);
+      }
+
+      antdMessage.success("已儲存第二階段");
+    } catch (err) {
+      console.error(err);
+      antdMessage.error("儲存失敗");
+    }
+  };
+
+  const handleSaveStage3 = async () => {
+    try {
+      const token = await getToken();
+
+      if (!code) {
+        antdMessage.error("請先輸入程式碼");
+        return;
+      }
+
+      const now = Date.now();
+      const deltaSec = Math.max(
+        0,
+        Math.floor((now - (lastTickRef.current || now)) / 1000)
+      );
+      lastTickRef.current = now;
+
+      const res = await fetch("/api/submissions/stage3", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          questionId: "Q001",
+          code: code,
+          language: language,
+          completed: false,
+          durationDeltaSec: deltaSec,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error);
+      }
+
+      antdMessage.success("已儲存第三階段");
+    } catch (err) {
+      console.error(err);
+      antdMessage.error("儲存失敗");
+    }
+  };
+
+
+  // 「上傳」：單純把目前內容與時間增量寫回後端，不做 AI 檢查
+  const handleUpload = async () => {
     const token = await getToken();
-    let payload = { questionId: "Q001", completed: false };
     const now = Date.now();
-    const deltaSec = Math.max(0, Math.floor((now - (lastTickRef.current || now)) / 1000));
+    const deltaSec = Math.max(
+      0,
+      Math.floor((now - (lastTickRef.current || now)) / 1000),
+    );
     lastTickRef.current = now;
-    payload.durationDeltaSec = deltaSec;
 
     if (saving) return; // 防止重複點擊
     setSaving(true);
     setApiError("");
 
     try {
-      // ---------- 第 1 步：進行檢查 ----------
       if (!code || !question) {
         antdMessage.info("請先輸入程式碼與確認題目");
         return;
       }
 
-      setChecking(true);
-      if (onChecking) onChecking(true);
-
-      let checkRes;
-      let checkData;
-      try {
-        if (isStage3) {
-          // 第三階段：檢查程式語法
-          checkRes = await fetch("/api/check-code", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ question, code, language }),
-          });
-        } else {
-          // 第二階段：檢查 pseudocode
-          checkRes = await fetch("/api/check-pseudocode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ question, userPseudoCode: code }),
-          });
-        }
-
-        checkData = await checkRes.json();
-      } catch (err) {
-        console.error("檢查階段錯誤:", err);
-        antdMessage.error("檢查失敗，請稍後再試。");
-        return;
-      } finally {
-        setChecking(false);
-        if (onChecking) onChecking(false);
-      }
-
-      // ---------- 第 2 步：檢查回傳結果 ----------
-      if (!checkData?.success) {
-        antdMessage.error(checkData?.error || "檢查未通過，請修改後再試。");
-        if (onFeedback) onFeedback(checkData?.feedback || "");
-        return;
-      }
-
-      // 檢查成功
-      antdMessage.success("語法檢查回饋已顯示於右側助教區");
-      if (onFeedback) onFeedback(checkData.feedback);
-
-      // ---------- 第 3 步：進行儲存 ----------
       const questionId =
         localStorage.getItem("currentFlowchartQuestionId") || "Q001";
-      // const API_BASE = import.meta.env.VITE_API_BASE;
 
-      let saveRes, saveData;
-
+      let saveRes;
       if (isStage3) {
-        console.log("[HandleSave] 儲存第三階段資料...");
+        console.log("[handleUpload] 儲存第三階段資料...");
         saveRes = await fetch(`/api/submissions/stage3`, {
           method: "POST",
           headers: {
@@ -449,7 +498,7 @@ const OnlineCoding = ({
           }),
         });
       } else {
-        console.log("[HandleSave] 儲存第二階段資料...");
+        console.log("[handleUpload] 儲存第二階段資料...");
         saveRes = await fetch(`/api/submissions/stage2`, {
           method: "POST",
           headers: {
@@ -471,21 +520,20 @@ const OnlineCoding = ({
         throw new Error(`HTTP error! status: ${saveRes.status}`);
       }
 
-      saveData = await saveRes.json();
-      console.log("💾 儲存回傳資料:", saveData);
+      const saveData = await saveRes.json();
+      console.log("💾 上傳回傳資料:", saveData);
 
       if (saveData.success) {
         antdMessage.success(
-          isStage3 ? "已儲存第三階段的作答" : "已儲存第二階段的作答"
+          isStage3 ? "已上傳第三階段的作答" : "已上傳第二階段的作答",
         );
-        console.log("保存成功", { questionId, stage: isStage3 ? 3 : 2 });
       } else {
-        antdMessage.error(saveData.error || "儲存失敗");
+        antdMessage.error(saveData.error || "上傳失敗");
       }
     } catch (err) {
-      console.error("HandleSave 發生錯誤:", err);
-      setApiError("操作失敗，請稍後再試。");
-      antdMessage.error("操作失敗，請稍後再試。");
+      console.error("handleUpload 發生錯誤:", err);
+      setApiError("上傳失敗，請稍後再試。");
+      antdMessage.error("上傳失敗，請稍後再試。");
     } finally {
       setSaving(false);
     }
@@ -555,30 +603,70 @@ const OnlineCoding = ({
               }}
             >
               <Button
-                onClick={HandleSave}
+                onClick={() => setConfirmOpen(true)}
                 style={{
-                  backgroundColor: "#B2C8FF",
+                  backgroundColor: "#9287ee94",
                   color: "#223687",
                   border: "none",
                   transition: "all 0.2s ease",
                 }}
                 onMouseEnter={(e) => {
-                  // e.target.style.backgroundColor = "#9BB8FF";
                   e.target.style.transform = "scale(1.02)";
                 }}
                 onMouseLeave={(e) => {
-                  // e.target.style.backgroundColor = "#B2C8FF";
                   e.target.style.transform = "scale(1)";
                 }}
-                loading={checking || saving}
-                disabled={checking || saving}
+                loading={saving}
+                disabled={saving}
               >
-                檢查
+                上傳
               </Button>
+              <Modal
+                  title={<span style={{ fontWeight: "bold" }}>📌 提示</span>}
+                  open={confirmOpen}
+                  centered
+                  width={400}
+
+                  onOk={async () => {
+                    await handleUpload();
+                    setConfirmOpen(false);
+                  }}
+
+                  onCancel={() => setConfirmOpen(false)}
+
+                  okText="確定上傳"
+                  cancelText="取消"
+                  confirmLoading={saving}
+
+                  okButtonProps={{
+                    style: {
+                      backgroundColor: "#6C63FF",
+                      border: "none"
+                    }
+                  }}
+
+                  styles={{
+                    content: {
+                      borderRadius: "16px",
+                      padding: "20px"
+                    }
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                    <span style={{ fontSize: "22px" }}>⚠️</span>
+                    <div>
+                      <div style={{ fontWeight: "bold", paddingTop: "10px" }}>確定要上傳嗎？</div>
+                      <div style={{ fontSize: "14px", color: "#888", paddingBottom: "10px" }}>
+                        上傳後將儲存目前作答進度
+                      </div>
+                    </div>
+                  </div>
+                </Modal>
+
               <Button
-                onClick={handleReset}
+                onClick={isStage3 ? handleSaveStage3 : handleSaveStage2}
                 style={{
-                  backgroundColor: "#9287ee94",
+                  backgroundColor: "#c1e8ee94",
                   color: "#223687",
                   border: "none",
                   transition: "all 0.2s ease",
@@ -592,7 +680,7 @@ const OnlineCoding = ({
                   e.target.style.transform = "scale(1)";
                 }}
               >
-                清空
+                儲存
               </Button>
 
               {isStage3 && (
@@ -602,7 +690,7 @@ const OnlineCoding = ({
                       onClick={handleRun}
                       loading={runLoading}
                       style={{
-                        backgroundColor: "rgb(193, 232, 238)",
+                        backgroundColor: "rgb(128, 180, 139)0)",
                         color: "#223687",
                         border: "none",
                         transition: "all 0.2s ease",
