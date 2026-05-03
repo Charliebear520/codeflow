@@ -112,6 +112,13 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
     }
   }, [stageResult]);
 
+  // 阶段切换时清空消息和输入框
+  useEffect(() => {
+    setMessages([]);
+    setInputValue("");
+    setLastCheckHash(null);
+  }, [stage]);
+
   const handleInputChange = (e) => setInputValue(e.target.value);
 
   const handleCheck = async () => {
@@ -143,11 +150,27 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
       if (!res.ok || !data.success) throw new Error(data.error || "檢查失敗");
       dispatch({ type: "check/setCheckResult", payload: data });
       setLastCheckHash(getContentHash(stage));
+
+      // 生成报告消息
+      const reportText = `
+## 📋 檢查結果報告
+
+**總分**：${Math.round(data.scores?.overall || 0)} 分
+- 結構：${Math.round(data.scores?.structure || 0)} 分
+- 節點：${Math.round(data.scores?.nodes || 0)} 分
+- 連線：${Math.round(data.scores?.edges || 0)} 分
+
+## 💡 AI 助教建議
+
+${data.checkFeedback || data.feedback || "已完成檢查"}
+`;
+
       setMessages((prev) => [
         ...prev.slice(0, -1),
         {
           sender: "assistant",
-          text: `## 檢查結果\n\n${data.checkReport || "已完成檢查"}\n\n有任何問題都可以問我！`,
+          text: reportText,
+          isReport: true,
         },
       ]);
     } catch (error) {
@@ -220,9 +243,11 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
     >
       {msg.sender === "assistant" && <div className={styles.avatar}>🤖</div>}
       <div
-        className={
+        className={`${
           msg.sender === "assistant" ? styles.bubbleLeft : styles.bubbleRight
-        }
+        } ${
+          msg.isReport ? styles.isReport : ""
+        }`}
       >
         <ReactMarkdown>{msg.text}</ReactMarkdown>
       </div>
@@ -261,55 +286,6 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
               {isChecking && (
                 <div style={{ textAlign: "center", padding: "10px" }}>
                   <Spin size="small" tip="AI 辨識中..." />
-                </div>
-              )}
-
-              {scores && checkFeedback && (
-                <div
-                  style={{
-                    marginBottom: "20px",
-                    borderBottom: "1px solid #eee",
-                    paddingBottom: "20px",
-                  }}
-                >
-                  <h3 style={{ color: "#9287EE", marginBottom: "16px" }}>
-                    檢查結果報告
-                  </h3>
-                  <Card title="評分結果" style={{ marginBottom: "16px" }}>
-                    <Row gutter={16}>
-                      <Col span={6}>
-                        <Statistic
-                          title="總分"
-                          value={Math.round(scores.overall || 0)}
-                          suffix="分"
-                        />
-                      </Col>
-                      <Col span={6}>
-                        <Statistic
-                          title="結構"
-                          value={Math.round(scores.structure || 0)}
-                          suffix="分"
-                        />
-                      </Col>
-                      <Col span={6}>
-                        <Statistic
-                          title="節點"
-                          value={Math.round(scores.nodes || 0)}
-                          suffix="分"
-                        />
-                      </Col>
-                      <Col span={6}>
-                        <Statistic
-                          title="連線"
-                          value={Math.round(scores.edges || 0)}
-                          suffix="分"
-                        />
-                      </Col>
-                    </Row>
-                  </Card>
-                  <Card title="AI 助教建議">
-                    <ReactMarkdown>{checkFeedback}</ReactMarkdown>
-                  </Card>
                 </div>
               )}
 
