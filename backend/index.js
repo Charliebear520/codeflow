@@ -2544,10 +2544,10 @@ app.get("/api/submissions/stage3", async (req, res) => {
 // });
 
 // 新增：通用的助教對話 API 端點
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", requireAuth(), async (req, res) => {
   try {
     const { prompt, stage, currentData, question, questionId } = req.body;
-    const student = req.user;
+    const { userId } = req.auth();
 
     // 1. 取得已經封裝好的 Gemini 服務
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
@@ -2556,8 +2556,8 @@ app.post("/api/chat", async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // 💡 修正模型名稱為官方標準格式，例如 gemini-1.5-flash
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // 💡 修正模型名稱為官方標準格式，例如 gemini-2.5-flash
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // 2. 設定 AI 的說話人格
     const systemInstruction = `
@@ -2571,6 +2571,15 @@ app.post("/api/chat", async (req, res) => {
       2. 不要直接給答案，要用提問或提示的方式引導學生。
       3. 回答時可以使用 Markdown 格式。
     `;
+
+    // 2.5 ✅ 根據 Clerk userId 查詢 MongoDB 中的學生記錄
+    const student = await mongoose.model("Student").findOne({ userId }).lean();
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        error: "學生記錄未找到",
+      });
+    }
 
     // 3. 發送請求給 Gemini
     const result = await model.generateContent([systemInstruction, prompt]);
