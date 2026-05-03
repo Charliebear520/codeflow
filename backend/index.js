@@ -2545,10 +2545,10 @@ app.get("/api/submissions/stage3", async (req, res) => {
 
 // 新增：通用的助教對話 API 端點
 app.post("/api/chat", requireAuth(), async (req, res) => {
-  try {
-    const { prompt, stage, currentData, question, questionId } = req.body;
-    const { userId } = req.auth();
+  const { prompt, stage, currentData, question, questionId } = req.body;
+  const { userId } = req.auth();
 
+  try {
     // 1. 取得已經封裝好的 Gemini 服務
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     if (!process.env.GEMINI_API_KEY) {
@@ -2613,6 +2613,23 @@ app.post("/api/chat", requireAuth(), async (req, res) => {
     res.json({ success: true, result: text });
   } catch (error) {
     console.error("Gemini Chat Error:", error);
+    const isQuotaError =
+      error?.status === 429 ||
+      /quota|rate limit|too many requests/i.test(error?.message || "");
+
+    if (isQuotaError) {
+      const fallbackReply =
+        stage === "stage1" || /流程圖/.test(question || "")
+          ? "先確認流程圖是否有開始、判斷、處理與結束，並把分支箭頭標示清楚。"
+          : "先補齊開始、判斷與結束，再檢查每個分支是否都有對應步驟。";
+
+      return res.json({
+        success: true,
+        result: fallbackReply,
+        fallback: true,
+      });
+    }
+
     res.status(500).json({
       success: false,
       error: "AI 助教目前忙線中",
