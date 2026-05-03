@@ -140,17 +140,15 @@ function compareFlowSpecs(ideal, student) {
   }
   console.log("🔗 ID 映射表:", JSON.stringify(idMapping, null, 2));
 
-  // 邊涵蓋率：優先檢查 required=true 的邊；若理想答案未標 required，則改比對全部理想邊
-  const allIdealEdges = ideal.edges || [];
-  const requiredEdges = allIdealEdges.filter((e) => e.required);
-  const edgesToCheck = requiredEdges.length > 0 ? requiredEdges : allIdealEdges;
+  // 邊涵蓋率(僅檢查 required=true 的邊)
+  const requiredEdges = (ideal.edges || []).filter((e) => e.required);
   console.log(
     "🔗 必要的邊(requiredEdges):",
     JSON.stringify(requiredEdges, null, 2),
   );
   console.log("🔗 學生的所有邊:", JSON.stringify(student.edges, null, 2));
 
-  const missingEdges = edgesToCheck.filter((re) => {
+  const missingEdges = requiredEdges.filter((re) => {
     // 使用映射表將理想答案的 ID 轉換為學生的 ID
     const mappedFrom = idMapping[re.from] || re.from;
     const mappedTo = idMapping[re.to] || re.to;
@@ -175,9 +173,9 @@ function compareFlowSpecs(ideal, student) {
   console.log("❌ 缺少的邊:", JSON.stringify(missingEdges, null, 2));
 
   const edgesCoverage =
-    edgesToCheck.length === 0
+    requiredEdges.length === 0
       ? 1
-      : (edgesToCheck.length - missingEdges.length) / edgesToCheck.length;
+      : (requiredEdges.length - missingEdges.length) / requiredEdges.length;
 
   // 邏輯簡檢：decision 節點是否帶有 yes/no 出邊
   const studentEdgesByFrom = {};
@@ -353,21 +351,21 @@ async function generateFeedbackText(question, ideal, student, diffs, scores) {
 
   try {
     const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
-    const prompt = `你是一位非常簡潔的國中程式設計助教。你的任務是根據現有的「比對差異」和「分數」，只用繁體中文提供一個簡短、具體的引導式建議。
+    const prompt = `你是一位非常簡潔的國中程式設計助教。你的任務是根據現有的「比對差異」和「分數」，只用繁體中文提供簡短的引導式建議。
 
 **輸入資訊**：
 - 比對差異：${JSON.stringify(diffs, null, 2)}
 - 分數：${JSON.stringify(scores, null, 2)}
 
 **⚠️ 絕對限制（違反將視為無效輸出）**：
-1. 總字數：**維持 150 字以內**（包含標點符號）
+1. 總字數：**嚴格限制在 150 字以內**（包含標點符號）
 2. 格式：**絕對禁止**使用任何符號：-、•、*、1.、2.、3. 等
-3. 風格：只輸出一段話，不編號、不分點
+3. 風格：每個建議寫成完整句子，用空行分隔，不編號
 
 **輸出規則**：
 1. **絕對不要**自己重新分析題目或給出完整答案
 2. **只根據**上方提供的「比對差異」來產生提示
-3. **風格**：優先針對最明顯的問題點，用引導式問句，例如「是不是少了...？」或「可以思考看看...」
+3. **風格**：引導式問句，例如「是不是少了...？」或「可以思考看看...」
 4. **字數檢查**：完成後請自行確認總字數 ≤ 150 字
 5. **如果差異很少**：就說「做得很好，架構很完整！可以再檢查看看細節喔。」（限 30 字內）
 6. **語言**：僅使用繁體中文

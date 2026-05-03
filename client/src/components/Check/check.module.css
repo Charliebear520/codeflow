@@ -99,8 +99,7 @@
 .bubbleLeft ul,
 .bubbleLeft ol {
   margin: 8px 0;
-  padding-left: 1.25rem; /* 保留 marker 所需縮排，避免超出氣泡 */
-  list-style-position: outside;
+  padding-left: 0; /* 清除瀏覽器預設的 40px padding */
 }
 
 /* 右側訊息（使用者） */
