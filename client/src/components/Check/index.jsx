@@ -202,14 +202,20 @@ ${data.checkFeedback || data.feedback || "已完成檢查"}
     setIsTyping(true);
 
     try {
+      if (!isSignedIn) throw new Error("請先登入");
+      const token = await getToken();
       const response = await fetch("http://localhost:5000/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           prompt: textToSend,
           stage,
           currentData: stageResult,
           question,
+          questionId: "Q001",
         }),
       });
 
@@ -245,9 +251,7 @@ ${data.checkFeedback || data.feedback || "已完成檢查"}
       <div
         className={`${
           msg.sender === "assistant" ? styles.bubbleLeft : styles.bubbleRight
-        } ${
-          msg.isReport ? styles.isReport : ""
-        }`}
+        } ${msg.isReport ? styles.isReport : ""}`}
       >
         <ReactMarkdown>{msg.text}</ReactMarkdown>
       </div>

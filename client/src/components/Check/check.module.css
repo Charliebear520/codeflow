@@ -1,8 +1,8 @@
-.mainspace{
-  height: 100vh; 
+.mainspace {
+  height: 100vh;
   padding: 0rem 1rem 2rem 2rem;
-  display: flex;             /* 啟用 Flexbox */
-  flex-direction: column;    /* 設定主軸為垂直方向 */
+  display: flex; /* 啟用 Flexbox */
+  flex-direction: column; /* 設定主軸為垂直方向 */
   justify-content: flex-end; /* 將子元素對齊到主軸的結尾 (底部) */
 }
 .container {
@@ -11,7 +11,6 @@
   height: 95%; /* 設定高度為視窗高度 */
   overflow: hidden; /* 防止滾動條出現 */
   /* gap:1rem; */
-
 }
 
 .tutorbox {
@@ -25,9 +24,9 @@
   grid-template-rows: 1fr auto;
   background: #ffffff;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
-  flex-grow: 1; 
-  margin-bottom: 1rem; 
-  padding: 10px; 
+  flex-grow: 1;
+  margin-bottom: 1rem;
+  padding: 10px;
   overflow: hidden;
   box-sizing: border-box;
   height: 100%;
@@ -44,7 +43,7 @@
   flex-shrink: 0;
 }
 
-.actionButtons{
+.actionButtons {
   display: flex;
   justify-content: flex-end;
   margin: 10px 0;
@@ -54,7 +53,7 @@
 /*自訂對話氣泡*/
 .bubble {
   position: relative;
-  background-color: #F3F5FA; /* 截圖中的淺藍灰色 */
+  background-color: #f3f5fa; /* 截圖中的淺藍灰色 */
   color: #333;
   padding: 10px 12px;
   border-radius: 12px;
@@ -85,7 +84,6 @@
 .rowLeft {
   display: flex;
   align-items: flex-start;
-  
 }
 
 .bubbleLeft {
@@ -95,10 +93,11 @@
   max-width: 75%;
   color: #333;
   /* 確保長文字會換行 */
-  word-break: break-word; 
+  word-break: break-word;
 }
 
-.bubbleLeft ul, .bubbleLeft ol {
+.bubbleLeft ul,
+.bubbleLeft ol {
   margin: 8px 0;
   padding-left: 0; /* 清除瀏覽器預設的 40px padding */
 }
@@ -119,7 +118,8 @@
 }
 
 /* 頭像 */
-.avatar, .avatarUser {
+.avatar,
+.avatarUser {
   width: 36px;
   height: 36px;
   background: #dfe8ff;
@@ -139,7 +139,8 @@
 }
 
 /* 為了讓 Markdown 圖片或程式碼不會爆出去 */
-.bubbleLeft img, .bubbleRight img {
+.bubbleLeft img,
+.bubbleRight img {
   max-width: 100%;
 }
 
@@ -159,7 +160,7 @@
   color: #223687;
 }
 
-.actionButtons{
+.actionButtons {
   display: flex;
   justify-content: center;
   margin: 5px 0;
@@ -175,15 +176,15 @@
 }
 
 /* 如果你想自訂點擊時的微小變化，可以改用變色而不是邊框 */
-.actionButtons button:active, .sendButton:active {
+.actionButtons button:active,
+.sendButton:active {
   transform: scale(0.98); /* 點擊時輕微縮小，增加回饋感 */
   filter: brightness(0.9); /* 點擊時顏色稍微變暗 */
-
 }
 
 /* 傳送按鈕專屬樣式 */
 .sendButton {
-  width: 48px ;  /* 寬度與高度必須一致 */
+  width: 48px; /* 寬度與高度必須一致 */
   height: 40px;
   border-radius: 50% !important; /* 強制變圓形 */
   background-color: #d9c9ff;
