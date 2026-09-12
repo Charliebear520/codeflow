@@ -5,8 +5,7 @@
       "src": "client/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist",
-        "buildCommand": "cd client && yarn install && yarn build"
+        "distDir": "dist"
       }
     },
     {

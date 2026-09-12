@@ -2769,4 +2769,4 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // 導出app供Vercel使用 (僅在作為模塊導入時)
-// export default app;
+export default app;
