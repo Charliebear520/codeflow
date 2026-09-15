@@ -15,7 +15,7 @@ import StageSwitcher from "../StageSwitcher";
 const Topic = () => {
   const { getToken, isSignedIn } = useAuth();
   const [question, setQuestion] = useState(
-    "請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。"
+    "請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。",
   );
   const [loading, setLoading] = useState(false);
   const [hintLevel, setHintLevel] = useState(1); // 提示層級，從1開始
@@ -37,7 +37,7 @@ const Topic = () => {
         // 將當前題目存儲到 localStorage，以便在提交流程圖時使用
         localStorage.setItem(
           "currentFlowchartQuestion",
-          response.data.question
+          response.data.question,
         );
         // 重置提示層級和提示緩存
         setHintLevel(1);
@@ -74,7 +74,7 @@ const Topic = () => {
         },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
+        },
       );
 
       if (response.data.success) {

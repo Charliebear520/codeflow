@@ -64,17 +64,14 @@ const Home = () => {
 
     try {
       const token = await getToken();
-      const res = await fetch(
-        "/api/submissions/all-stages/summary",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ questionId: "Q001", regenerate }),
+      const res = await fetch("/api/submissions/all-stages/summary", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({ questionId: "Q001", regenerate }),
+      });
 
       const data = await res.json();
       if (data.success) {

@@ -55,7 +55,10 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   };
 
   const preparePayload = async (stageNum) => {
-    const basePayload = { questionId: "Q001" };
+    const basePayload = {
+      questionId: "Q001",
+      question: question || currentQuestion || "",
+    };
     if (stageNum === 1) {
       const reactFlowWrapper = document.querySelector(".react-flow");
       if (!reactFlowWrapper) throw new Error("找不到流程圖");
@@ -202,13 +205,19 @@ ${data.checkFeedback || data.feedback || "已完成檢查"}
     setIsTyping(true);
 
     try {
-      if (!isSignedIn) throw new Error("請先登入");
+      if (!isSignedIn) {
+        setMessages((prev) => [
+          ...prev,
+          { sender: "assistant", text: "請先登入後再向助教提問喔！" },
+        ]);
+        return;
+      }
       const token = await getToken();
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           prompt: textToSend,
@@ -223,12 +232,15 @@ ${data.checkFeedback || data.feedback || "已完成檢查"}
 
       setMessages((prev) => [
         ...prev,
-        { sender: "assistant", text: data.result || "無法回覆" },
+        {
+          sender: "assistant",
+          text: data.result || data.error || "助教目前忙線中，請稍後再試。",
+        },
       ]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { sender: "assistant", text: "❌ 服務故障" },
+        { sender: "assistant", text: "助教目前忙線中，請稍後再試。" },
       ]);
     } finally {
       setIsTyping(false);

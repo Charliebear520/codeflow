@@ -40,7 +40,7 @@ function blankDecorationExtension() {
             builder.add(
               start,
               end,
-              Decoration.mark({ class: "cm-blank-field" })
+              Decoration.mark({ class: "cm-blank-field" }),
             );
           }
         }
@@ -49,7 +49,7 @@ function blankDecorationExtension() {
     },
     {
       decorations: (v) => v.decorations,
-    }
+    },
   );
 }
 
@@ -165,7 +165,7 @@ const OnlineCoding = ({
   }, [question]);
 
   const handleCheck = async () => {
-    setAttemptCount(prev => prev + 1);
+    setAttemptCount((prev) => prev + 1);
     if (!code || !question) {
       antdMessage.info("請先輸入程式碼與確認題目");
       return false;
@@ -183,7 +183,12 @@ const OnlineCoding = ({
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ question, code, language, questionId: "Q001" }),
+          body: JSON.stringify({
+            question,
+            code,
+            language,
+            questionId: "Q001",
+          }),
         });
         const data = await res.json();
         if (data.success) {
@@ -369,7 +374,7 @@ const OnlineCoding = ({
       { type: "system", content: "程式執行已停止" },
     ]);
   };
-  
+
   //新增「Modal 控制 state」
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -385,7 +390,7 @@ const OnlineCoding = ({
       const now = Date.now();
       const deltaSec = Math.max(
         0,
-        Math.floor((now - (lastTickRef.current || now)) / 1000)
+        Math.floor((now - (lastTickRef.current || now)) / 1000),
       );
       lastTickRef.current = now;
 
@@ -428,7 +433,7 @@ const OnlineCoding = ({
       const now = Date.now();
       const deltaSec = Math.max(
         0,
-        Math.floor((now - (lastTickRef.current || now)) / 1000)
+        Math.floor((now - (lastTickRef.current || now)) / 1000),
       );
       lastTickRef.current = now;
 
@@ -459,7 +464,6 @@ const OnlineCoding = ({
       antdMessage.error("儲存失敗");
     }
   };
-
 
   // 「上傳」：單純把目前內容與時間增量寫回後端，不做 AI 檢查
   const handleUpload = async () => {
@@ -626,46 +630,51 @@ const OnlineCoding = ({
                 上傳
               </Button>
               <Modal
-                  title={<span style={{ fontWeight: "bold" }}>📌 提示</span>}
-                  open={confirmOpen}
-                  centered
-                  width={400}
-
-                  onOk={async () => {
-                    await handleUpload();
-                    setConfirmOpen(false);
-                  }}
-
-                  onCancel={() => setConfirmOpen(false)}
-
-                  okText="確定上傳"
-                  cancelText="取消"
-                  confirmLoading={saving}
-
-                  okButtonProps={{
-                    style: {
-                      backgroundColor: "#6C63FF",
-                      border: "none"
-                    }
-                  }}
-
-                  styles={{
-                    content: {
-                      borderRadius: "16px",
-                      padding: "20px"
-                    }
-                  }}
+                title={<span style={{ fontWeight: "bold" }}>📌 提示</span>}
+                open={confirmOpen}
+                centered
+                width={400}
+                onOk={async () => {
+                  await handleUpload();
+                  setConfirmOpen(false);
+                }}
+                onCancel={() => setConfirmOpen(false)}
+                okText="確定上傳"
+                cancelText="取消"
+                confirmLoading={saving}
+                okButtonProps={{
+                  style: {
+                    backgroundColor: "#6C63FF",
+                    border: "none",
+                  },
+                }}
+                styles={{
+                  content: {
+                    borderRadius: "16px",
+                    padding: "20px",
+                  },
+                }}
+              >
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "20px" }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                    <span style={{ fontSize: "22px" }}>⚠️</span>
-                    <div>
-                      <div style={{ fontWeight: "bold", paddingTop: "10px" }}>確定要上傳嗎？</div>
-                      <div style={{ fontSize: "14px", color: "#888", paddingBottom: "10px" }}>
-                        上傳後將儲存目前作答進度
-                      </div>
+                  <span style={{ fontSize: "22px" }}>⚠️</span>
+                  <div>
+                    <div style={{ fontWeight: "bold", paddingTop: "10px" }}>
+                      確定要上傳嗎？
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        color: "#888",
+                        paddingBottom: "10px",
+                      }}
+                    >
+                      上傳後將儲存目前作答進度
                     </div>
                   </div>
-                </Modal>
+                </div>
+              </Modal>
 
               <Button
                 onClick={isStage3 ? handleSaveStage3 : handleSaveStage2}
@@ -761,7 +770,7 @@ const OnlineCoding = ({
                     color: "#FFFFFF",
                     border: "none",
                   }}
-                  onClick={() => { }}
+                  onClick={() => {}}
                 >
                   詢問沐芙助教
                 </Button>

@@ -27,7 +27,6 @@ const TopicStage2 = ({
   const [hintCache, setHintCache] = useState({});
   const [regenerating, setRegenerating] = useState(false);
 
-
   // =========================
   // ✅【新增 1】開始時間
   const [startTime, setStartTime] = useState(null);
@@ -39,7 +38,6 @@ const TopicStage2 = ({
     console.log("Stage2 開始時間:", now);
     setStartTime(now);
   }, []);
-
 
   // ✅【新增 3】離開頁面時送時間
   useEffect(() => {
@@ -63,7 +61,7 @@ const TopicStage2 = ({
             },
             {
               headers: token ? { Authorization: `Bearer ${token}` } : {},
-            }
+            },
           );
         } catch (e) {
           console.warn("送出 Stage2 時間失敗:", e?.message);
@@ -87,7 +85,7 @@ const TopicStage2 = ({
           questionId: "Q1",
           durationDeltaSec: durationSec,
           completed: true,
-        })
+        }),
       );
     };
 
@@ -102,14 +100,12 @@ const TopicStage2 = ({
   const fetchNewQuestion = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(
-        "/api/generate-question"
-      );
+      const response = await axios.get("/api/generate-question");
       if (response.data.success) {
         setQuestion(response.data.question);
         localStorage.setItem(
           "currentFlowchartQuestion",
-          response.data.question
+          response.data.question,
         );
         setHintLevel(1);
         setHintCache({});
@@ -145,7 +141,7 @@ const TopicStage2 = ({
         },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-        }
+        },
       );
 
       if (response.data.success) {
@@ -292,50 +288,47 @@ const TopicStage2 = ({
       </div>
 
       <div className={styles.container}>
-      
-      <div style={{ height: "85%" }}>
-        <div className={styles.topicbox}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              flexDirection: "column",
-              overflowY: "hidden",
-            }}
-          >
-            <div style={{ paddingBottom: "2rem" }}>
-              <h3>Ch2,製作pseudocode</h3>
+        <div style={{ height: "85%" }}>
+          <div className={styles.topicbox}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexDirection: "column",
+                overflowY: "hidden",
+              }}
+            >
+              <div style={{ paddingBottom: "2rem" }}>
+                <h3>Ch2,製作pseudocode</h3>
+              </div>
+              <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
+              <br />
             </div>
-            <p style={{ flex: 1, padding: "0 1rem" }}>{question}</p>
-            <br />
-          </div>
-          <div className={styles.infobox}>
-            <div className={styles.examplebox}>
-              <img src={"/Camera.png"} height={14} width={14} />
-              <Popover placement="right" content={content} trigger="hover">
-                <h5 className={styles.example}>流程圖範例</h5>
-              </Popover>
-            </div>
-            <div className={styles.examplebox}>
-              <img src={"/Graduation.png"} height={14} width={14} />
-              <Popover placement="right" content={example} trigger="hover">
-                <h5 className={styles.example}>流程圖的概念</h5>
-              </Popover>
-            </div>
-            {/* <div className={styles.examplebox}>
+            <div className={styles.infobox}>
+              <div className={styles.examplebox}>
+                <img src={"/Camera.png"} height={14} width={14} />
+                <Popover placement="right" content={content} trigger="hover">
+                  <h5 className={styles.example}>流程圖範例</h5>
+                </Popover>
+              </div>
+              <div className={styles.examplebox}>
+                <img src={"/Graduation.png"} height={14} width={14} />
+                <Popover placement="right" content={example} trigger="hover">
+                  <h5 className={styles.example}>流程圖的概念</h5>
+                </Popover>
+              </div>
+              {/* <div className={styles.examplebox}>
               <img src={"/Book.png"} height={14} width={14} />
               <Popover placement="right" content={content} trigger="hover">
                 <h5 className={styles.example}>流程圖大揭秘</h5>
               </Popover>
             </div> */}
+            </div>
           </div>
         </div>
       </div>
     </div>
-
-    </div>
-    
   );
 };
 

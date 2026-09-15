@@ -262,40 +262,41 @@ app.use((req, res, next) => {
   }
 });
 
-// 資料表連接 - 優先使用雲端 Atlas (mongodb+srv://)，避免連向 serverless 無法使用的 localhost
+// 資料表連接 - 僅從環境變數讀取，嚴禁在程式碼中硬編碼連線帳密
 const getMongoUri = () => {
-  const candidates = [
-    process.env.MONGO,
-    process.env.MONGO_URI,
-    "mongodb+srv://50406s97116:8Tke6eQ8iPPWWME7@codeflow.ouiww.mongodb.net/aichat?retryWrites=true&w=majority&appName=Codeflow",
-    "mongodb://127.0.0.1:27017/codeflow",
-  ].filter(Boolean);
+  const uri =
+    process.env.MONGODB_URI ||
+    process.env.MONGO_URI ||
+    process.env.MONGO ||
+    process.env.MONGO_URL;
 
-  for (const u of candidates) {
-    if (
-      u.startsWith("mongodb+srv:") ||
-      (!u.includes("localhost") && !u.includes("127.0.0.1"))
-    ) {
-      return u;
-    }
+  if (uri && typeof uri === "string" && uri.trim()) {
+    return uri.trim();
   }
-  return candidates[0];
+
+  // 僅在非生產環境（本地開發）下允許 fallback 到本地 MongoDB
+  if (process.env.NODE_ENV !== "production") {
+    return "mongodb://127.0.0.1:27017/codeflow";
+  }
+
+  return "";
 };
 
 const mongoUri = getMongoUri();
-
-// 關閉指令緩衝，避免連線失敗時資料庫操作卡住 10-30 秒導致請求超時
-mongoose.set("bufferCommands", false);
 
 let dbConnectionPromise = null;
 async function connectToDatabase() {
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
+  const uri = getMongoUri();
+  if (!uri) {
+    return null;
+  }
   if (!dbConnectionPromise) {
     console.log("Connecting to MongoDB...");
     dbConnectionPromise = mongoose
-      .connect(mongoUri, {
+      .connect(uri, {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 30000,
         connectTimeoutMS: 5000,
@@ -315,20 +316,74 @@ async function connectToDatabase() {
   return dbConnectionPromise;
 }
 
-// 啟動時發起連線
-connectToDatabase();
+// 啟動時如果已配置 URI 則嘗試發起連線
+if (mongoUri) {
+  connectToDatabase().catch((e) =>
+    console.warn("Initial DB connection warning:", e.message),
+  );
+}
 
 // 針對 Serverless Function：在處理 API 前確保連線就緒
 app.use(async (req, res, next) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
+    const uri = getMongoUri();
+    if (uri && mongoose.connection.readyState !== 1) {
       await connectToDatabase();
     }
   } catch (err) {
-    console.error("Database connection wait error:", err);
+    console.error("Database connection wait error:", err.message);
   }
   next();
 });
+
+// 安全查詢資料庫輔助函式（離線/未連線防護）
+async function getQuestionByIdOrTitle(questionId) {
+  if (!questionId || mongoose.connection.readyState !== 1) return null;
+  try {
+    if (mongoose.isValidObjectId(questionId)) {
+      return await Question.findById(questionId).lean();
+    } else {
+      return await Question.findOne({ questionTitle: questionId }).lean();
+    }
+  } catch (err) {
+    console.warn("getQuestionByIdOrTitle error:", err.message);
+    return null;
+  }
+}
+
+async function getIdealAnswerByQuestionId(questionId) {
+  if (!questionId || mongoose.connection.readyState !== 1) return null;
+  try {
+    return await IdealAnswer.findOne({ questionId: String(questionId) }).lean();
+  } catch (err) {
+    console.warn("getIdealAnswerByQuestionId error:", err.message);
+    return null;
+  }
+}
+
+async function saveIdealAnswer(questionId, updateData) {
+  if (!questionId || mongoose.connection.readyState !== 1) return null;
+  try {
+    return await IdealAnswer.findOneAndUpdate(
+      { questionId: String(questionId) },
+      {
+        $set: {
+          ...updateData,
+          generatedAt: new Date(),
+        },
+        $setOnInsert: {
+          questionId: String(questionId),
+          flowSpec: {},
+          version: "v1",
+        },
+      },
+      { upsert: true, new: true },
+    );
+  } catch (err) {
+    console.warn("saveIdealAnswer error:", err.message);
+    return null;
+  }
+}
 
 // const imagekit = new ImageKit({ // 暫時註解掉
 //   urlEndpoint: process.env.IMAGE_KIT_ENDPOINT,
@@ -368,8 +423,7 @@ async function ensureStudent(userId) {
       }
     }
 
-    const role =
-      email && ADMIN_EMAILS_SET.has(email) ? "teacher" : "student";
+    const role = email && ADMIN_EMAILS_SET.has(email) ? "teacher" : "student";
 
     if (mongoose.connection.readyState === 1) {
       const setOnInsert = { userId };
@@ -562,11 +616,13 @@ app.post("/api/generate-hint", async (req, res) => {
       if (userId && mongoose.connection.readyState === 1) {
         const student = await ensureStudent(userId);
         if (student?._id) {
-          await mongoose.model("Submission").findOneAndUpdate(
-            { student: student._id, questionId },
-            { $inc: { helpCount: 1 } },
-            { upsert: true },
-          );
+          await mongoose
+            .model("Submission")
+            .findOneAndUpdate(
+              { student: student._id, questionId },
+              { $inc: { helpCount: 1 } },
+              { upsert: true },
+            );
         }
       }
     } catch (e) {
@@ -576,10 +632,7 @@ app.post("/api/generate-hint", async (req, res) => {
     // 呼叫 Gemini 生成提示
     try {
       const geminiServices = await loadGeminiServices();
-      const hint = await geminiServices.generateFlowchartHint(
-        question,
-        level,
-      );
+      const hint = await geminiServices.generateFlowchartHint(question, level);
       res.json({ success: true, hint });
     } catch (geminiError) {
       console.error("Gemini hint error:", geminiError.message);
@@ -594,7 +647,8 @@ app.post("/api/generate-hint", async (req, res) => {
       };
       res.json({
         success: true,
-        hint: fallbackHints[level] || "請檢查你的條件分支與結束節點連接是否完整。",
+        hint:
+          fallbackHints[level] || "請檢查你的條件分支與結束節點連接是否完整。",
         fallback: true,
       });
     }
@@ -639,17 +693,8 @@ app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
     // 取得題目文字：優先 body.questionText，其次從 Question 資料表讀取
     let qText = (questionText || "").trim();
     if (!qText && questionId) {
-      // questionId 可能是 ObjectId 或你們自訂字串，先以 ObjectId 嘗試，失敗再用 questionTitle 比對
-      if (mongoose.isValidObjectId(questionId)) {
-        const doc = await Question.findById(questionId).lean();
-        qText = doc?.description || doc?.questionTitle || "";
-      }
-      if (!qText) {
-        const docByTitle = await Question.findOne({
-          questionTitle: questionId,
-        }).lean();
-        qText = docByTitle?.description || docByTitle?.questionTitle || "";
-      }
+      const qDoc = await getQuestionByIdOrTitle(questionId);
+      qText = qDoc?.description || qDoc?.questionTitle || "";
     }
     if (!qText) {
       return res
@@ -658,20 +703,13 @@ app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
     }
 
     const flowSpec = await generateIdealFlowSpec(qText);
-    const saved = await IdealAnswer.findOneAndUpdate(
-      { questionId: String(questionId || "UNKNOWN") },
-      {
-        $set: {
-          flowSpec,
-          version: "v1",
-          modelUsed: "Gemini 2.5 Flash",
-          generatedAt: new Date(),
-        },
-      },
-      { upsert: true, new: true },
-    );
+    const saved = await saveIdealAnswer(questionId || "UNKNOWN", {
+      flowSpec,
+      version: "v1",
+      modelUsed: "Gemini 2.5 Flash",
+    });
 
-    res.json({ success: true, data: saved });
+    res.json({ success: true, data: saved || { flowSpec, version: "v1" } });
   } catch (err) {
     console.error("ideal/flow/generate error:", err);
     res.status(500).json({ success: false, error: err.message });
@@ -681,9 +719,7 @@ app.post("/api/ideal/flow/generate", requireTeacher, async (req, res) => {
 // 取得理想答案
 app.get("/api/ideal/flow/:questionId", async (req, res) => {
   try {
-    const doc = await IdealAnswer.findOne({
-      questionId: String(req.params.questionId),
-    }).lean();
+    const doc = await getIdealAnswerByQuestionId(req.params.questionId);
     if (!doc)
       return res
         .status(404)
@@ -694,41 +730,56 @@ app.get("/api/ideal/flow/:questionId", async (req, res) => {
   }
 });
 
-// Stage1 比對：解析 -> 比對 -> 產生回饋（需登入）
-app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
+// Stage1 比對：解析 -> 比對 -> 產生回饋
+app.post("/api/submissions/stage1/compare", async (req, res) => {
   try {
-    const { userId } = req.auth();
-    const studentDoc = await ensureStudent(userId);
+    const auth =
+      typeof req.auth === "function"
+        ? req.auth()
+        : typeof getAuth === "function"
+          ? getAuth(req)
+          : {};
+    const userId = auth?.userId;
+    let studentDoc = null;
+    if (userId) {
+      try {
+        studentDoc = await ensureStudent(userId);
+      } catch (e) {
+        console.warn("Failed to ensureStudent:", e.message);
+      }
+    }
 
-    const { questionId, imageBase64, graph } = req.body || {};
+    const {
+      questionId,
+      imageBase64,
+      graph,
+      question: bodyQuestion,
+    } = req.body || {};
     if (!questionId)
       return res.status(400).json({ success: false, error: "questionId 必填" });
 
     // 取得題目內容（給 Vision/回饋參考，沒抓到也不阻擋）
-    let questionText = "";
-    if (mongoose.isValidObjectId(questionId)) {
-      const q = await Question.findById(questionId).lean();
-      questionText = q?.description || q?.questionTitle || "";
-    } else {
-      const q = await Question.findOne({ questionTitle: questionId }).lean();
-      questionText = q?.description || q?.questionTitle || "";
+    let questionText = bodyQuestion || "";
+    if (!questionText) {
+      const q = await getQuestionByIdOrTitle(questionId);
+      questionText =
+        q?.description || q?.questionTitle || "請根據題意繪製流程圖";
     }
 
     // 1) 取得或生成理想答案
-    let ideal = await IdealAnswer.findOne({
-      questionId: String(questionId),
-    }).lean();
+    let ideal = await getIdealAnswerByQuestionId(questionId);
     if (!ideal) {
       const generated = await generateIdealFlowSpec(
         questionText || "請根據題意繪製流程圖",
       );
-      ideal = await IdealAnswer.create({
+      ideal = {
         questionId: String(questionId),
         flowSpec: generated,
         version: "v1",
         modelUsed: "Gemini 2.5 Flash",
         generatedAt: new Date(),
-      });
+      };
+      await saveIdealAnswer(questionId, ideal);
     }
     const idealSpec = normalizeFlowSpec(ideal.flowSpec);
     console.log("🎯 理想答案 idealSpec:", JSON.stringify(idealSpec, null, 2));
@@ -778,33 +829,41 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
     const isCompleted = percentScore >= 70;
 
     // 5) 寫回 Submission（保留你現有 stage1 結構，擴充比對結果）
-    const update = {
-      $set: {
-        "stages.stage1.flowSpec": studentSpec,
-        "stages.stage1.score": percentScore,
-        "stages.stage1.scores": scores,
-        "stages.stage1.diffs": diffs,
-        "stages.stage1.feedback": feedback,
-        "stages.stage1.checkReport": checkReport,
-        "stages.stage1.completed": isCompleted,
-        "stages.stage1.feedbackLength": feedback.length,
-        "stages.stage1.updatedAt": new Date(),
-        idealVersion: ideal.version || "v1",
-        studentName: studentDoc.name ?? null,
-        studentEmail: studentDoc.email?.toLowerCase() ?? null,
-      },
-      $setOnInsert: {
-        student: studentDoc._id,
-        questionId,
-        createdAt: new Date(),
-      },
-    };
+    let submissionId = null;
+    if (studentDoc?._id && mongoose.connection.readyState === 1) {
+      try {
+        const update = {
+          $set: {
+            "stages.stage1.flowSpec": studentSpec,
+            "stages.stage1.score": percentScore,
+            "stages.stage1.scores": scores,
+            "stages.stage1.diffs": diffs,
+            "stages.stage1.feedback": feedback,
+            "stages.stage1.checkReport": checkReport,
+            "stages.stage1.completed": isCompleted,
+            "stages.stage1.feedbackLength": feedback.length,
+            "stages.stage1.updatedAt": new Date(),
+            idealVersion: ideal?.version || "v1",
+            studentName: studentDoc.name ?? null,
+            studentEmail: studentDoc.email?.toLowerCase() ?? null,
+          },
+          $setOnInsert: {
+            student: studentDoc._id,
+            questionId,
+            createdAt: new Date(),
+          },
+        };
 
-    const doc = await Submission.findOneAndUpdate(
-      { student: studentDoc._id, questionId },
-      update,
-      { new: true, upsert: true },
-    );
+        const doc = await Submission.findOneAndUpdate(
+          { student: studentDoc._id, questionId },
+          update,
+          { new: true, upsert: true },
+        );
+        submissionId = doc?._id;
+      } catch (dbErr) {
+        console.warn("Stage1 DB save warning:", dbErr.message);
+      }
+    }
 
     res.json({
       success: true,
@@ -812,7 +871,7 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
       diffs,
       feedback,
       checkReport,
-      submissionId: doc._id,
+      submissionId,
     });
   } catch (err) {
     console.error("stage1/compare error:", err);
@@ -821,37 +880,40 @@ app.post("/api/submissions/stage1/compare", requireAuth(), async (req, res) => {
 });
 
 // Stage 2: 虛擬碼檢查端點
-app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
+app.post("/api/submissions/stage2/compare", async (req, res) => {
   try {
-    const { userId } = req.auth();
-    const studentDoc = await ensureStudent(userId);
+    const auth =
+      typeof req.auth === "function"
+        ? req.auth()
+        : typeof getAuth === "function"
+          ? getAuth(req)
+          : {};
+    const userId = auth?.userId;
+    let studentDoc = null;
+    if (userId) {
+      try {
+        studentDoc = await ensureStudent(userId);
+      } catch (e) {
+        console.warn("Failed to ensureStudent:", e.message);
+      }
+    }
 
-    const { questionId, pseudocode } = req.body || {};
+    const { questionId, pseudocode, question: bodyQuestion } = req.body || {};
     if (!questionId)
       return res.status(400).json({ success: false, error: "questionId 必填" });
     if (!pseudocode)
       return res.status(400).json({ success: false, error: "pseudocode 必填" });
 
     // 取得題目內容
-    let questionText = "";
-    console.log("🔍 [Stage2 DEBUG] questionId:", questionId);
-    console.log(
-      "🔍 [Stage2 DEBUG] 是否為 ObjectId:",
-      mongoose.isValidObjectId(questionId),
-    );
-
-    if (mongoose.isValidObjectId(questionId)) {
-      const q = await Question.findById(questionId).lean();
-      questionText = q?.description || q?.questionTitle || "";
-    } else {
-      const q = await Question.findOne({ questionTitle: questionId }).lean();
-      questionText = q?.description || q?.questionTitle || "";
+    let questionText = bodyQuestion || "";
+    if (!questionText) {
+      const q = await getQuestionByIdOrTitle(questionId);
+      questionText =
+        q?.description || q?.questionTitle || "請根據題意撰寫虛擬碼";
     }
 
     // 1) 取得或生成理想虛擬碼
-    let ideal = await IdealAnswer.findOne({
-      questionId: String(questionId),
-    });
+    let ideal = await getIdealAnswerByQuestionId(questionId);
 
     // 檢查是否需要重新生成：沒有理想答案、沒有虛擬碼、或虛擬碼包含錯誤訊息或 fallback 值
     const needsRegenerationStage2 =
@@ -866,40 +928,13 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
 
     if (needsRegenerationStage2) {
       console.log("生成新的理想虛擬碼...");
-      console.log(
-        "原因:",
-        !ideal
-          ? "無理想答案"
-          : !ideal.pseudocode
-            ? "無虛擬碼"
-            : "虛擬碼包含錯誤訊息",
-      );
 
       // 確保有有效的題目文字
       if (!questionText || questionText === "請根據題意撰寫虛擬碼") {
-        console.warn(
-          "⚠️ questionText 無效或為 fallback 值，嘗試從 Question 資料表重新取得",
-        );
-        // 再次嘗試從資料庫取得題目
-        if (mongoose.isValidObjectId(questionId)) {
-          const q = await Question.findById(questionId).lean();
-          questionText = q?.description || q?.questionTitle || "";
-          console.log("從 Question (by ID) 取得 questionText:", questionText);
-        } else {
-          const q = await Question.findOne({
-            questionTitle: questionId,
-          }).lean();
-          questionText = q?.description || q?.questionTitle || "";
-          console.log(
-            "從 Question (by Title) 取得 questionText:",
-            questionText,
-          );
+        const q = await getQuestionByIdOrTitle(questionId);
+        if (q) {
+          questionText = q.description || q.questionTitle || questionText;
         }
-      }
-
-      // 最後檢查：如果 questionText 仍然無效，記錄警告但仍嘗試生成
-      if (!questionText || questionText === "請根據題意撰寫虛擬碼") {
-        console.error("❌ 無法取得有效的題目文字，AI 可能無法生成正確答案");
       }
 
       const generated = await generateIdealPseudocode(
@@ -912,29 +947,24 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
         !generated.pseudocode.includes("錯誤") &&
         !generated.pseudocode.includes("未提供")
       ) {
-        ideal = await IdealAnswer.findOneAndUpdate(
-          { questionId: String(questionId) },
-          {
-            $set: {
-              pseudocode: generated.pseudocode,
-              pseudocodeStructure: generated.structure,
-              modelUsed: "gemini-2.5-flash",
-              generatedAt: new Date(),
-            },
-            $setOnInsert: {
-              questionId: String(questionId),
-              flowSpec: {},
-              version: "v1",
-            },
-          },
-          { upsert: true, new: true },
-        );
+        ideal = {
+          questionId: String(questionId),
+          pseudocode: generated.pseudocode,
+          pseudocodeStructure: generated.structure,
+          modelUsed: "gemini-2.5-flash",
+        };
+        await saveIdealAnswer(questionId, {
+          pseudocode: generated.pseudocode,
+          pseudocodeStructure: generated.structure,
+          modelUsed: "gemini-2.5-flash",
+        });
         console.log("✅ 理想虛擬碼生成並儲存成功");
       } else {
         console.error("❌ AI 生成的虛擬碼包含錯誤訊息，使用基本結構繼續比對");
         // 使用基本的 fallback 結構，不中斷流程
         if (!ideal) {
           ideal = {
+            pseudocode: "BEGIN\n  // 根據題目生成的虛擬碼\nEND",
             pseudocodeStructure: {
               variables: [],
               conditions: [],
@@ -947,8 +977,14 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
     }
 
     // 2) 比對虛擬碼
+    const pseudocodeStructure = ideal?.pseudocodeStructure || {
+      variables: [],
+      conditions: [],
+      loops: [],
+      logicFlow: [],
+    };
     const { diffs, scores } = comparePseudocode(
-      ideal.pseudocodeStructure,
+      pseudocodeStructure,
       pseudocode,
       questionText,
     );
@@ -958,7 +994,7 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
     // 3) 產生回饋
     const feedback = await generatePseudocodeFeedback(
       questionText || "",
-      ideal,
+      ideal || { pseudocode: "" },
       pseudocode,
       diffs,
       scores,
@@ -972,32 +1008,40 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
     const isCompleted = percentScore >= 70;
 
     // 4) 寫回 Submission
-    const update = {
-      $set: {
-        "stages.stage2.pseudocode": pseudocode,
-        "stages.stage2.score": percentScore,
-        "stages.stage2.scores": scores,
-        "stages.stage2.diffs": diffs,
-        "stages.stage2.feedback": feedback,
-        "stages.stage2.checkReport": checkReport,
-        "stages.stage2.completed": isCompleted,
-        "stages.stage2.feedbackLength": feedback.length,
-        "stages.stage2.updatedAt": new Date(),
-        studentName: studentDoc.name ?? null,
-        studentEmail: studentDoc.email?.toLowerCase() ?? null,
-      },
-      $setOnInsert: {
-        student: studentDoc._id,
-        questionId,
-        createdAt: new Date(),
-      },
-    };
+    let submissionId = null;
+    if (studentDoc?._id && mongoose.connection.readyState === 1) {
+      try {
+        const update = {
+          $set: {
+            "stages.stage2.pseudocode": pseudocode,
+            "stages.stage2.score": percentScore,
+            "stages.stage2.scores": scores,
+            "stages.stage2.diffs": diffs,
+            "stages.stage2.feedback": feedback,
+            "stages.stage2.checkReport": checkReport,
+            "stages.stage2.completed": isCompleted,
+            "stages.stage2.feedbackLength": feedback.length,
+            "stages.stage2.updatedAt": new Date(),
+            studentName: studentDoc.name ?? null,
+            studentEmail: studentDoc.email?.toLowerCase() ?? null,
+          },
+          $setOnInsert: {
+            student: studentDoc._id,
+            questionId,
+            createdAt: new Date(),
+          },
+        };
 
-    const doc = await Submission.findOneAndUpdate(
-      { student: studentDoc._id, questionId },
-      update,
-      { new: true, upsert: true },
-    );
+        const doc = await Submission.findOneAndUpdate(
+          { student: studentDoc._id, questionId },
+          update,
+          { new: true, upsert: true },
+        );
+        submissionId = doc?._id;
+      } catch (dbErr) {
+        console.warn("Stage2 DB save warning:", dbErr.message);
+      }
+    }
 
     res.json({
       success: true,
@@ -1005,7 +1049,7 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
       diffs,
       feedback,
       checkReport,
-      submissionId: doc._id,
+      submissionId,
     });
   } catch (err) {
     console.error("stage2/compare error:", err);
@@ -1014,31 +1058,45 @@ app.post("/api/submissions/stage2/compare", requireAuth(), async (req, res) => {
 });
 
 // Stage 3: 程式碼檢查端點
-app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
+app.post("/api/submissions/stage3/compare", async (req, res) => {
   try {
-    const { userId } = req.auth();
-    const studentDoc = await ensureStudent(userId);
+    const auth =
+      typeof req.auth === "function"
+        ? req.auth()
+        : typeof getAuth === "function"
+          ? getAuth(req)
+          : {};
+    const userId = auth?.userId;
+    let studentDoc = null;
+    if (userId) {
+      try {
+        studentDoc = await ensureStudent(userId);
+      } catch (e) {
+        console.warn("Failed to ensureStudent:", e.message);
+      }
+    }
 
-    const { questionId, code, language = "python" } = req.body || {};
+    const {
+      questionId,
+      code,
+      language = "python",
+      question: bodyQuestion,
+    } = req.body || {};
     if (!questionId)
       return res.status(400).json({ success: false, error: "questionId 必填" });
     if (!code)
       return res.status(400).json({ success: false, error: "code 必填" });
 
     // 取得題目內容
-    let questionText = "";
-    if (mongoose.isValidObjectId(questionId)) {
-      const q = await Question.findById(questionId).lean();
-      questionText = q?.description || q?.questionTitle || "";
-    } else {
-      const q = await Question.findOne({ questionTitle: questionId }).lean();
-      questionText = q?.description || q?.questionTitle || "";
+    let questionText = bodyQuestion || "";
+    if (!questionText) {
+      const q = await getQuestionByIdOrTitle(questionId);
+      questionText =
+        q?.description || q?.questionTitle || "請根據題意撰寫程式碼";
     }
 
     // 1) 取得或生成理想程式碼
-    let ideal = await IdealAnswer.findOne({
-      questionId: String(questionId),
-    });
+    let ideal = await getIdealAnswerByQuestionId(questionId);
 
     // 檢查是否需要重新生成：沒有理想答案、沒有程式碼、語言不符、或程式碼包含錯誤訊息或 fallback 值
     const needsRegenerationStage3 =
@@ -1054,42 +1112,13 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
 
     if (needsRegenerationStage3) {
       console.log(`生成新的理想 ${language} 程式碼...`);
-      console.log(
-        "原因:",
-        !ideal
-          ? "無理想答案"
-          : !ideal.code
-            ? "無程式碼"
-            : ideal.language !== language
-              ? `語言不符(${ideal.language} vs ${language})`
-              : "程式碼包含錯誤訊息",
-      );
 
       // 確保有有效的題目文字
       if (!questionText || questionText === "請根據題意撰寫程式碼") {
-        console.warn(
-          "⚠️ questionText 無效或為 fallback 值，嘗試從 Question 資料表重新取得",
-        );
-        // 再次嘗試從資料庫取得題目
-        if (mongoose.isValidObjectId(questionId)) {
-          const q = await Question.findById(questionId).lean();
-          questionText = q?.description || q?.questionTitle || "";
-          console.log("從 Question (by ID) 取得 questionText:", questionText);
-        } else {
-          const q = await Question.findOne({
-            questionTitle: questionId,
-          }).lean();
-          questionText = q?.description || q?.questionTitle || "";
-          console.log(
-            "從 Question (by Title) 取得 questionText:",
-            questionText,
-          );
+        const q = await getQuestionByIdOrTitle(questionId);
+        if (q) {
+          questionText = q.description || q.questionTitle || questionText;
         }
-      }
-
-      // 最後檢查：如果 questionText 仍然無效，記錄警告但仍嘗試生成
-      if (!questionText || questionText === "請根據題意撰寫程式碼") {
-        console.error("❌ 無法取得有效的題目文字，AI 可能無法生成正確答案");
       }
 
       const generated = await generateIdealCode(
@@ -1103,30 +1132,27 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
         !generated.code.includes("錯誤") &&
         !generated.code.includes("未提供")
       ) {
-        ideal = await IdealAnswer.findOneAndUpdate(
-          { questionId: String(questionId) },
-          {
-            $set: {
-              code: generated.code,
-              language: language,
-              codeStructure: generated.structure,
-              modelUsed: "gemini-2.5-flash",
-              generatedAt: new Date(),
-            },
-            $setOnInsert: {
-              questionId: String(questionId),
-              flowSpec: {},
-              version: "v1",
-            },
-          },
-          { upsert: true, new: true },
-        );
+        ideal = {
+          questionId: String(questionId),
+          code: generated.code,
+          language: language,
+          codeStructure: generated.structure,
+          modelUsed: "gemini-2.5-flash",
+        };
+        await saveIdealAnswer(questionId, {
+          code: generated.code,
+          language: language,
+          codeStructure: generated.structure,
+          modelUsed: "gemini-2.5-flash",
+        });
         console.log(`✅ 理想 ${language} 程式碼生成並儲存成功`);
       } else {
         console.error("❌ AI 生成的程式碼包含錯誤訊息，使用基本結構繼續比對");
         // 使用基本的 fallback 結構，不中斷流程
         if (!ideal) {
           ideal = {
+            code: "",
+            language,
             codeStructure: {
               functions: [],
               variables: [],
@@ -1139,8 +1165,14 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
     }
 
     // 2) 比對程式碼
+    const codeStructure = ideal?.codeStructure || {
+      functions: [],
+      variables: [],
+      controlFlow: [],
+      expectedOutput: "",
+    };
     const { diffs, scores } = compareCode(
-      ideal.codeStructure,
+      codeStructure,
       code,
       language,
       questionText,
@@ -1151,7 +1183,7 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
     // 3) 產生回饋
     const feedback = await generateCodeFeedback(
       questionText || "",
-      ideal,
+      ideal || { code: "" },
       code,
       diffs,
       scores,
@@ -1166,33 +1198,41 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
     const isCompleted = percentScore >= 70;
 
     // 4) 寫回 Submission
-    const update = {
-      $set: {
-        "stages.stage3.code": code,
-        "stages.stage3.language": language,
-        "stages.stage3.score": percentScore,
-        "stages.stage3.scores": scores,
-        "stages.stage3.diffs": diffs,
-        "stages.stage3.feedback": feedback,
-        "stages.stage3.checkReport": checkReport,
-        "stages.stage3.completed": isCompleted,
-        "stages.stage3.feedbackLength": feedback.length,
-        "stages.stage3.updatedAt": new Date(),
-        studentName: studentDoc.name ?? null,
-        studentEmail: studentDoc.email?.toLowerCase() ?? null,
-      },
-      $setOnInsert: {
-        student: studentDoc._id,
-        questionId,
-        createdAt: new Date(),
-      },
-    };
+    let submissionId = null;
+    if (studentDoc?._id && mongoose.connection.readyState === 1) {
+      try {
+        const update = {
+          $set: {
+            "stages.stage3.code": code,
+            "stages.stage3.language": language,
+            "stages.stage3.score": percentScore,
+            "stages.stage3.scores": scores,
+            "stages.stage3.diffs": diffs,
+            "stages.stage3.feedback": feedback,
+            "stages.stage3.checkReport": checkReport,
+            "stages.stage3.completed": isCompleted,
+            "stages.stage3.feedbackLength": feedback.length,
+            "stages.stage3.updatedAt": new Date(),
+            studentName: studentDoc.name ?? null,
+            studentEmail: studentDoc.email?.toLowerCase() ?? null,
+          },
+          $setOnInsert: {
+            student: studentDoc._id,
+            questionId,
+            createdAt: new Date(),
+          },
+        };
 
-    const doc = await Submission.findOneAndUpdate(
-      { student: studentDoc._id, questionId },
-      update,
-      { new: true, upsert: true },
-    );
+        const doc = await Submission.findOneAndUpdate(
+          { student: studentDoc._id, questionId },
+          update,
+          { new: true, upsert: true },
+        );
+        submissionId = doc?._id;
+      } catch (dbErr) {
+        console.warn("Stage3 DB save warning:", dbErr.message);
+      }
+    }
 
     res.json({
       success: true,
@@ -1200,7 +1240,7 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
       diffs,
       feedback,
       checkReport,
-      submissionId: doc._id,
+      submissionId,
     });
   } catch (err) {
     console.error("stage3/compare error:", err);
@@ -1209,216 +1249,242 @@ app.post("/api/submissions/stage3/compare", requireAuth(), async (req, res) => {
 });
 
 // 新增：學生整體作答結果統整
-app.post(
-  "/api/submissions/all-stages/summary",
-  requireAuth(),
-  async (req, res) => {
-    try {
-      const { userId } = req.auth();
-      const studentDoc = await ensureStudent(userId);
-      const { questionId, regenerate = false } = req.body || {};
+app.post("/api/submissions/all-stages/summary", async (req, res) => {
+  try {
+    const auth =
+      typeof req.auth === "function"
+        ? req.auth()
+        : typeof getAuth === "function"
+          ? getAuth(req)
+          : {};
+    const userId = auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "請先登入" });
+    }
+    const studentDoc = await ensureStudent(userId);
+    const { questionId, regenerate = false } = req.body || {};
 
-      if (!questionId) {
-        return res
-          .status(400)
-          .json({ success: false, error: "questionId 必填" });
-      }
+    if (!questionId) {
+      return res.status(400).json({ success: false, error: "questionId 必填" });
+    }
 
-      // 查詢學生的作答記錄（不使用 .lean() 以便後續更新）
-      let submission = await Submission.findOne({
-        student: studentDoc._id,
-        questionId,
-      });
-
-      // 如果沒有任何作答記錄
-      if (!submission) {
-        return res.json({
-          success: true,
-          summary: "目前尚未開始作答任何階段，請先完成第一階段的流程圖設計。",
-          stages: {
-            stage1: { score: 0, report: "尚未作答", completed: false },
-            stage2: { score: 0, report: "尚未作答", completed: false },
-            stage3: { score: 0, report: "尚未作答", completed: false },
-          },
-          generatedAt: null,
-          isFromCache: false,
-          hasHistory: false,
-        });
-      }
-
-      // 檢查快取：若有 currentSummary 且在 30 分鐘內且不強制重新生成
-      const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 分鐘
-      const hasCachedSummary = submission.currentSummary?.summary;
-      const cacheAge = hasCachedSummary
-        ? Date.now() - new Date(submission.currentSummary.generatedAt).getTime()
-        : Infinity;
-      const isCacheValid = hasCachedSummary && cacheAge < CACHE_DURATION_MS;
-
-      if (isCacheValid && !regenerate) {
-        console.log(
-          `✅ 使用快取報告（${Math.round(cacheAge / 1000 / 60)} 分鐘前生成）`,
-        );
-        return res.json({
-          success: true,
-          summary: submission.currentSummary.summary,
-          stages: {
-            stage1: {
-              score: submission.stages?.stage1?.score || 0,
-              report:
-                submission.stages?.stage1?.checkReport || "目前第1階段尚未作答",
-              completed: submission.stages?.stage1?.completed || false,
-            },
-            stage2: {
-              score: submission.stages?.stage2?.score || 0,
-              report:
-                submission.stages?.stage2?.checkReport || "目前第2階段尚未作答",
-              completed: submission.stages?.stage2?.completed || false,
-            },
-            stage3: {
-              score: submission.stages?.stage3?.score || 0,
-              report:
-                submission.stages?.stage3?.checkReport || "目前第3階段尚未作答",
-              completed: submission.stages?.stage3?.completed || false,
-            },
-          },
-          generatedAt: submission.currentSummary.generatedAt,
-          isFromCache: true,
-          hasHistory: (submission.summaryHistory?.length || 0) > 0,
-        });
-      }
-
-      // 需要生成新報告
-      console.log(
-        "🔄 生成新報告（" + (regenerate ? "手動重新生成" : "快取過期") + "）",
-      );
-
-      // 準備三個階段的資料
-      const stages = {
-        stage1: {
-          score: submission.stages?.stage1?.score || 0,
-          report:
-            submission.stages?.stage1?.checkReport || "目前第1階段尚未作答",
-          completed: submission.stages?.stage1?.completed || false,
-        },
-        stage2: {
-          score: submission.stages?.stage2?.score || 0,
-          report:
-            submission.stages?.stage2?.checkReport || "目前第2階段尚未作答",
-          completed: submission.stages?.stage2?.completed || false,
-        },
-        stage3: {
-          score: submission.stages?.stage3?.score || 0,
-          report:
-            submission.stages?.stage3?.checkReport || "目前第3階段尚未作答",
-          completed: submission.stages?.stage3?.completed || false,
-        },
-      };
-
-      // 計算統計資料
-      const completedStages = [
-        stages.stage1.completed,
-        stages.stage2.completed,
-        stages.stage3.completed,
-      ].filter(Boolean).length;
-      const totalScore = Math.round(
-        (stages.stage1.score + stages.stage2.score + stages.stage3.score) / 3,
-      );
-
-      // 生成整體總結
-      const summary = await generateOverallSummary(stages);
-      const generatedAt = new Date();
-
-      // 儲存報告：將舊報告推入歷史，更新當前報告
-      const updateOps = {
-        $set: {
-          currentSummary: {
-            summary,
-            generatedAt,
-            totalScore,
-            completedStages,
-          },
-        },
-      };
-
-      // 若有舊報告，推入歷史（限制最多 10 筆）
-      if (hasCachedSummary) {
-        updateOps.$push = {
-          summaryHistory: {
-            $each: [submission.currentSummary],
-            $position: 0, // 插入到陣列開頭（最新的在前）
-            $slice: 10, // 只保留前 10 筆
-          },
-        };
-      }
-
-      try {
-        submission = await Submission.findByIdAndUpdate(
-          submission._id,
-          updateOps,
-          { new: true },
-        );
-        console.log("✅ 報告已儲存到資料庫");
-      } catch (saveErr) {
-        console.error("⚠️ 儲存報告失敗，但仍回傳生成的報告:", saveErr);
-        // 即使儲存失敗，仍回傳生成的報告給使用者
-      }
-
-      res.json({
+    if (!studentDoc?._id || mongoose.connection.readyState !== 1) {
+      return res.json({
         success: true,
-        summary,
-        stages,
-        generatedAt,
+        summary: "目前尚未開始作答任何階段，請先完成第一階段的流程圖設計。",
+        stages: {
+          stage1: { score: 0, report: "尚未作答", completed: false },
+          stage2: { score: 0, report: "尚未作答", completed: false },
+          stage3: { score: 0, report: "尚未作答", completed: false },
+        },
+        generatedAt: null,
         isFromCache: false,
+        hasHistory: false,
+      });
+    }
+
+    // 查詢學生的作答記錄（不使用 .lean() 以便後續更新）
+    let submission = await Submission.findOne({
+      student: studentDoc._id,
+      questionId,
+    });
+
+    // 如果沒有任何作答記錄
+    if (!submission) {
+      return res.json({
+        success: true,
+        summary: "目前尚未開始作答任何階段，請先完成第一階段的流程圖設計。",
+        stages: {
+          stage1: { score: 0, report: "尚未作答", completed: false },
+          stage2: { score: 0, report: "尚未作答", completed: false },
+          stage3: { score: 0, report: "尚未作答", completed: false },
+        },
+        generatedAt: null,
+        isFromCache: false,
+        hasHistory: false,
+      });
+    }
+
+    // 檢查快取：若有 currentSummary 且在 30 分鐘內且不強制重新生成
+    const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 分鐘
+    const hasCachedSummary = submission.currentSummary?.summary;
+    const cacheAge = hasCachedSummary
+      ? Date.now() - new Date(submission.currentSummary.generatedAt).getTime()
+      : Infinity;
+    const isCacheValid = hasCachedSummary && cacheAge < CACHE_DURATION_MS;
+
+    if (isCacheValid && !regenerate) {
+      console.log(
+        `✅ 使用快取報告（${Math.round(cacheAge / 1000 / 60)} 分鐘前生成）`,
+      );
+      return res.json({
+        success: true,
+        summary: submission.currentSummary.summary,
+        stages: {
+          stage1: {
+            score: submission.stages?.stage1?.score || 0,
+            report:
+              submission.stages?.stage1?.checkReport || "目前第1階段尚未作答",
+            completed: submission.stages?.stage1?.completed || false,
+          },
+          stage2: {
+            score: submission.stages?.stage2?.score || 0,
+            report:
+              submission.stages?.stage2?.checkReport || "目前第2階段尚未作答",
+            completed: submission.stages?.stage2?.completed || false,
+          },
+          stage3: {
+            score: submission.stages?.stage3?.score || 0,
+            report:
+              submission.stages?.stage3?.checkReport || "目前第3階段尚未作答",
+            completed: submission.stages?.stage3?.completed || false,
+          },
+        },
+        generatedAt: submission.currentSummary.generatedAt,
+        isFromCache: true,
         hasHistory: (submission.summaryHistory?.length || 0) > 0,
       });
-    } catch (err) {
-      console.error("all-stages/summary error:", err);
-      res.status(500).json({ success: false, error: err.message });
     }
-  },
-);
+
+    // 需要生成新報告
+    console.log(
+      "🔄 生成新報告（" + (regenerate ? "手動重新生成" : "快取過期") + "）",
+    );
+
+    // 準備三個階段的資料
+    const stages = {
+      stage1: {
+        score: submission.stages?.stage1?.score || 0,
+        report: submission.stages?.stage1?.checkReport || "目前第1階段尚未作答",
+        completed: submission.stages?.stage1?.completed || false,
+      },
+      stage2: {
+        score: submission.stages?.stage2?.score || 0,
+        report: submission.stages?.stage2?.checkReport || "目前第2階段尚未作答",
+        completed: submission.stages?.stage2?.completed || false,
+      },
+      stage3: {
+        score: submission.stages?.stage3?.score || 0,
+        report: submission.stages?.stage3?.checkReport || "目前第3階段尚未作答",
+        completed: submission.stages?.stage3?.completed || false,
+      },
+    };
+
+    // 計算統計資料
+    const completedStages = [
+      stages.stage1.completed,
+      stages.stage2.completed,
+      stages.stage3.completed,
+    ].filter(Boolean).length;
+    const totalScore = Math.round(
+      (stages.stage1.score + stages.stage2.score + stages.stage3.score) / 3,
+    );
+
+    // 生成整體總結
+    const summary = await generateOverallSummary(stages);
+    const generatedAt = new Date();
+
+    // 儲存報告：將舊報告推入歷史，更新當前報告
+    const updateOps = {
+      $set: {
+        currentSummary: {
+          summary,
+          generatedAt,
+          totalScore,
+          completedStages,
+        },
+      },
+    };
+
+    // 若有舊報告，推入歷史（限制最多 10 筆）
+    if (hasCachedSummary) {
+      updateOps.$push = {
+        summaryHistory: {
+          $each: [submission.currentSummary],
+          $position: 0, // 插入到陣列開頭（最新的在前）
+          $slice: 10, // 只保留前 10 筆
+        },
+      };
+    }
+
+    try {
+      submission = await Submission.findByIdAndUpdate(
+        submission._id,
+        updateOps,
+        { new: true },
+      );
+      console.log("✅ 報告已儲存到資料庫");
+    } catch (saveErr) {
+      console.error("⚠️ 儲存報告失敗，但仍回傳生成的報告:", saveErr);
+      // 即使儲存失敗，仍回傳生成的報告給使用者
+    }
+
+    res.json({
+      success: true,
+      summary,
+      stages,
+      generatedAt,
+      isFromCache: false,
+      hasHistory: (submission.summaryHistory?.length || 0) > 0,
+    });
+  } catch (err) {
+    console.error("all-stages/summary error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // 新增：查詢報告歷史版本
-app.get(
-  "/api/submissions/all-stages/summary/history",
-  requireAuth(),
-  async (req, res) => {
-    try {
-      const { userId } = req.auth();
-      const studentDoc = await ensureStudent(userId);
-      const { questionId } = req.query;
-
-      if (!questionId) {
-        return res
-          .status(400)
-          .json({ success: false, error: "questionId 必填" });
-      }
-
-      const submission = await Submission.findOne({
-        student: studentDoc._id,
-        questionId,
-      }).lean();
-
-      if (!submission || !submission.summaryHistory) {
-        return res.json({
-          success: true,
-          history: [],
-          total: 0,
-        });
-      }
-
-      // 歷史紀錄已經按 generatedAt 降序排列（最新的在前）
-      res.json({
-        success: true,
-        history: submission.summaryHistory,
-        total: submission.summaryHistory.length,
-      });
-    } catch (err) {
-      console.error("summary/history error:", err);
-      res.status(500).json({ success: false, error: err.message });
+app.get("/api/submissions/all-stages/summary/history", async (req, res) => {
+  try {
+    const auth =
+      typeof req.auth === "function"
+        ? req.auth()
+        : typeof getAuth === "function"
+          ? getAuth(req)
+          : {};
+    const userId = auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "請先登入" });
     }
-  },
-);
+    const studentDoc = await ensureStudent(userId);
+    const { questionId } = req.query;
+
+    if (!questionId) {
+      return res.status(400).json({ success: false, error: "questionId 必填" });
+    }
+
+    if (!studentDoc?._id || mongoose.connection.readyState !== 1) {
+      return res.json({
+        success: true,
+        history: [],
+        total: 0,
+      });
+    }
+
+    const submission = await Submission.findOne({
+      student: studentDoc._id,
+      questionId,
+    }).lean();
+
+    if (!submission || !submission.summaryHistory) {
+      return res.json({
+        success: true,
+        history: [],
+        total: 0,
+      });
+    }
+
+    // 歷史紀錄已經按 generatedAt 降序排列（最新的在前）
+    res.json({
+      success: true,
+      history: submission.summaryHistory,
+      total: submission.summaryHistory.length,
+    });
+  } catch (err) {
+    console.error("summary/history error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // 修改：接收題目參數的檢查端點
 app.post("/api/check", async (req, res) => {
@@ -2103,8 +2169,12 @@ app.post("/api/stop-process", async (req, res) => {
 
 app.post("/api/check-code", async (req, res) => {
   try {
-    const { question, code, language = "python", questionId = "Q001" } =
-      req.body || {};
+    const {
+      question,
+      code,
+      language = "python",
+      questionId = "Q001",
+    } = req.body || {};
 
     if (!question || !code) {
       return res.status(400).json({
@@ -2125,11 +2195,13 @@ app.post("/api/check-code", async (req, res) => {
       if (userId && mongoose.connection.readyState === 1) {
         const student = await ensureStudent(userId);
         if (student?._id) {
-          await mongoose.model("Submission").findOneAndUpdate(
-            { student: student._id, questionId },
-            { $inc: { attemptCount: 1 } },
-            { upsert: true },
-          );
+          await mongoose
+            .model("Submission")
+            .findOneAndUpdate(
+              { student: student._id, questionId },
+              { $inc: { attemptCount: 1 } },
+              { upsert: true },
+            );
         }
       }
     } catch (dbErr) {
@@ -2385,9 +2457,23 @@ app.get("/api/questions/:id", async (req, res) => {
 });
 
 //儲存 stage1 的流程圖
-app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
+app.post("/api/submissions/stage1", async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const auth =
+      typeof req.auth === "function"
+        ? req.auth()
+        : typeof getAuth === "function"
+          ? getAuth(req)
+          : {};
+    const userId = auth?.userId;
+    if (!userId) {
+      return res.json({
+        success: true,
+        message: "未登入，跳過儲存",
+        durationSec: 0,
+      });
+    }
+
     const {
       questionId,
       graph,
@@ -2410,42 +2496,51 @@ app.post("/api/submissions/stage1", requireAuth(), async (req, res) => {
     const delta = Number.isFinite(Number(durationDeltaSec))
       ? Math.max(0, Math.floor(Number(durationDeltaSec)))
       : 0;
-    const setFields = {
-      "stages.stage1.mode": mode || null,
-      "stages.stage1.completed": !!completed,
-      "stages.stage1.updatedAt": new Date(),
-      studentName: student.name ?? null,
-      studentEmail: student.email?.toLowerCase() ?? null,
-    };
 
-    // 只在有值時才帶入
-    if (graph) setFields["stages.stage1.graph"] = graph;
-    if (imageBase64) setFields["stages.stage1.imageBase64"] = imageBase64;
+    if (mongoose.connection.readyState === 1 && student?._id) {
+      const setFields = {
+        "stages.stage1.mode": mode || null,
+        "stages.stage1.completed": !!completed,
+        "stages.stage1.updatedAt": new Date(),
+        studentName: student.name ?? null,
+        studentEmail: student.email?.toLowerCase() ?? null,
+      };
 
-    console.log("儲存前 setFields：", setFields);
+      // 只在有值時才帶入
+      if (graph) setFields["stages.stage1.graph"] = graph;
+      if (imageBase64) setFields["stages.stage1.imageBase64"] = imageBase64;
 
-    const update = {
-      $set: setFields,
-      $setOnInsert: {
-        student: student._id,
-        questionId,
-      },
-      $inc: {
-        "stages.stage1.durationSec": delta, // 原子累加
-      },
-    };
+      console.log("儲存前 setFields：", setFields);
 
-    console.log("儲存前 update：", JSON.stringify(update, null, 2));
+      const update = {
+        $set: setFields,
+        $setOnInsert: {
+          student: student._id,
+          questionId,
+        },
+        $inc: {
+          "stages.stage1.durationSec": delta, // 原子累加
+        },
+      };
 
-    const doc = await Submission.findOneAndUpdate(
-      { student: student._id, questionId },
-      update,
-      { new: true, upsert: true },
-    );
-    res.status(201).json({
+      console.log("儲存前 update：", JSON.stringify(update, null, 2));
+
+      const doc = await Submission.findOneAndUpdate(
+        { student: student._id, questionId },
+        update,
+        { new: true, upsert: true },
+      );
+      return res.status(201).json({
+        success: true,
+        submissionId: doc?._id,
+        durationSec: doc?.stages?.stage1?.durationSec ?? 0,
+      });
+    }
+
+    return res.status(201).json({
       success: true,
-      submissionId: doc._id,
-      durationSec: doc?.stages?.stage1?.durationSec ?? 0,
+      message: "資料庫離線，略過儲存",
+      durationSec: delta,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -2658,27 +2753,41 @@ app.get("/api/submissions/stage3", async (req, res) => {
 // });
 
 // 新增：通用的助教對話 API 端點
-app.post("/api/chat", requireAuth(), async (req, res) => {
+app.post("/api/chat", async (req, res) => {
   try {
-    const { prompt, stage, currentData, question, questionId } = req.body;
-    const { userId } = req.auth();
-
-    // 1. 取得已經封裝好的 Gemini 服務
-    const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("Missing GEMINI_API_KEY");
+    const {
+      prompt,
+      stage,
+      currentData,
+      question,
+      questionId = "Q001",
+    } = req.body || {};
+    const auth =
+      typeof req.auth === "function"
+        ? req.auth()
+        : typeof getAuth === "function"
+          ? getAuth(req)
+          : {};
+    const userId = auth?.userId;
+    let student = null;
+    if (userId) {
+      try {
+        student = await ensureStudent(userId);
+      } catch (e) {
+        console.warn("Failed to ensureStudent in /api/chat:", e.message);
+      }
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // 💡 修正模型名稱為官方標準格式，例如 gemini-2.5-flash
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // 計算階段 stageKey
+    const stageNum = String(stage || "1").replace(/[^0-9]/g, "") || "1";
+    const stageKey = `stage${stageNum}`;
 
     // 2. 設定 AI 的說話人格
     const systemInstruction = `
       你是一位親切的程式助教「沐芙」，正在引導學生學習程式邏輯。
-      當前階段：${stage || "未提供"}
+      當前階段：第 ${stageNum} 階段
       題目內容：${question || "未提供"}
-      之前的分析回饋：${currentData || "無"}
+      之前的分析回饋：${typeof currentData === "object" ? JSON.stringify(currentData) : currentData || "無"}
 
       請遵循以下原則：
       1. 使用繁體中文回答，語氣溫柔且多鼓勵。
@@ -2686,51 +2795,72 @@ app.post("/api/chat", requireAuth(), async (req, res) => {
       3. 回答時可以使用 Markdown 格式。
     `;
 
-    // 2.5 ✅ 根據 Clerk userId 查詢 MongoDB 中的學生記錄
-    const student = await mongoose.model("Student").findOne({ userId }).lean();
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        error: "學生記錄未找到",
-      });
+    // 3. 發送請求給 Gemini
+    let text = "";
+    try {
+      if (process.env.GEMINI_API_KEY) {
+        const { GoogleGenerativeAI } = await import("@google/generative-ai");
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const result = await model.generateContent([
+          systemInstruction,
+          prompt || "你好！",
+        ]);
+        const response = await result.response;
+        text = response.text();
+      }
+    } catch (aiErr) {
+      console.warn("Gemini chat API error:", aiErr.message);
     }
 
-    // 3. 發送請求給 Gemini
-    const result = await model.generateContent([systemInstruction, prompt]);
-    const response = await result.response;
-    const text = response.text();
+    // Fallback 回覆
+    if (!text) {
+      const defaultReplies = {
+        stage1:
+          "我是助教沐芙！請仔細檢查你的流程圖節點連接是否正確，特別是判斷菱形是否都有 Yes 和 No 兩條分支喔！",
+        stage2:
+          "我是助教沐芙！請確認虛擬碼的變數定義與迴圈條件是否清晰，每一步的邏輯順序是否有對應題目需求喔！",
+        stage3:
+          "我是助教沐芙！請檢查程式碼的語法與縮排，特別是變數命名與條件判斷是否符合題意喔！",
+      };
+      text =
+        defaultReplies[stageKey] ||
+        "我是助教沐芙！請檢查一下目前的步驟是否完整，一步一步來一定可以解出來的！";
+    }
 
-    // 4. ✅ 關鍵修正：依照階段動態存入資料庫
-    // 假設前端傳來的 stage 是 "stage1", "stage2" 或 "stage3"
-    const stageKey = stage || "stage1";
-
-    await mongoose.model("Submission").findOneAndUpdate(
-      { student: student._id, questionId },
-      {
-        $inc: {
-          [`stages.${stageKey}.chatCount`]: 1, // 增加對應階段的對話次數
-        },
-        $push: {
-          [`stages.${stageKey}.chatHistory`]: {
-            // 存入對話紀錄，次數才會正確計算
-            role: "user",
-            message: prompt,
-            answer: text,
-            timestamp: new Date(),
+    // 4. 依照階段動態存入資料庫
+    if (student?._id && mongoose.connection.readyState === 1) {
+      try {
+        await mongoose.model("Submission").findOneAndUpdate(
+          { student: student._id, questionId },
+          {
+            $inc: {
+              [`stages.${stageKey}.chatCount`]: 1,
+            },
+            $push: {
+              [`stages.${stageKey}.chatHistory`]: {
+                role: "user",
+                message: prompt || "",
+                answer: text,
+                timestamp: new Date(),
+              },
+            },
           },
-        },
-      },
-      { upsert: true },
-    );
+          { upsert: true },
+        );
+      } catch (dbErr) {
+        console.warn("DB save chat history warning:", dbErr.message);
+      }
+    }
 
     // 5. 回傳給前端
     res.json({ success: true, result: text });
   } catch (error) {
     console.error("Gemini Chat Error:", error);
-    res.status(500).json({
-      success: false,
-      error: "AI 助教目前忙線中",
-      details: error.message,
+    res.json({
+      success: true,
+      result:
+        "我是助教沐芙！請仔細檢查目前的程式與邏輯，有任何疑問都可以問我喔！",
     });
   }
 });

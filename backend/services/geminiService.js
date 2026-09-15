@@ -32,7 +32,7 @@ export { getGenAI };
  */
 export const generateContent = async (
   prompt,
-  modelName = "gemini-2.5-flash"
+  modelName = "gemini-2.5-flash",
 ) => {
   try {
     const model = getGenAI().getGenerativeModel({ model: modelName });
@@ -213,6 +213,8 @@ export const generatePseudoCode = async (prompt) => {
   const response = await result.response;
   let text = response.text().trim();
 
+  // 去除 markdown code block（如 ```json ... ``` 或 ``` ... ```）
+  text = text.replace(/^```json\s*|^```\s*|```$/gm, "").trim();
   // 嘗試提取標準 JSON 區塊
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
@@ -226,7 +228,7 @@ export const generatePseudoCode = async (prompt) => {
   } catch (e) {
     console.error("Gemini 回傳內容不是合法 JSON：", text);
     throw new Error(
-      "Gemini 回傳內容不是合法 JSON，請檢查 prompt 或 API 回應格式"
+      "Gemini 回傳內容不是合法 JSON，請檢查 prompt 或 API 回應格式",
     );
   }
 };
