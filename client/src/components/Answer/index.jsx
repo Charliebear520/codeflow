@@ -95,17 +95,14 @@ const Answer = ({ onChecking }) => {
 
       // 呼叫完整的比對 API
       const token = await getToken();
-      const res = await fetch(
-        `http://localhost:5000/api/submissions/stage1/compare`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`/api/submissions/stage1/compare`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await res.json();
 
@@ -176,11 +173,17 @@ const Answer = ({ onChecking }) => {
   ];
   const handleSave = async () => {
     try {
-      if (!isSignedIn) { message.error("請先登入"); return; }
+      if (!isSignedIn) {
+        message.error("請先登入");
+        return;
+      }
 
       let payload = { questionId: "Q001", completed: false };
       const now = Date.now();
-      const deltaSec = Math.max(0, Math.floor((now - (lastTickRef.current || now)) / 1000));
+      const deltaSec = Math.max(
+        0,
+        Math.floor((now - (lastTickRef.current || now)) / 1000),
+      );
       lastTickRef.current = now;
       payload.durationDeltaSec = deltaSec;
 
@@ -203,7 +206,10 @@ const Answer = ({ onChecking }) => {
         }
         const { nodes, edges } = flowRef.current.exportGraph();
         const hasData = (nodes?.length || 0) + (edges?.length || 0) > 0;
-        if (!hasData) { message.error("還沒有流程圖可以儲存"); return; }
+        if (!hasData) {
+          message.error("還沒有流程圖可以儲存");
+          return;
+        }
 
         const flowElement = document.querySelector(".react-flow");
         if (!flowElement) {
@@ -219,7 +225,10 @@ const Answer = ({ onChecking }) => {
         payload.mode = "editor";
         // ...existing code...
         console.log("送出前 payload：", payload);
-        console.log("imageBase64 長度：", payload.imageBase64 ? payload.imageBase64.length : "null");
+        console.log(
+          "imageBase64 長度：",
+          payload.imageBase64 ? payload.imageBase64.length : "null",
+        );
         // ...existing code...
       } else {
         message.error("未知的分頁");
@@ -227,7 +236,7 @@ const Answer = ({ onChecking }) => {
       }
 
       const token = await getToken();
-      const res = await fetch(`http://localhost:5000/api/submissions/stage1`, {
+      const res = await fetch(`/api/submissions/stage1`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -236,7 +245,8 @@ const Answer = ({ onChecking }) => {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok || !data.success)
+        throw new Error(data.error || `HTTP ${res.status}`);
 
       message.success("已儲存第一階段的作答");
     } catch (err) {

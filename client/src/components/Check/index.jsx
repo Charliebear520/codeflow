@@ -51,7 +51,7 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   const hasSuggestionsData = scores && diffs && checkFeedback;
 
   const getApiEndpoint = (stageNum) => {
-    return `http://localhost:5000/api/submissions/stage${stageNum}/compare`;
+    return `/api/submissions/stage${stageNum}/compare`;
   };
 
   const preparePayload = async (stageNum) => {
@@ -204,7 +204,7 @@ ${data.checkFeedback || data.feedback || "已完成檢查"}
     try {
       if (!isSignedIn) throw new Error("請先登入");
       const token = await getToken();
-      const response = await fetch("http://localhost:5000/api/chat", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

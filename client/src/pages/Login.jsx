@@ -3,7 +3,7 @@ import { useSignIn, useAuth } from "@clerk/clerk-react";
 import "../styles/Login.css";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-const API = import.meta.env.VITE_API_URL || "";
+const API = "";
 
 
 function Login() {

@@ -176,9 +176,13 @@ const OnlineCoding = ({
     try {
       if (isStage3) {
         // 第三階段：檢查程式語法
+        const token = await getToken();
         const res = await fetch("/api/check-code", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ question, code, language, questionId: "Q001" }),
         });
         const data = await res.json();

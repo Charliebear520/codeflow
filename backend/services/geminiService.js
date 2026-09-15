@@ -211,10 +211,15 @@ export const generatePseudoCode = async (prompt) => {
   const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
   const result = await model.generateContent(prompt);
   const response = await result.response;
-  let text = response.text();
+  let text = response.text().trim();
 
-  // 去除 markdown code block（如 ```json ... ``` 或 ``` ... ```）
-  text = text.replace(/^```json\s*|^```\s*|```$/gm, "").trim();
+  // 嘗試提取標準 JSON 區塊
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    text = jsonMatch[0];
+  } else {
+    text = text.replace(/^```json\s*|^```\s*|```$/gm, "").trim();
+  }
 
   try {
     return JSON.parse(text);

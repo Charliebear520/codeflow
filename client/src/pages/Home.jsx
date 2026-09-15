@@ -65,7 +65,7 @@ const Home = () => {
     try {
       const token = await getToken();
       const res = await fetch(
-        "http://localhost:5000/api/submissions/all-stages/summary",
+        "/api/submissions/all-stages/summary",
         {
           method: "POST",
           headers: {
@@ -110,7 +110,7 @@ const Home = () => {
     try {
       const token = await getToken();
       const res = await fetch(
-        "http://localhost:5000/api/submissions/all-stages/summary/history?questionId=Q001",
+        "/api/submissions/all-stages/summary/history?questionId=Q001",
         {
           method: "GET",
           headers: {

@@ -9,6 +9,7 @@ import {
 } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "@clerk/clerk-react";
 import StageSwitcher from "../StageSwitcher";
 
 const TopicStage2 = ({
@@ -17,6 +18,7 @@ const TopicStage2 = ({
   currentStage,
   setCurrentStage,
 }) => {
+  const { getToken, isSignedIn } = useAuth();
   const [loading, setLoading] = useState(false);
   const [hintLevel, setHintLevel] = useState(1); // 提示層級，從1開始
   const [isHintModalVisible, setIsHintModalVisible] = useState(false);
@@ -48,13 +50,27 @@ const TopicStage2 = ({
 
       console.log("送出 Stage2 時間:", durationSec);
 
-      axios.post("/api/submissions/stage2", {
-        questionId: "Q1", // ⚠️ TODO: 改成你的實際題目 ID
-        durationDeltaSec: durationSec,
-        completed: true,
-      });
+      (async () => {
+        try {
+          const token = isSignedIn ? await getToken() : null;
+          await axios.post(
+            "/api/submissions/stage2",
+            {
+              questionId:
+                localStorage.getItem("currentFlowchartQuestionId") || "Q001",
+              durationDeltaSec: durationSec,
+              completed: true,
+            },
+            {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            }
+          );
+        } catch (e) {
+          console.warn("送出 Stage2 時間失敗:", e?.message);
+        }
+      })();
     };
-  }, [startTime]);
+  }, [startTime, isSignedIn, getToken]);
 
   // ✅【新增 4】防止關閉頁面沒送到
   useEffect(() => {
@@ -118,11 +134,17 @@ const TopicStage2 = ({
 
     setHintLoading(true);
     try {
+      const token = isSignedIn ? await getToken() : null;
       const response = await axios.post(
         "/api/generate-hint",
         {
           question,
           hintLevel,
+          questionId:
+            localStorage.getItem("currentFlowchartQuestionId") || "Q001",
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         }
       );
 

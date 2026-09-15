@@ -54,6 +54,7 @@ export default function Stage3Page() {
           <Col span={12}>
             <OnlineCoding
               question={question}
+              currentStage={currentStage}
               onFeedback={(fb) => {
                 setFeedback(fb);
                 dispatch(setStageFeedback({ stage: 3, feedback: fb }));
