@@ -64,18 +64,18 @@ ${questionText}
 export function comparePseudocode(
   idealStructure,
   studentPseudocode,
-  questionText = ""
+  questionText = "",
 ) {
   const studentLower = studentPseudocode.toLowerCase();
 
   // 檢查變數使用
   const usedVariables =
     idealStructure.variables?.filter((v) =>
-      studentLower.includes(v.toLowerCase())
+      studentLower.includes(v.toLowerCase()),
     ) || [];
   const missingVariables =
     idealStructure.variables?.filter(
-      (v) => !studentLower.includes(v.toLowerCase())
+      (v) => !studentLower.includes(v.toLowerCase()),
     ) || [];
 
   // 檢查條件判斷
@@ -84,11 +84,11 @@ export function comparePseudocode(
       (c) =>
         studentLower.includes(c.toLowerCase()) ||
         studentLower.includes("if") ||
-        studentLower.includes("else")
+        studentLower.includes("else"),
     ) || [];
   const missingConditions =
     idealStructure.conditions?.filter(
-      (c) => !studentLower.includes(c.toLowerCase())
+      (c) => !studentLower.includes(c.toLowerCase()),
     ) || [];
 
   // 檢查迴圈
@@ -102,7 +102,7 @@ export function comparePseudocode(
   // 檢查邏輯流程
   const missingLogic =
     idealStructure.logicFlow?.filter(
-      (logic) => !studentLower.includes(logic.toLowerCase().substring(0, 10))
+      (logic) => !studentLower.includes(logic.toLowerCase().substring(0, 10)),
     ) || [];
 
   // 計算分數
@@ -169,7 +169,7 @@ export async function generatePseudocodeFeedback(
   ideal,
   studentPseudocode,
   diffs,
-  scores
+  scores,
 ) {
   const prompt = `你是一位非常簡潔的國中程式設計助教。你的任務是根據「理想虛擬碼」和「學生虛擬碼」的比對結果，用繁體中文提供引導式建議。
 
@@ -283,70 +283,27 @@ ${
  * 用於「檢查」按鈕，列出具體問題點
  */
 export async function generatePseudocodeCheckReport(diffs) {
-  const prompt = `你是程式教學專家。請根據以下虛擬碼比對結果，生成一份簡潔的檢查報告，列出學生作答中的具體問題點。
-
-比對結果：
-- 缺少邏輯：${JSON.stringify(diffs.missingLogic || [])}
-- 錯誤條件：${JSON.stringify(diffs.incorrectConditions || [])}
-- 缺少變數：${JSON.stringify(diffs.missingVariables || [])}
-- 缺少迴圈：${JSON.stringify(diffs.missingLoops || [])}
-- 結構問題：${JSON.stringify(diffs.structureIssues || [])}
-
-請生成格式如下（**每個問題類別獨立一行，類別之間用換行分隔**）：
-缺少邏輯：輸入驗證、結果輸出
-
-錯誤條件：迴圈條件應為 < 而非 <=
-
-缺少變數：counter、sum
-
-要求：
-1. 只列出有問題的項目，沒問題的不要提及
-2. 使用自然語言描述具體問題
-3. **每個問題類別後面必須加上換行（\n）**
-4. 總字數：嚴格限制在 150 字以內
-5. 如果沒有任何問題，回覆：✅ 太棒了！虛擬碼沒有發現任何問題！`;
-
-  try {
-    const result = await generateContent(prompt);
-    let checkReport = result.trim();
-
-    // 驗證字數
-    const charCount = checkReport.length;
-    console.log("✅ 虛擬碼檢查報告字數:", charCount, "字");
-
-    // 強制截斷超過 150 字的內容
-    if (charCount > 150) {
-      console.warn("⚠️ 檢查報告超過 150 字，進行截斷");
-      checkReport = checkReport.substring(0, 147) + "...";
-    }
-
-    return checkReport;
-  } catch (error) {
-    console.error("生成虛擬碼檢查報告失敗:", error);
-
-    // 降級方案：使用簡單列表
-    const issues = [];
-    if (diffs.missingLogic?.length > 0) {
-      issues.push(`缺少邏輯：${diffs.missingLogic.join("、")}`);
-    }
-    if (diffs.incorrectConditions?.length > 0) {
-      issues.push(`錯誤條件：${diffs.incorrectConditions.join("、")}`);
-    }
-    if (diffs.missingVariables?.length > 0) {
-      issues.push(`缺少變數：${diffs.missingVariables.join("、")}`);
-    }
-    if (diffs.missingLoops?.length > 0) {
-      issues.push(`缺少迴圈：${diffs.missingLoops.join("、")}`);
-    }
-    if (diffs.structureIssues?.length > 0) {
-      issues.push(`結構問題：${diffs.structureIssues.join("、")}`);
-    }
-
-    if (issues.length === 0) {
-      return "✅ 太棒了！虛擬碼沒有發現任何問題！";
-    }
-
-    const report = issues.join("\n");
-    return report.length > 150 ? report.substring(0, 147) + "..." : report;
+  const issues = [];
+  if (diffs?.missingLogic?.length > 0) {
+    issues.push(`缺少邏輯：${diffs.missingLogic.join("、")}`);
   }
+  if (diffs?.incorrectConditions?.length > 0) {
+    issues.push(`錯誤條件：${diffs.incorrectConditions.join("、")}`);
+  }
+  if (diffs?.missingVariables?.length > 0) {
+    issues.push(`缺少變數：${diffs.missingVariables.join("、")}`);
+  }
+  if (diffs?.missingLoops?.length > 0) {
+    issues.push(`缺少迴圈：${diffs.missingLoops.join("、")}`);
+  }
+  if (diffs?.structureIssues?.length > 0) {
+    issues.push(`結構問題：${diffs.structureIssues.join("、")}`);
+  }
+
+  if (issues.length === 0) {
+    return "✅ 太棒了！虛擬碼沒有發現任何問題！";
+  }
+
+  const report = issues.join("\n\n");
+  return report.length > 150 ? report.substring(0, 147) + "..." : report;
 }

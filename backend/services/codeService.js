@@ -55,8 +55,8 @@ ${questionText}
       language === "python"
         ? `# ${questionText}\nprint("請實作程式碼")`
         : language === "javascript"
-        ? `// ${questionText}\nconsole.log("請實作程式碼");`
-        : `// ${questionText}\n#include <stdio.h>\nint main() {\n  printf("請實作程式碼");\n  return 0;\n}`;
+          ? `// ${questionText}\nconsole.log("請實作程式碼");`
+          : `// ${questionText}\n#include <stdio.h>\nint main() {\n  printf("請實作程式碼");\n  return 0;\n}`;
 
     return {
       code: defaultCode,
@@ -82,7 +82,7 @@ export function compareCode(
   idealStructure,
   studentCode,
   language,
-  questionText = ""
+  questionText = "",
 ) {
   const studentLower = studentCode.toLowerCase();
 
@@ -224,7 +224,7 @@ export async function generateCodeFeedback(
   studentCode,
   diffs,
   scores,
-  language
+  language,
 ) {
   const languageMap = {
     python: "Python",
@@ -340,70 +340,27 @@ ${
  * 用於「檢查」按鈕，列出具體問題點
  */
 export async function generateCodeCheckReport(diffs, language = "python") {
-  const prompt = `你是 ${language} 程式教學專家。請根據以下程式碼比對結果，生成一份簡潔的檢查報告，列出學生作答中的具體問題點。
-
-比對結果：
-- 語法錯誤：${JSON.stringify(diffs.syntaxErrors || [])}
-- 邏輯錯誤：${JSON.stringify(diffs.logicErrors || [])}
-- 執行警告：${JSON.stringify(diffs.runtimeWarnings || [])}
-- 缺少功能：${JSON.stringify(diffs.missingFeatures || [])}
-- 缺少控制流：${JSON.stringify(diffs.missingControlFlow || [])}
-
-請生成格式如下（**每個問題類別獨立一行，類別之間用換行分隔**）：
-語法錯誤：第 5 行缺少冒號
-
-邏輯錯誤：條件判斷應使用 == 而非 =
-
-缺少功能：輸入驗證、錯誤處理
-
-要求：
-1. 只列出有問題的項目，沒問題的不要提及
-2. 使用自然語言描述具體問題
-3. **每個問題類別後面必須加上換行（\n）**
-4. 總字數：嚴格限制在 150 字以內
-5. 如果沒有任何問題，回覆：✅ 太棒了！程式碼沒有發現任何問題！`;
-
-  try {
-    const result = await generateContent(prompt);
-    let checkReport = result.trim();
-
-    // 驗證字數
-    const charCount = checkReport.length;
-    console.log("✅ 程式碼檢查報告字數:", charCount, "字");
-
-    // 強制截斷超過 150 字的內容
-    if (charCount > 150) {
-      console.warn("⚠️ 檢查報告超過 150 字，進行截斷");
-      checkReport = checkReport.substring(0, 147) + "...";
-    }
-
-    return checkReport;
-  } catch (error) {
-    console.error("生成程式碼檢查報告失敗:", error);
-
-    // 降級方案：使用簡單列表
-    const issues = [];
-    if (diffs.syntaxErrors?.length > 0) {
-      issues.push(`語法錯誤：${diffs.syntaxErrors.join("、")}`);
-    }
-    if (diffs.logicErrors?.length > 0) {
-      issues.push(`邏輯錯誤：${diffs.logicErrors.join("、")}`);
-    }
-    if (diffs.runtimeWarnings?.length > 0) {
-      issues.push(`執行警告：${diffs.runtimeWarnings.join("、")}`);
-    }
-    if (diffs.missingFeatures?.length > 0) {
-      issues.push(`缺少功能：${diffs.missingFeatures.join("、")}`);
-    }
-    if (diffs.missingControlFlow?.length > 0) {
-      issues.push(`缺少控制流：${diffs.missingControlFlow.join("、")}`);
-    }
-
-    if (issues.length === 0) {
-      return "✅ 太棒了！程式碼沒有發現任何問題！";
-    }
-
-    const report = issues.join("\n");
-    return report.length > 150 ? report.substring(0, 147) + "..." : report;
+  const issues = [];
+  if (diffs?.syntaxErrors?.length > 0) {
+    issues.push(`語法問題：${diffs.syntaxErrors.join("、")}`);
   }
+  if (diffs?.logicErrors?.length > 0) {
+    issues.push(`邏輯問題：${diffs.logicErrors.join("、")}`);
+  }
+  if (diffs?.runtimeWarnings?.length > 0) {
+    issues.push(`執行警告：${diffs.runtimeWarnings.join("、")}`);
+  }
+  if (diffs?.missingFeatures?.length > 0) {
+    issues.push(`缺少功能：${diffs.missingFeatures.join("、")}`);
+  }
+  if (diffs?.missingControlFlow?.length > 0) {
+    issues.push(`缺少控制流：${diffs.missingControlFlow.join("、")}`);
+  }
+
+  if (issues.length === 0) {
+    return "✅ 太棒了！程式碼沒有發現任何問題！";
+  }
+
+  const report = issues.join("\n\n");
+  return report.length > 150 ? report.substring(0, 147) + "..." : report;
 }

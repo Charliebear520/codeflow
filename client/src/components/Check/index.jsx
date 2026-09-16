@@ -148,24 +148,49 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
         },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      let data = null;
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch (_) {}
+      }
 
-      if (!res.ok || !data.success) throw new Error(data.error || "檢查失敗");
+      if (!res.ok || !data?.success) {
+        if (res.status === 504) {
+          throw new Error("伺服器處理逾時 (504)，請稍候再試一次。");
+        }
+        if (res.status === 500) {
+          throw new Error(
+            data?.error || "伺服器處理發生錯誤 (500)，請稍後再試。",
+          );
+        }
+        throw new Error(data?.error || `檢查失敗 (HTTP ${res.status})`);
+      }
+
       dispatch({ type: "check/setCheckResult", payload: data });
       setLastCheckHash(getContentHash(stage));
 
-      // 生成报告消息
+      // 依階段顯示評分細項
+      let breakdownText = "";
+      if (stage === 1) {
+        breakdownText = `- 結構：${Math.round(data.scores?.structure || 0)} 分\n- 節點：${Math.round(data.scores?.nodes || 0)} 分\n- 連線：${Math.round(data.scores?.edges || 0)} 分`;
+      } else if (stage === 2) {
+        breakdownText = `- 邏輯相似度：${Math.round(data.scores?.logicSimilarity || 0)} 分\n- 結構完整度：${Math.round(data.scores?.structureCompleteness || 0)} 分\n- 變數使用：${Math.round(data.scores?.variableUsage || 0)} 分\n- 控制流程：${Math.round(data.scores?.controlFlow || 0)} 分`;
+      } else if (stage === 3) {
+        breakdownText = `- 語法正確性：${Math.round(data.scores?.syntaxCorrectness || 0)} 分\n- 邏輯相似度：${Math.round(data.scores?.logicSimilarity || 0)} 分\n- 執行安全性：${Math.round(data.scores?.executionSafety || 0)} 分\n- 程式碼品質：${Math.round(data.scores?.codeQuality || 0)} 分`;
+      }
+
+      // 生成報告消息
       const reportText = `
 ## 📋 檢查結果報告
 
 **總分**：${Math.round(data.scores?.overall || 0)} 分
-- 結構：${Math.round(data.scores?.structure || 0)} 分
-- 節點：${Math.round(data.scores?.nodes || 0)} 分
-- 連線：${Math.round(data.scores?.edges || 0)} 分
+${breakdownText}
 
 ## 💡 AI 助教建議
 
-${data.checkFeedback || data.feedback || "已完成檢查"}
+${data.checkReport || data.checkFeedback || data.feedback || "已完成檢查"}
 `;
 
       setMessages((prev) => [

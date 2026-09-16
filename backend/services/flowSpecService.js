@@ -441,78 +441,31 @@ async function generateFeedbackText(question, ideal, student, diffs, scores) {
  * 生成流程圖檢查報告（≤150字）
  * 用於「檢查」按鈕，列出具體問題點
  */
-async function generateCheckReport(diffs) {
-  const ai = getGenAI();
-  // 與其他服務統一，改用已支援的模型名稱
-  const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-  const prompt = `你是程式教學專家。請根據以下流程圖比對結果，生成一份簡潔的檢查報告，列出學生作答中的具體問題點。
-
-比對結果：
-- 缺少節點：${JSON.stringify(diffs.missingNodes || [])}
-- 缺少連線：${JSON.stringify(diffs.missingEdges || [])}
-- 結構問題：${JSON.stringify(diffs.structureIssues || [])}
-- 邏輯問題：${JSON.stringify(diffs.logicIssues || [])}
-
-請生成格式如下（**每個問題類別獨立一行，類別之間用換行分隔**）：
-缺少節點：開始、結束節點
-
-缺少連線：判斷節點缺少是或否兩條連線
-
-邏輯問題：連線需要標註是或否
-
-要求：
-1. 只列出有問題的項目，沒問題的不要提及
-2. 使用自然語言描述具體問題
-3. **每個問題類別後面必須加上換行（\n）**
-4. 總字數：嚴格限制在 150 字以內
-5. 如果沒有任何問題，回覆：✅ 太棒了！流程圖沒有發現任何問題！`;
-
-  try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    let checkReport = response.text().trim();
-
-    // 驗證字數
-    const charCount = checkReport.length;
-    console.log("✅ 流程圖檢查報告字數:", charCount, "字");
-
-    // 強制截斷超過 150 字的內容
-    if (charCount > 150) {
-      console.warn("⚠️ 檢查報告超過 150 字，進行截斷");
-      checkReport = checkReport.substring(0, 147) + "...";
-    }
-
-    return checkReport;
-  } catch (error) {
-    console.error("生成流程圖檢查報告失敗:", error);
-
-    // 降級方案：使用簡單列表
-    const issues = [];
-    if (diffs.missingNodes?.length > 0) {
-      issues.push(
-        `缺少節點：${diffs.missingNodes
-          .map((n) => n.label || n.type)
-          .join("、")}`,
-      );
-    }
-    if (diffs.missingEdges?.length > 0) {
-      issues.push(`缺少連線：${diffs.missingEdges.length} 條必要連線`);
-    }
-    if (diffs.structureIssues?.length > 0) {
-      issues.push(`結構問題：${diffs.structureIssues.join("、")}`);
-    }
-    if (diffs.logicIssues?.length > 0) {
-      issues.push(`邏輯問題：${diffs.logicIssues.join("、")}`);
-    }
-
-    if (issues.length === 0) {
-      return "✅ 太棒了！流程圖沒有發現任何問題！";
-    }
-
-    const report = issues.join("\n");
-    return report.length > 150 ? report.substring(0, 147) + "..." : report;
+function generateCheckReport(diffs) {
+  const issues = [];
+  if (diffs?.missingNodes?.length > 0) {
+    issues.push(
+      `缺少節點：${diffs.missingNodes
+        .map((n) => n.label || n.type)
+        .join("、")}`,
+    );
   }
+  if (diffs?.missingEdges?.length > 0) {
+    issues.push(`缺少連線：${diffs.missingEdges.length} 條必要連線`);
+  }
+  if (diffs?.structureIssues?.length > 0) {
+    issues.push(`結構問題：${diffs.structureIssues.join("、")}`);
+  }
+  if (diffs?.logicIssues?.length > 0) {
+    issues.push(`邏輯問題：${diffs.logicIssues.join("、")}`);
+  }
+
+  if (issues.length === 0) {
+    return "✅ 太棒了！流程圖沒有發現任何問題！";
+  }
+
+  const report = issues.join("\n\n");
+  return report.length > 150 ? report.substring(0, 147) + "..." : report;
 }
 
 export {

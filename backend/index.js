@@ -285,6 +285,7 @@ const getMongoUri = () => {
 const mongoUri = getMongoUri();
 
 let dbConnectionPromise = null;
+let lastDbFailTime = 0;
 async function connectToDatabase() {
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
@@ -293,14 +294,18 @@ async function connectToDatabase() {
   if (!uri) {
     return null;
   }
+  // 若近期連線失敗，冷卻 30 秒以內不重複嘗試連線，避免請求阻塞
+  if (Date.now() - lastDbFailTime < 30000) {
+    return null;
+  }
   if (!dbConnectionPromise) {
     console.log("Connecting to MongoDB...");
     dbConnectionPromise = mongoose
       .connect(uri, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 30000,
-        connectTimeoutMS: 5000,
-        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 2000,
+        socketTimeoutMS: 10000,
+        connectTimeoutMS: 2000,
+        maxPoolSize: 5,
         retryWrites: true,
       })
       .then((conn) => {
@@ -308,6 +313,7 @@ async function connectToDatabase() {
         return conn;
       })
       .catch((err) => {
+        lastDbFailTime = Date.now();
         dbConnectionPromise = null;
         console.error("MongoDB connection error:", err.message);
         return null;
@@ -351,28 +357,114 @@ async function getQuestionByIdOrTitle(questionId) {
   }
 }
 
+// 預設示範題的標準理想結構快取，保證毫秒級比對與防止冷啟動/DB未連線時的 504 逾時
+const DEFAULT_IDEAL_ANSWERS = {
+  Q001: {
+    questionId: "Q001",
+    flowSpec: {
+      nodes: [
+        { id: "n1", type: "start", label: "開始", required: true },
+        { id: "n2", type: "decision", label: "是否下雨", required: true },
+        { id: "n3", type: "process", label: "帶傘", required: true },
+        { id: "n4", type: "process", label: "不帶傘", required: true },
+        { id: "n5", type: "end", label: "結束", required: true },
+      ],
+      edges: [
+        { from: "n1", to: "n2", required: true },
+        { from: "n2", to: "n3", label: "yes", required: true },
+        { from: "n2", to: "n4", label: "no", required: true },
+        { from: "n3", to: "n5", required: true },
+        { from: "n4", to: "n5", required: true },
+      ],
+      rubrics: {},
+      scoringWeights: { structure: 0.25, nodes: 0.25, edges: 0.25, logic: 0.25 },
+    },
+    pseudocode: `BEGIN
+  INPUT weather
+  IF weather == "下雨" THEN
+    OUTPUT "帶傘"
+  ELSE
+    OUTPUT "不帶傘"
+  ENDIF
+END`,
+    pseudocodeStructure: {
+      variables: ["weather"],
+      conditions: ["weather == '下雨'"],
+      loops: [],
+      logicFlow: ["輸入天氣", "判斷是否下雨", "輸出帶傘或不帶傘"],
+    },
+    code: `weather = input("今天會下雨嗎？: ")
+if weather == "下雨":
+    print("帶傘")
+else:
+    print("不用帶傘")`,
+    codeStructure: {
+      functions: [],
+      variables: ["weather"],
+      controlFlow: ["if-else"],
+      expectedOutput: "帶傘",
+    },
+  },
+};
+
+const idealAnswerMemoryCache = new Map();
+
 async function getIdealAnswerByQuestionId(questionId) {
-  if (!questionId || mongoose.connection.readyState !== 1) return null;
-  try {
-    return await IdealAnswer.findOne({ questionId: String(questionId) }).lean();
-  } catch (err) {
-    console.warn("getIdealAnswerByQuestionId error:", err.message);
-    return null;
+  if (!questionId) return null;
+  const qId = String(questionId);
+
+  // 1. 先查記憶體快取
+  if (idealAnswerMemoryCache.has(qId)) {
+    return idealAnswerMemoryCache.get(qId);
   }
+
+  // 2. 查資料庫
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const doc = await IdealAnswer.findOne({ questionId: qId }).lean();
+      if (doc) {
+        idealAnswerMemoryCache.set(qId, doc);
+        return doc;
+      }
+    } catch (err) {
+      console.warn("getIdealAnswerByQuestionId error:", err.message);
+    }
+  }
+
+  // 3. 使用內建預設理想答案
+  if (DEFAULT_IDEAL_ANSWERS[qId]) {
+    return DEFAULT_IDEAL_ANSWERS[qId];
+  }
+
+  return null;
 }
 
 async function saveIdealAnswer(questionId, updateData) {
-  if (!questionId || mongoose.connection.readyState !== 1) return null;
+  if (!questionId) return null;
+  const qId = String(questionId);
+
+  // 同步更新記憶體快取
+  const existing =
+    idealAnswerMemoryCache.get(qId) || DEFAULT_IDEAL_ANSWERS[qId] || {};
+  const merged = {
+    ...existing,
+    ...updateData,
+    questionId: qId,
+    generatedAt: new Date(),
+  };
+  idealAnswerMemoryCache.set(qId, merged);
+
+  if (mongoose.connection.readyState !== 1) return merged;
   try {
     return await IdealAnswer.findOneAndUpdate(
-      { questionId: String(questionId) },
+      { questionId: qId },
       {
         $set: {
           ...updateData,
           generatedAt: new Date(),
         },
         $setOnInsert: {
-          questionId: String(questionId),
+          questionId: qId,
           flowSpec: {},
           version: "v1",
         },
@@ -381,7 +473,7 @@ async function saveIdealAnswer(questionId, updateData) {
     );
   } catch (err) {
     console.warn("saveIdealAnswer error:", err.message);
-    return null;
+    return merged;
   }
 }
 
@@ -399,7 +491,13 @@ const ADMIN_EMAILS_SET = new Set(
     .filter(Boolean),
 );
 
+const studentMemoryCache = new Map();
+
 async function ensureStudent(userId) {
+  if (!userId) return null;
+  if (studentMemoryCache.has(userId)) {
+    return studentMemoryCache.get(userId);
+  }
   try {
     let fullName = "";
     let email = null;
@@ -437,17 +535,22 @@ async function ensureStudent(userId) {
         { $setOnInsert: setOnInsert, $set: set },
         { new: true, upsert: true },
       );
-      return doc;
+      if (doc) {
+        studentMemoryCache.set(userId, doc);
+        return doc;
+      }
     }
 
     // 資料庫未連線時提供 fallback 物件，避免全站崩潰
-    return {
+    const fallbackDoc = {
       userId,
       name: fullName || "Student",
       email,
       role,
       _id: userId,
     };
+    studentMemoryCache.set(userId, fallbackDoc);
+    return fallbackDoc;
   } catch (err) {
     console.error("ensureStudent error:", err.message);
     return {
@@ -812,17 +915,17 @@ app.post("/api/submissions/stage1/compare", async (req, res) => {
     console.log("📈 比對結果 scores:", scores);
     console.log("📋 比對結果 diffs:", JSON.stringify(diffs, null, 2));
 
-    // 4) 產生回饋
-    const feedback = await generateFeedbackText(
-      questionText || "",
-      idealSpec,
-      studentSpec,
-      diffs,
-      scores,
-    );
-
-    // 4.5) 產生檢查報告（用於「檢查」按鈕）
-    const checkReport = await generateCheckReport(diffs);
+    // 4) 平行產生回饋與檢查報告
+    const [feedback, checkReport] = await Promise.all([
+      generateFeedbackText(
+        questionText || "",
+        idealSpec,
+        studentSpec,
+        diffs,
+        scores,
+      ),
+      generateCheckReport(diffs),
+    ]);
 
     // 4.6) 計算百分制分數和完成狀態
     const percentScore = scores.overall || 0;
@@ -991,17 +1094,17 @@ app.post("/api/submissions/stage2/compare", async (req, res) => {
     console.log("📈 Stage2 比對結果 scores:", scores);
     console.log("📋 Stage2 比對結果 diffs:", JSON.stringify(diffs, null, 2));
 
-    // 3) 產生回饋
-    const feedback = await generatePseudocodeFeedback(
-      questionText || "",
-      ideal || { pseudocode: "" },
-      pseudocode,
-      diffs,
-      scores,
-    );
-
-    // 3.5) 產生檢查報告（用於「檢查」按鈕）
-    const checkReport = await generatePseudocodeCheckReport(diffs);
+    // 3) 平行產生回饋與檢查報告
+    const [feedback, checkReport] = await Promise.all([
+      generatePseudocodeFeedback(
+        questionText || "",
+        ideal || { pseudocode: "" },
+        pseudocode,
+        diffs,
+        scores,
+      ),
+      generatePseudocodeCheckReport(diffs),
+    ]);
 
     // 3.6) 計算完成狀態（scores.overall 已經是 0-100）
     const percentScore = scores.overall;
@@ -1180,18 +1283,18 @@ app.post("/api/submissions/stage3/compare", async (req, res) => {
     console.log("📈 Stage3 比對結果 scores:", scores);
     console.log("📋 Stage3 比對結果 diffs:", JSON.stringify(diffs, null, 2));
 
-    // 3) 產生回饋
-    const feedback = await generateCodeFeedback(
-      questionText || "",
-      ideal || { code: "" },
-      code,
-      diffs,
-      scores,
-      language,
-    );
-
-    // 3.5) 產生檢查報告（用於「檢查」按鈕）
-    const checkReport = await generateCodeCheckReport(diffs, language);
+    // 3) 平行產生回饋與檢查報告
+    const [feedback, checkReport] = await Promise.all([
+      generateCodeFeedback(
+        questionText || "",
+        ideal || { code: "" },
+        code,
+        diffs,
+        scores,
+        language,
+      ),
+      generateCodeCheckReport(diffs, language),
+    ]);
 
     // 3.6) 計算完成狀態（scores.overall 已經是 0-100）
     const percentScore = scores.overall;
@@ -3021,5 +3124,6 @@ if (process.env.NODE_ENV !== "production") {
   console.log("Skipping app.listen in production mode");
 }
 
-// 導出app供Vercel使用 (僅在作為模塊導入時)
+// 導出 maxDuration 與 app 供 Vercel Serverless Function 使用
+export const maxDuration = 60;
 export default app;

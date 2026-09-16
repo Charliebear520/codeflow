@@ -33,15 +33,30 @@ export { getGenAI };
 export const generateContent = async (
   prompt,
   modelName = "gemini-2.5-flash",
+  timeoutMs = 5000,
 ) => {
+  let timer = null;
   try {
-    const model = getGenAI().getGenerativeModel({ model: modelName });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Gemini API 請求逾時 (${timeoutMs}ms)`)),
+        timeoutMs,
+      );
+    });
+
+    const callPromise = (async () => {
+      const model = getGenAI().getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    })();
+
+    return await Promise.race([callPromise, timeoutPromise]);
   } catch (error) {
-    console.error("Error in generateContent:", error);
+    console.error("Error in generateContent:", error.message);
     throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 };
 
