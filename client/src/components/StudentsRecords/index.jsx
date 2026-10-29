@@ -1,9 +1,9 @@
-import { DownOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { Row, Col, Select, App, Spin, Empty } from "antd";
 import styles from "./StudentsRecords.module.css";
 import StudentsRecordsCard from "../StudentsRecordsCard";
+import { readJson } from "../../lib/api";
 
 const subjects = [
   { key: "all", label: "全部" },
@@ -29,7 +29,7 @@ const StudentsRecords = () => {
         const res = await fetch(`/api/admin/submissions${qs}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const data = await res.json();
+        const data = await readJson(res);
         console.log("fetch submissions:", data);
         if (!data.success) throw new Error(data.error || "讀取失敗");
         setSubs(data.items || []);

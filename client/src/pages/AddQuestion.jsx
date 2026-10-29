@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { readJson } from "../lib/api";
 
 // const Question = require("./models/Question"); // 加在檔案最上方
 
@@ -32,7 +33,7 @@ export default function AddQuestion() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       setMsg(data.success ? "新增成功" : "新增失敗：" + data.error);
     } catch (err) {
       setMsg("API 錯誤：" + err.message);

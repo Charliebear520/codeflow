@@ -79,6 +79,25 @@ if (process.env.NODE_ENV !== "production") {
 const port = process.env.PORT || 3000;
 const app = express();
 
+// Express 4 不會捕捉 async handler 拋出的 rejection，請求會一直掛著直到 Vercel 逾時。
+// 統一包裝所有路由，讓錯誤一律交給最後的全局錯誤處理中間件以 JSON 回應。
+const wrapAsync = (fn) =>
+  typeof fn === "function" && fn.length < 4
+    ? function (req, res, next) {
+        const ret = fn.call(this, req, res, next);
+        if (ret && typeof ret.catch === "function") ret.catch(next);
+        return ret;
+      }
+    : fn;
+for (const method of ["get", "post", "put", "patch", "delete"]) {
+  const original = app[method].bind(app);
+  // app.get(name) 只有一個參數時是讀取設定值，不能包裝
+  app[method] = (path, ...handlers) =>
+    handlers.length === 0
+      ? original(path)
+      : original(path, ...handlers.map(wrapAsync));
+}
+
 // 檢查 Clerk 和 Gemini 初始化狀態
 app.get("/api/status", (req, res) => {
   res.json({
@@ -263,26 +282,52 @@ app.use((req, res, next) => {
 });
 
 // 資料表連接 - 僅從環境變數讀取，嚴禁在程式碼中硬編碼連線帳密
-const getMongoUri = () => {
-  const uri =
-    process.env.MONGODB_URI ||
-    process.env.MONGO_URI ||
-    process.env.MONGO ||
-    process.env.MONGO_URL;
+// 依序讀取，第一個有值的變數會被採用
+const MONGO_URI_ENV_KEYS = ["MONGODB_URI", "MONGO_URI", "MONGO", "MONGO_URL"];
 
-  if (uri && typeof uri === "string" && uri.trim()) {
-    return uri.trim();
+const resolveMongoUri = () => {
+  for (const key of MONGO_URI_ENV_KEYS) {
+    const uri = process.env[key];
+    if (uri && typeof uri === "string" && uri.trim()) {
+      return { uri: uri.trim(), source: key };
+    }
   }
 
   // 僅在非生產環境（本地開發）下允許 fallback 到本地 MongoDB
   if (process.env.NODE_ENV !== "production") {
-    return "mongodb://127.0.0.1:27017/codeflow";
+    return { uri: "mongodb://127.0.0.1:27017/codeflow", source: "local-fallback" };
   }
 
-  return "";
+  return { uri: "", source: null };
 };
 
+const getMongoUri = () => resolveMongoUri().uri;
+
+// 只取出主機名稱供 log 使用，不輸出帳密
+const getMongoHost = (uri) =>
+  uri
+    ? uri
+        .replace(/^mongodb(\+srv)?:\/\//, "")
+        .split("/")[0]
+        .split("@")
+        .pop()
+    : null;
+
 const mongoUri = getMongoUri();
+
+// 連線未就緒時，查詢最多只排隊 3 秒（預設 10 秒），避免超過 Vercel 的 10 秒上限。
+// 不使用 bufferCommands=false，以免冷啟動連線中的查詢直接失敗。
+mongoose.set("bufferTimeoutMS", 3000);
+
+const isDbReady = () => mongoose.connection.readyState === 1;
+
+const DB_UNAVAILABLE_MESSAGE = "資料庫暫時無法連線，請稍後再試";
+
+// 需要資料庫的路由使用：未連線時立即回 503，不讓查詢卡住
+function requireDb(req, res, next) {
+  if (isDbReady()) return next();
+  return res.status(503).json({ success: false, error: DB_UNAVAILABLE_MESSAGE });
+}
 
 let dbConnectionPromise = null;
 let lastDbFailTime = 0;
@@ -320,6 +365,22 @@ async function connectToDatabase() {
       });
   }
   return dbConnectionPromise;
+}
+
+// 啟動時印出實際採用的變數名稱與主機（不含帳密），方便在 Vercel log 排查
+{
+  const { source } = resolveMongoUri();
+  const host = getMongoHost(mongoUri);
+  console.log(`MongoDB URI source: ${source || "none"} (host: ${host || "-"})`);
+  if (
+    process.env.NODE_ENV === "production" &&
+    host &&
+    /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)
+  ) {
+    console.error(
+      `MongoDB URI (${source}) 指向本機 ${host}，在 Vercel 上無法連線，請改為 Atlas 連線字串`,
+    );
+  }
 }
 
 // 啟動時如果已配置 URI 則嘗試發起連線
@@ -377,7 +438,12 @@ const DEFAULT_IDEAL_ANSWERS = {
         { from: "n4", to: "n5", required: true },
       ],
       rubrics: {},
-      scoringWeights: { structure: 0.25, nodes: 0.25, edges: 0.25, logic: 0.25 },
+      scoringWeights: {
+        structure: 0.25,
+        nodes: 0.25,
+        edges: 0.25,
+        logic: 0.25,
+      },
     },
     pseudocode: `BEGIN
   INPUT weather
@@ -521,14 +587,18 @@ async function ensureStudent(userId) {
       }
     }
 
-    const role = email && ADMIN_EMAILS_SET.has(email) ? "teacher" : "student";
+    const isAdminEmail = !!email && ADMIN_EMAILS_SET.has(email);
+    const role = isAdminEmail ? "teacher" : "student";
 
     if (mongoose.connection.readyState === 1) {
       const setOnInsert = { userId };
       const set = {};
       if (fullName) set.name = fullName;
       if (email) set.email = email;
-      set.role = role;
+      // 只在 ADMIN_EMAILS 內才升級為 teacher；其餘僅在新建時設為 student，
+      // 避免覆蓋資料庫中手動設定的 teacher 角色
+      if (isAdminEmail) set.role = "teacher";
+      else setOnInsert.role = "student";
 
       const doc = await Student.findOneAndUpdate(
         { userId },
@@ -541,16 +611,15 @@ async function ensureStudent(userId) {
       }
     }
 
-    // 資料庫未連線時提供 fallback 物件，避免全站崩潰
-    const fallbackDoc = {
+    // 資料庫未連線時提供 fallback 物件，避免全站崩潰。
+    // 不寫入快取，資料庫恢復後下一次請求即可取得真實資料
+    return {
       userId,
       name: fullName || "Student",
       email,
       role,
       _id: userId,
     };
-    studentMemoryCache.set(userId, fallbackDoc);
-    return fallbackDoc;
   } catch (err) {
     console.error("ensureStudent error:", err.message);
     return {
@@ -637,11 +706,18 @@ app.get("/api/me", async (req, res) => {
 function requireTeacher(req, res, next) {
   (async () => {
     try {
-      const auth = getAuth(req) || {};
-      const userId = auth.userId;
+      const auth = typeof req.auth === "function" ? req.auth() : getAuth(req);
+      const userId = auth?.userId;
 
       if (!userId) {
         return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
+
+      // 角色存在資料庫中，未連線時無法判斷，直接回 503 而不是讓查詢卡住
+      if (!isDbReady()) {
+        return res
+          .status(503)
+          .json({ success: false, error: DB_UNAVAILABLE_MESSAGE });
       }
 
       // 從資料庫查詢使用者角色
@@ -656,12 +732,29 @@ function requireTeacher(req, res, next) {
         .json({ success: false, error: "Forbidden - Teacher role required" });
     } catch (e) {
       console.error("requireTeacher error:", e);
-      return res.status(401).json({ success: false, error: "Unauthorized" });
+      return res
+        .status(500)
+        .json({ success: false, error: "無法驗證教師權限，請稍後再試" });
     }
   })();
 }
 
+// 測試 / 除錯端點在正式環境僅限教師使用（/api/test-*、/api/debug-*、/test）
+const DEBUG_ROUTE_RE = /^\/(api\/(test-|debug-)|test$)/;
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === "production" && DEBUG_ROUTE_RE.test(req.path)) {
+    return requireTeacher(req, res, next);
+  }
+  next();
+});
+
 app.get("/api/upload", (req, res) => {
+  // ImageKit 目前停用（見檔案開頭的 import），避免 imagekit 未定義而拋出 ReferenceError
+  if (typeof imagekit === "undefined") {
+    return res
+      .status(501)
+      .json({ success: false, error: "圖片上傳功能目前未啟用" });
+  }
   const result = imagekit.getAuthenticationParameters();
   res.send(result);
 });
@@ -2343,7 +2436,7 @@ app.get("/test", (req, res) => {
 });
 
 // 教師後台資料：僅教師可訪問
-app.get("/api/admin/submissions", requireTeacher, async (req, res) => {
+app.get("/api/admin/submissions", requireTeacher, requireDb, async (req, res) => {
   // try {
   //   // 範例：回傳最近題目（實際可換為作答紀錄）
   //   const latest = await Question.find({}).sort({ createdAt: -1 }).limit(10);
@@ -2405,7 +2498,7 @@ app.post("/api/test-error-explanation", async (req, res) => {
 
 // 檢查環境變量
 console.log("API Key available:", !!process.env.GEMINI_API_KEY);
-console.log("MongoDB URI available:", !!process.env.MONGO_URI);
+console.log("MongoDB URI available:", !!getMongoUri());
 
 // 新增：基本測試端點
 app.get("/api/test-basic", (req, res) => {
@@ -2417,14 +2510,10 @@ app.get("/api/test-env", (req, res) => {
   res.json({
     success: true,
     hasGeminiKey: !!process.env.GEMINI_API_KEY,
-    hasMongoUri: !!process.env.MONGO_URI,
+    hasMongoUri: !!getMongoUri(),
+    mongoUriSource: resolveMongoUri().source,
+    mongoHost: getMongoHost(getMongoUri()),
     nodeEnv: process.env.NODE_ENV,
-    geminiKeyLength: process.env.GEMINI_API_KEY
-      ? process.env.GEMINI_API_KEY.length
-      : 0,
-    geminiKeyPrefix: process.env.GEMINI_API_KEY
-      ? process.env.GEMINI_API_KEY.substring(0, 10)
-      : "N/A",
   });
 });
 
@@ -3048,25 +3137,6 @@ app.get("/api/submissions/summary/:studentId", async (req, res) => {
   }
 });
 
-// 新增：測試資料插入的端點
-app.get("/api/test-insert", async (req, res) => {
-  const Submission = mongoose.model("Submission");
-
-  const newData = await Submission.create({
-    student: new mongoose.Types.ObjectId(),
-    stages: {
-      stage1: { durationSec: 120 },
-      stage2: { durationSec: 300 },
-      stage3: { durationSec: 600 },
-    },
-    attemptCount: 2,
-    chatCount: 5,
-    helpCount: 1,
-  });
-
-  res.json(newData);
-});
-
 // 新增：列出所有提交紀錄的端點（僅供測試使用，實際應加上認證與分頁）
 app.get("/api/debug-submissions", async (req, res) => {
   const data = await mongoose.model("Submission").find();
@@ -3079,6 +3149,16 @@ app.get("/api/debug-submissions", async (req, res) => {
 // 全局錯誤處理中間件（置於所有路由之後，確保捕捉所有異常並以 JSON 回應）
 app.use((err, req, res, next) => {
   console.error("Global error handler caught:", err);
+  if (res.headersSent) return next(err);
+  // 資料庫連線失敗 / 查詢排隊逾時 → 503，讓前端顯示可理解的訊息
+  const isDbError =
+    /Mongo(ose)?ServerSelectionError|MongoNetworkError/.test(err?.name || "") ||
+    /buffering timed out/.test(err?.message || "");
+  if (isDbError) {
+    return res
+      .status(503)
+      .json({ success: false, error: DB_UNAVAILABLE_MESSAGE });
+  }
   res.status(err.status || 500).json({
     success: false,
     error: err.message || "Internal server error",

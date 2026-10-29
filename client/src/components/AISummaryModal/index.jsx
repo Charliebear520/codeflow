@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Spin, message } from 'antd';
+import { readJson } from '../../lib/api';
 import {
   LineChart,
   Line,
@@ -45,14 +46,29 @@ const AISummaryModal = ({ isVisible, onClose, studentId, studentName }) => {
     return Math.round(sec / 60);
   };
 
+  // 後端未提供 aiSummary 時，依互動次數產生簡易回饋
+  const generateFallbackFeedback = (chatCount, attemptCount, helpCount) => {
+    const parts = [
+      `共嘗試作答 ${attemptCount} 次，與 AI 對話 ${chatCount} 次，請求提示 ${helpCount} 次。`,
+    ];
+    if (helpCount > 3 || chatCount > 10) {
+      parts.push("較依賴提示與對話，建議先自行拆解題目步驟再求助。");
+    } else if (attemptCount > 5) {
+      parts.push("嘗試次數較多，建議提交前先檢查流程與邊界條件。");
+    } else {
+      parts.push("作答過程穩定，持續保持！");
+    }
+    return parts.join("");
+  };
+
   const fetchStudentSummary = async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/submissions/summary/${studentId}`);
-      const result = await response.json();
+      const result = await readJson(response);
 
       if (!result.success) {
-        throw new Error("後端回傳失敗");
+        throw new Error(result.error || "後端回傳失敗");
       }
 
       const payload = result.data || {};
@@ -99,7 +115,7 @@ const AISummaryModal = ({ isVisible, onClose, studentId, studentName }) => {
       });
     } catch (error) {
       console.error("❌ 取得總結失敗:", error);
-      message.error("連線伺服器失敗");
+      message.error(error.message || "連線伺服器失敗");
     } finally {
       setLoading(false);
     }
