@@ -21,19 +21,14 @@ import Stage3Page from "./pages/Stage3Page.jsx";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AddQuestion from "./pages/AddQuestion";
-import { OrganizationSwitcher, useOrganization } from "@clerk/clerk-react";
+import { useIsTeacher } from "./lib/roles";
 import BootstrapMe from "./components/BootstrapMe.jsx";
 
-// 教師Route：依據 Active Organization 的 membership role 判斷
+// 教師Route：Organization 角色或後端資料庫角色為教師即可（規則見 lib/roles.js）
 const TeacherRoute = ({ children }) => {
-  const { membership, isLoaded } = useOrganization();
+  const { isLoaded, isTeacher } = useIsTeacher();
   if (!isLoaded) return null;
-  const role = membership?.role;
-  return role === "teacher" || role === "org:admin" ? (
-    children
-  ) : (
-    <Navigate to="/no-access" replace />
-  );
+  return isTeacher ? children : <Navigate to="/no-access" replace />;
 };
 import Stage1List from "./pages/StageList.jsx";
 
@@ -262,9 +257,11 @@ function App() {
               path="add-question"
               element={
                 <ProtectedRoute>
-                  <PageLayout>
-                    <AddQuestion />
-                  </PageLayout>
+                  <TeacherRoute>
+                    <PageLayout>
+                      <AddQuestion />
+                    </PageLayout>
+                  </TeacherRoute>
                 </ProtectedRoute>
               }
             />
@@ -282,9 +279,11 @@ function App() {
               path="stage-list"
               element={
                 <ProtectedRoute>
-                  <PageLayout>
-                    <Stage1List />
-                  </PageLayout>
+                  <TeacherRoute>
+                    <PageLayout>
+                      <Stage1List />
+                    </PageLayout>
+                  </TeacherRoute>
                 </ProtectedRoute>
               }
             />

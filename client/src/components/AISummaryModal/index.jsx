@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Spin, message } from 'antd';
+import { useAuth } from '@clerk/clerk-react';
 import { readJson } from '../../lib/api';
 import {
   LineChart,
@@ -22,6 +23,7 @@ import styles from './AISummaryModal.module.css';
  * @param {string} studentName - 顯示在標題的學生姓名
  */
 const AISummaryModal = ({ isVisible, onClose, studentId, studentName }) => {
+  const { getToken } = useAuth();
   // --- 狀態管理 ---
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]); // 用於 Recharts 的圖表數據
@@ -64,7 +66,11 @@ const AISummaryModal = ({ isVisible, onClose, studentId, studentName }) => {
   const fetchStudentSummary = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/submissions/summary/${studentId}`);
+      // 此 API 僅限教師，需帶上登入 token
+      const token = await getToken();
+      const response = await fetch(`/api/submissions/summary/${studentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const result = await readJson(response);
 
       if (!result.success) {

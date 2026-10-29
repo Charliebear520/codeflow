@@ -1,10 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import {
-  useClerk,
-  useUser,
-  useAuth,
-  useOrganization,
-} from "@clerk/clerk-react";
+import { useClerk, useUser, useAuth } from "@clerk/clerk-react";
+import { useIsTeacher } from "../../lib/roles";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import "../../styles/Login.css";
@@ -38,7 +34,7 @@ const UserMenu = () => {
   const { user, isLoaded: isUserLoaded } = useUser();
   const { signOut } = useClerk();
   const navigate = useNavigate();
-  const { membership, isLoaded: isOrgLoaded } = useOrganization();
+  const { isTeacher } = useIsTeacher();
 
   // State 管理
   const [isOpen, setIsOpen] = useState(false);
@@ -110,11 +106,10 @@ const UserMenu = () => {
   }, [isOpen]);
 
   // 如果認證或用戶數據未載入完成，顯示載入狀態
-  if (!isAuthLoaded || !isUserLoaded || !isOrgLoaded) {
+  // 角色載入中不擋住整個選單，只是暫時不顯示教師專屬項目
+  if (!isAuthLoaded || !isUserLoaded) {
     return <div className="user-menu-loading">載入中...</div>;
   }
-  const isTeacher =
-    membership?.role === "admin" || membership?.role === "org:admin";
 
   // 如果未登入或沒有用戶，不顯示菜單
   if (!isSignedIn || !user) {

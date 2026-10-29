@@ -1,14 +1,24 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
+import { readJson } from "../lib/api";
 
 function Stage1List() {
+  const { getToken } = useAuth();
   const [data, setData] = useState([]);
   const [raw, setRaw] = useState(null);
 
   useEffect(() => {
-    fetch("/api/submissions/stage3")
-      .then((res) => {
-        if (!res.ok) throw new Error(`Fetch failed ${res.status}`);
-        return res.json();
+    // 此 API 僅限教師，需帶上登入 token
+    getToken()
+      .then((token) =>
+        fetch("/api/submissions/stage3", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      )
+      .then(async (res) => {
+        const body = await readJson(res);
+        if (!res.ok) throw new Error(body?.error || `Fetch failed ${res.status}`);
+        return body;
       })
       .then((submissions) => {
         console.log("Fetched submissions (stage3):", submissions);
@@ -31,7 +41,7 @@ function Stage1List() {
         setData([]);
         setRaw(null);
       });
-  }, []);
+  }, [getToken]);
 
   return (
     <div>

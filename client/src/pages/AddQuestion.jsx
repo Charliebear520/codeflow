@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { readJson } from "../lib/api";
 
 // const Question = require("./models/Question"); // 加在檔案最上方
@@ -15,6 +16,7 @@ import { readJson } from "../lib/api";
 // });
 
 export default function AddQuestion() {
+  const { getToken } = useAuth();
   const [form, setForm] = useState({
     questionTitle: "",
     description: "",
@@ -28,9 +30,14 @@ export default function AddQuestion() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // 此 API 僅限教師，需帶上登入 token
+      const token = await getToken();
       const res = await fetch("/api/add-question", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(form),
       });
       const data = await readJson(res);
