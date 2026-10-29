@@ -115,6 +115,13 @@ app.get("/api/status", (req, res) => {
     mongodb: {
       connected: mongoose.connection.readyState === 1,
       uriSource: resolveMongoUri().source,
+      // 正式環境中因指向 localhost 而被略過的變數
+      skippedLocal:
+        process.env.NODE_ENV === "production"
+          ? MONGO_URI_ENV_KEYS.filter(
+              (key) => process.env[key] && isLocalMongoUri(process.env[key]),
+            )
+          : [],
       host: maskMongoHost(getMongoHost(getMongoUri())),
       lastError: lastDbError,
     },
@@ -286,15 +293,20 @@ app.use((req, res, next) => {
 });
 
 // 資料表連接 - 僅從環境變數讀取，嚴禁在程式碼中硬編碼連線帳密
-// 依序讀取，第一個有值的變數會被採用
-const MONGO_URI_ENV_KEYS = ["MONGODB_URI", "MONGO_URI", "MONGO", "MONGO_URL"];
+// 依序讀取，第一個有值的變數會被採用（MONGO 優先，與 acf0cac 之前的行為一致）。
+// 正式環境會跳過指向 localhost 的值：Vercel 上設有 MONGO_URI=mongodb://127.0.0.1...，
+// 若直接採用會造成 ECONNREFUSED
+const MONGO_URI_ENV_KEYS = ["MONGO", "MONGODB_URI", "MONGO_URI", "MONGO_URL"];
+
+const isLocalMongoUri = (uri) => /:\/\/([^/@]*@)?(localhost|127\.0\.0\.1)\b/.test(uri);
 
 const resolveMongoUri = () => {
+  const isProd = process.env.NODE_ENV === "production";
   for (const key of MONGO_URI_ENV_KEYS) {
     const uri = process.env[key];
-    if (uri && typeof uri === "string" && uri.trim()) {
-      return { uri: uri.trim(), source: key };
-    }
+    if (!uri || typeof uri !== "string" || !uri.trim()) continue;
+    if (isProd && isLocalMongoUri(uri.trim())) continue;
+    return { uri: uri.trim(), source: key };
   }
 
   // 僅在非生產環境（本地開發）下允許 fallback 到本地 MongoDB
@@ -398,13 +410,17 @@ async function connectToDatabase() {
   const { source } = resolveMongoUri();
   const host = getMongoHost(mongoUri);
   console.log(`MongoDB URI source: ${source || "none"} (host: ${host || "-"})`);
-  if (
-    process.env.NODE_ENV === "production" &&
-    host &&
-    /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)
-  ) {
+  const skippedLocal = MONGO_URI_ENV_KEYS.filter(
+    (key) => process.env[key] && isLocalMongoUri(process.env[key]),
+  );
+  if (process.env.NODE_ENV === "production" && skippedLocal.length) {
+    console.warn(
+      `已略過指向本機的 MongoDB 變數：${skippedLocal.join(", ")}（Vercel 上無法連線）`,
+    );
+  }
+  if (process.env.NODE_ENV === "production" && !source) {
     console.error(
-      `MongoDB URI (${source}) 指向本機 ${host}，在 Vercel 上無法連線，請改為 Atlas 連線字串`,
+      `找不到可用的 MongoDB 連線字串，請在 Vercel 設定 ${MONGO_URI_ENV_KEYS.join(" / ")} 其中之一為 Atlas 連線字串`,
     );
   }
 }
