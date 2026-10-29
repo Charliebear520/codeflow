@@ -111,8 +111,12 @@ app.get("/api/status", (req, res) => {
     gemini: {
       apiKey: !!process.env.GEMINI_API_KEY,
     },
+    // 診斷用：沒有 Vercel log 權限時也能從瀏覽器判斷連線問題（不含帳密，主機已遮罩）
     mongodb: {
       connected: mongoose.connection.readyState === 1,
+      uriSource: resolveMongoUri().source,
+      host: maskMongoHost(getMongoHost(getMongoUri())),
+      lastError: lastDbError,
     },
   });
 });
@@ -313,7 +317,23 @@ const getMongoHost = (uri) =>
         .pop()
     : null;
 
+// 本機位址照實顯示（用來判斷是否誤設成 localhost），其餘只保留網域尾段
+const maskMongoHost = (host) => {
+  if (!host) return null;
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return host;
+  return host
+    .split(",")
+    .map((h) => "*." + h.split(".").slice(-2).join("."))
+    .join(",");
+};
+
+const maskMongoText = (text = "") =>
+  text.replace(/[\w-]+(\.[\w-]+)*\.mongodb\.net/g, "*.mongodb.net");
+
 const mongoUri = getMongoUri();
+
+// 最近一次連線失敗的訊息，供 /api/status 診斷
+let lastDbError = null;
 
 // 連線未就緒時，查詢最多只排隊 3 秒（預設 10 秒），避免超過 Vercel 的 10 秒上限。
 // 不使用 bufferCommands=false，以免冷啟動連線中的查詢直接失敗。
@@ -355,10 +375,16 @@ async function connectToDatabase() {
       })
       .then((conn) => {
         console.log("MongoDB connected successfully");
+        lastDbError = null;
         return conn;
       })
       .catch((err) => {
         lastDbFailTime = Date.now();
+        lastDbError = {
+          name: err.name,
+          message: maskMongoText(err.message),
+          at: new Date().toISOString(),
+        };
         dbConnectionPromise = null;
         console.error("MongoDB connection error:", err.message);
         return null;
