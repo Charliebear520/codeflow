@@ -1,3 +1,4 @@
+import { requestHint, currentQuestionId } from "../../lib/submissions";
 import React, { useState, useEffect } from "react";
 import styles from "./topic.module.css";
 import { Image, Popover, Button, message, Modal } from "antd";
@@ -13,7 +14,7 @@ import { useAuth } from "@clerk/clerk-react";
 import StageSwitcher from "../StageSwitcher";
 
 const Topic = () => {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, userId } = useAuth();
   const [question, setQuestion] = useState(
     "請根據下方敘述繪製流程圖。 你正要出門上學，但需要判斷門外是否會下雨。請應用流程圖，幫助你決定是否需要帶雨傘。",
   );
@@ -63,19 +64,7 @@ const Topic = () => {
 
     setHintLoading(true);
     try {
-      const token = isSignedIn ? await getToken() : null;
-      const response = await axios.post(
-        "/api/generate-hint",
-        {
-          question,
-          hintLevel,
-          questionId:
-            localStorage.getItem("currentFlowchartQuestionId") || "Q001",
-        },
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
+      const response = await requestHint({ question, hintLevel, questionId: currentQuestionId(), stage: 1 }, getToken, userId);
 
       if (response.data.success) {
         const newHint = response.data.hint;

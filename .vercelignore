@@ -1,0 +1,24 @@
+# Local secrets are configured in Vercel settings, never uploaded as source.
+.env
+.env.*
+**/.env
+**/.env.*
+node_modules
+**/node_modules
+.git
+.dashboard-preview
+backend/test
+client/test
+.deployment-preview
+.vercel
+**/dist
+**/coverage
+**/temp
+**/tmp
+**/*.log
+**/*.bak
+**/*.bundle
+**/*.zip
+**/*.pem
+**/*.key
+client/public/studentanswer02.png

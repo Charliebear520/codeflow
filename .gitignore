@@ -152,3 +152,8 @@ backend/.env.local
 backend/.env.development.local
 backend/.env.test.local
 backend/.env.production.local
+
+# Local-only browser preview artifacts and isolated browser profile
+.dashboard-preview/
+.deployment-preview/
+.env.preview.local

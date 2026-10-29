@@ -3,6 +3,7 @@
 // 執行：cd backend && npm test
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import mongoose from "mongoose";
 
 process.env.NODE_ENV = "production"; // 正式模式：不自動 listen、不讀 .env
 process.env.MONGO = "mongodb://user:pw@unreachable.invalid:27017/codeflow_test";
@@ -22,10 +23,9 @@ before(async () => {
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
 
-after(() => {
-  server?.close();
-  // mongoose 的重試計時器會讓程序無法結束
-  setTimeout(() => process.exit(0), 100).unref();
+after(async () => {
+  if (server) await new Promise((resolve) => server.close(resolve));
+  await mongoose.disconnect();
 });
 
 async function request(path, options = {}) {
@@ -108,6 +108,13 @@ const unauthorizedCases = [
   ["POST", "/api/add-question"],
   ["GET", "/api/debug-submissions"],
   ["GET", "/api/test-env"],
+  ["POST", "/api/chat"],
+  ["POST", "/api/generate-hint"],
+  ["GET", "/api/submissions/mine?questionId=Q001"],
+  ...[1, 2, 3].flatMap((stage) => [
+    ["POST", `/api/submissions/stage${stage}`],
+    ["POST", `/api/submissions/stage${stage}/compare`],
+  ]),
 ];
 
 for (const [method, path] of unauthorizedCases) {

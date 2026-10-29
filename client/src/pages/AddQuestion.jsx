@@ -20,6 +20,7 @@ export default function AddQuestion() {
   const [form, setForm] = useState({
     questionTitle: "",
     description: "",
+    topic: "",
   });
   const [msg, setMsg] = useState("");
 
@@ -55,6 +56,8 @@ export default function AddQuestion() {
         value={form.questionTitle}
         onChange={handleChange}
       />
+      <br />
+      <input name="topic" placeholder="主題（未填則為未分類）" value={form.topic} onChange={handleChange} />
       <br />
       <textarea
         name="description"

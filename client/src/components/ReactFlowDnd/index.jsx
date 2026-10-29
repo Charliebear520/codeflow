@@ -70,6 +70,9 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
         type: n.type,
         position: n.position,
         data: { label: n.data?.label ?? "" },
+        ...(n.width || n.measured?.width ? { width: n.width || n.measured.width } : {}),
+        ...(n.height || n.measured?.height ? { height: n.height || n.measured.height } : {}),
+        ...(n.style ? { style: n.style } : {}),
       })),
       edges: edges.map((e) => ({
         id: e.id,
@@ -77,6 +80,8 @@ const DnDFlow = forwardRef(({ initialNodes, initialEdges, onReset }, ref) => {
         target: e.target,
         label: e.label ?? "",
         type: e.type ?? "smoothstep",
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
       })),
     }),
   }));

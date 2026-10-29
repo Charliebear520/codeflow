@@ -1,266 +1,89 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Spin, message } from 'antd';
-import { useAuth } from '@clerk/clerk-react';
-import { readJson } from '../../lib/api';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
-} from 'recharts';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Modal, Spin, Alert, Button, Tag, Empty } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
+import { useAuth } from "@clerk/clerk-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { readJson } from "../../lib/api";
+import { minutes } from "../../lib/learningDisplay";
+import styles from "./AISummaryModal.module.css";
 
-import styles from './AISummaryModal.module.css';
-
-/**
- * AISummaryModal 組件
- * @param {boolean} isVisible - 控制 Modal 顯示
- * @param {function} onClose - 關閉 Modal 的回呼函式
- * @param {string} studentId - 用於查詢資料庫的學生唯一 ID
- * @param {string} studentName - 顯示在標題的學生姓名
- */
-const AISummaryModal = ({ isVisible, onClose, studentId, studentName }) => {
+export default function AISummaryModal({ isVisible, onClose, studentId, studentName, submissionId, questionId, revision }) {
   const { getToken } = useAuth();
-  // --- 狀態管理 ---
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState([]); // 用於 Recharts 的圖表數據
-  const [summary, setSummary] = useState({
-    stages: {},
-    totalTime: 0,
-    chatCount: 0,
-    attemptCount: 0,
-    helpCount: 0,
-    aiFeedback: '',
-    errorPattern: ''
-  });
-
-  // --- 異步取得後端 MongoDB 資料 ---
-  useEffect(() => {
-    if (isVisible && studentId) {
-      fetchStudentSummary();
-    }
-  }, [isVisible, studentId]);
-
-  const secToMin = (sec) => {
-    return Math.round(sec / 60);
-  };
-
-  // 後端未提供 aiSummary 時，依互動次數產生簡易回饋
-  const generateFallbackFeedback = (chatCount, attemptCount, helpCount) => {
-    const parts = [
-      `共嘗試作答 ${attemptCount} 次，與 AI 對話 ${chatCount} 次，請求提示 ${helpCount} 次。`,
-    ];
-    if (helpCount > 3 || chatCount > 10) {
-      parts.push("較依賴提示與對話，建議先自行拆解題目步驟再求助。");
-    } else if (attemptCount > 5) {
-      parts.push("嘗試次數較多，建議提交前先檢查流程與邊界條件。");
-    } else {
-      parts.push("作答過程穩定，持續保持！");
-    }
-    return parts.join("");
-  };
-
-  const fetchStudentSummary = async () => {
-    setLoading(true);
+  const [error, setError] = useState("");
+  const active = useRef(null);
+  const reload = useCallback(async () => {
+    if (!studentId) return;
+    active.current?.abort(); const controller = new AbortController(); active.current = controller;
+    setLoading(true); setData(null); setError("");
     try {
-      // 此 API 僅限教師，需帶上登入 token
       const token = await getToken();
-      const response = await fetch(`/api/submissions/summary/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await readJson(response);
-
-      if (!result.success) {
-        throw new Error(result.error || "後端回傳失敗");
-      }
-
-      const payload = result.data || {};
-      console.log("🔥 後端 summary:", payload); // ⭐ 一定要看這個！
-
-      const stages = payload.stages || {};
-
-      // ===== 1️⃣ 圖表資料 =====
-      const chartData = [
-        {
-          name: "第一階段",
-          studentTime: secToMin(stages.stage1?.durationSec || 0),
-          avgTime: payload.avgStage1 || 20, // 👉 改成後端提供
-        },
-        {
-          name: "第二階段",
-          studentTime: secToMin(stages.stage2?.durationSec || 0),
-          avgTime: payload.avgStage2 || 30,
-        },
-        {
-          name: "第三階段",
-          studentTime: secToMin(stages.stage3?.durationSec || 0),
-          avgTime: payload.avgStage3 || 45,
-        },
-      ];
-      setData(chartData);
-
-      // ===== 2️⃣ 加總（安全寫法）=====
-      const totalChat = payload.chatCount ?? 0;
-      const totalAttempt = payload.attemptCount ?? 0;
-      const totalHelp = payload.helpCount ?? 0;
-
-      // ===== 3️⃣ 設定 summary =====
-      setSummary({
-        stages,
-        totalTime: Math.round((payload.totalDurationSec || 0) / 60),
-        chatCount: totalChat,
-        attemptCount: totalAttempt,
-        helpCount: totalHelp,
-        aiFeedback:
-          payload.aiSummary ||
-          generateFallbackFeedback(totalChat, totalAttempt, totalHelp),
-        errorPattern: payload.lastError || "目前無錯誤紀錄",
-      });
-    } catch (error) {
-      console.error("❌ 取得總結失敗:", error);
-      message.error(error.message || "連線伺服器失敗");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={isVisible}
-      onCancel={onClose}
-      footer={null}
-      width={900}
-      centered
-      // antd 5.x 樣式設定
-      styles={{ body: { borderRadius: '20px', padding: '20px', minHeight: '400px' } }}
-    >
-      <Spin spinning={loading} tip="AI 正在分析歷程資料...">
-        <div className={styles.modalContent}>
-          <h2 className={styles.header}>{studentName} 答題總結</h2>
-
-          <div className={styles.mainLayout}>
-            {/* 左側欄位：統計與圖表 */}
-            <div className={styles.leftColumn}>
-              <div className={styles.sectionTitle}>總結統計</div>
-              
-              {/* 階段時間卡片：動態渲染 */}
-              <div className={styles.statsGrid}>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>第一階段時間</div>
-                  <div className={styles.statValue}>{Math.round((summary.stages.stage1?.durationSec || 0) / 60)} 分</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>第二階段時間</div>
-                  <div className={styles.statValue}>{Math.round((summary.stages.stage2?.durationSec || 0) / 60)} 分</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>第三階段時間</div>
-                  <div className={styles.statValue}>{Math.round((summary.stages.stage3?.durationSec || 0) / 60)} 分</div>
-                </div>
+      const query = new URLSearchParams({ ...(submissionId ? { submissionId } : {}), ...(questionId ? { questionId } : {}) });
+      const response = await fetch(`/api/submissions/summary/${studentId}?${query}`, { headers: { Authorization: `Bearer ${token}` }, cache:"no-store", signal:controller.signal });
+      const body = await readJson(response);
+      if (!response.ok || !body.success) throw new Error(body.error || "無法取得總結");
+      if (!controller.signal.aborted) setData(body.data);
+    } catch (e) { if (!controller.signal.aborted) setError(e.message); }
+    finally { if (!controller.signal.aborted) setLoading(false); }
+  }, [getToken, studentId, submissionId, questionId, revision]);
+  useEffect(() => { if (isVisible) reload(); return () => active.current?.abort(); }, [isVisible, reload]);
+  const stat = (label, value, unit) => <div className={styles.statCard} key={label}><span>{label}</span><strong>{value}<small> {unit}</small></strong></div>;
+  return <Modal open={isVisible} onCancel={onClose} footer={null} centered width={1000} className={styles.modal} destroyOnClose
+    title={<div className={styles.title}><span>{studentName || "學生"} · 答題總結</span><Button type="text" aria-label="重新取得總結" icon={<ReloadOutlined />} onClick={reload} loading={loading} /></div>}>
+    <div className={styles.scroller}>
+      {error && <Alert type="error" showIcon message="無法讀取總結" description={error} />}
+      <Spin spinning={loading}>
+        {!data && !loading && !error && <Empty description="沒有總結資料" />}
+        {data && <>
+          <div className={styles.source}><Tag color={data.isDemo ? "blue" : "default"}>{data.analysis.source}</Tag><span>{data.questionId} · {data.questionTitle}</span></div>
+          <div className={styles.layout}>
+            <section className={styles.left}>
+              <h3>總結統計</h3>
+              <div className={styles.stats}>{["stage1","stage2","stage3"].map((key,i) => stat(`第${["一","二","三"][i]}階段時間`, minutes(data.stages?.[key]?.durationSec), "分鐘"))}</div>
+              <div className={styles.total}><div><span>本題累積用時</span><strong>{minutes(data.totalDurationSec)} 分鐘</strong></div><p>依已儲存的三階段秒數加總，用時不作為表現評級。</p></div>
+              <h3>四週互動紀錄</h3>
+              <p className={styles.caption}>{data.activity.dateStart} ～ {data.activity.dateEnd}（台灣時間）<br />來源：{data.activity.source}</p>
+              <div className={styles.stats}>{stat("對話次數",data.activity.totals.chat,"次")}{stat("嘗試次數",data.activity.totals.attempt,"次")}{stat("求助次數",data.activity.totals.help,"次")}</div>
+              {data.activity.hasHistory ? <div className={styles.chart}>
+                <ResponsiveContainer width="100%" height="100%"><LineChart data={data.activity.weekly} margin={{top:12,right:40,left:8,bottom:12}}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef0f5" />
+                  <XAxis dataKey="label" tick={{fontSize:10}} tickLine={false} interval={0} />
+                  <YAxis allowDecimals={false} label={{value:"次數",angle:-90,position:"insideLeft"}} tick={{fontSize:11}} width={42} />
+                  <Tooltip labelFormatter={(label,payload) => { const row=payload?.[0]?.payload; return row ? `${row.dateStart}～${row.dateEnd}` : label; }} />
+                  <Legend wrapperStyle={{fontSize:12}} />
+                  <Line name="對話次數" dataKey="chat" stroke="#2cb7d4" strokeWidth={2} dot={{r:3}} connectNulls={false} isAnimationActive={false} />
+                  <Line name="嘗試次數" dataKey="attempt" stroke="#65bf96" strokeWidth={2} dot={{r:3}} connectNulls={false} isAnimationActive={false} />
+                  <Line name="求助次數" dataKey="help" stroke="#e3ac49" strokeWidth={2} dot={{r:3}} connectNulls={false} isAnimationActive={false} />
+                </LineChart></ResponsiveContainer>
+              </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="歷史資料不足，無法還原四週折線" />}
+              <p className={styles.caption}>{data.activity.trackingStartedAt ? `事件自 ${new Date(data.activity.trackingStartedAt).toLocaleDateString("zh-TW",{timeZone:"Asia/Taipei"})} 起記錄；較早的未記錄週不補成零。` : "既有累計次數沒有操作時間戳，不轉換成週資料。"}</p>
+              {!data.isDemo && data.activity.hasHistory && !data.activity.completeWindow && <p className={styles.caption}>歷史紀錄不足以比較完整四週，目前只呈現已記錄的部分期間。</p>}
+              <details className={styles.definitions}><summary>計數定義與耗時比較</summary>
+                {Object.entries(data.activity.definitions).map(([key,text]) => <p key={key}>{text}</p>)}
+                <p>同班、同題、同主題、同資料來源的有紀錄階段平均；不混用示範與真實學生。</p>
+                <div className={styles.chart}><ResponsiveContainer width="100%" height="100%"><LineChart data={data.timingChart} margin={{top:16,right:12,left:8,bottom:8}}>
+                  <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{fontSize:11}} /><YAxis label={{value:"分鐘",angle:-90,position:"insideLeft"}} width={42} /><Tooltip /><Legend />
+                  <Line name="學生用時（分鐘）" dataKey="studentMinutes" stroke="#527bf0" isAnimationActive={false} />
+                  <Line name="同組平均（分鐘）" dataKey="averageMinutes" stroke="#abb5c8" strokeDasharray="4 4" isAnimationActive={false} />
+                </LineChart></ResponsiveContainer></div>
+              </details>
+            </section>
+            <section className={styles.right}>
+              <h3>問題總結</h3><div className={styles.textCard}>{data.analysis.problem}
+                {data.analysis.aiAdvice && <p style={{marginTop:12}}>AI 學習建議：{data.analysis.aiAdvice}</p>}
+                {data.analysis.aiUnavailable && <p className={styles.caption}>即時 AI 建議暫時無法取得；以上事實仍由目前紀錄計算。</p>}
               </div>
-
-              {/* 總時間強調區塊 */}
-              <div className={styles.totalTimeBox}>
-                <div>
-                  <div className={styles.statLabel}>總花費時間</div>
-                  <div className={styles.totalValue}>{summary.totalTime} 分鐘</div>
-                </div>
-                <div className={styles.timeNote}>
-                  {summary.totalTime > 80 
-                    ? "用時較長，建議針對邏輯判斷部分加強練習。" 
-                    : "解題速度優於平均，表現優異。"}
-                </div>
+              <h3>解題歷程分析</h3><div className={`${styles.status} ${styles[data.analysis.tone]}`}>{data.analysis.status}</div>
+              <p className={styles.process}>{data.analysis.process}</p>
+              <h3>錯誤模式分析</h3><div className={data.analysis.errors.length ? styles.errorCard : styles.neutralCard}>
+                <strong>{data.analysis.errors.length ? "已保存的問題紀錄" : "尚無已保存的錯誤"}</strong><p>{data.analysis.errorNote}</p>
+                {data.analysis.errors.length > 0 && <ul>{data.analysis.errors.map((e,i) => <li key={i}>{e}</li>)}</ul>}
               </div>
-
-              {/* 次數統計卡片 */}
-              <div className={styles.statsGrid}>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>對話次數</div>
-                  <div className={styles.statValue}>{summary.chatCount} 次</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>嘗試次數</div>
-                  <div className={styles.statValue}>{summary.attemptCount} 次</div>
-                </div>
-                <div className={styles.statCard}>
-                  <div className={styles.statLabel}>求助次數</div>
-                  <div className={styles.statValue}>{summary.helpCount} 次</div>
-                </div>
-              </div>
-
-              {/* 圖表呈現區塊 */}
-              <div className={styles.chartArea}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={data}
-                    margin={{ top: 20, right: 30, left: -10, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#888', fontSize: 12 }}
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#888', fontSize: 12 }}
-                    />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    />
-                    <Legend iconType="circle" verticalAlign="top" align="right" height={36}/>
-                    <Line
-                      name="學生用時"
-                      type="monotone"
-                      dataKey="studentTime"
-                      stroke="#4a90e2"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: '#4a90e2' }}
-                    />
-                    <Line
-                      name="平均用時"
-                      type="monotone"
-                      dataKey="avgTime"
-                      stroke="#ccc"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* 右側欄位：AI 分析文字 */}
-            <div className={styles.rightColumn}>
-              <div className={styles.sectionTitle}>問題總結</div>
-              <div className={styles.summaryCard}>
-                <p>{summary.aiFeedback}</p>
-              </div>
-
-              <div className={styles.sectionTitle}>解題歷程分析</div>
-              <div className={styles.statusTag}>
-                {summary.totalTime < 60 ? '✓ 表現優異' : '✓ 目前尚可'}
-              </div>
-
-              <div className={styles.sectionTitle}>錯誤模式分析</div>
-              <div className={styles.errorBox}>
-                <div className={styles.errorTitle}>! 注意邏輯分析，以下為該學生常犯錯誤</div>
-                <div className={styles.errorContent}>
-                  {summary.errorPattern}
-                </div>
-              </div>
-            </div>
+            </section>
           </div>
-        </div>
+        </>}
       </Spin>
-    </Modal>
-  );
-};
-
-export default AISummaryModal;
+    </div>
+  </Modal>;
+}

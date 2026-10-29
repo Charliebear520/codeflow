@@ -7,6 +7,7 @@ const questionSchema = new Schema(
     questionId: { type: String, unique: true, sparse: true, trim: true },
     questionTitle: { type: String, required: true, unique: true, trim: true },
     description: { type: String, required: true },
+    topic: { type: String, default: "未分類" },
     stage1: {
       description: String,
     },

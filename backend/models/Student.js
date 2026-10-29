@@ -6,6 +6,8 @@ const studentSchema = new Schema(
     {
       //基本資料  
       userId: { type: String, required: true, unique: true, index: true }, // Clerk 的 user.id (user_xxx)
+      isDemo: { type: Boolean, default: false },
+      demoBatch: { type: String, default: null },
       email: { type: String, index: true },
       role: { type: String, enum: ["student", "teacher"], default: "student", index: true },
       name: { type: String },

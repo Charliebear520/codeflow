@@ -1,123 +1,49 @@
-import { useState } from 'react';
-import { Button, Modal, Tabs } from 'antd';
-import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import styles from "./StudentAnswerModal.module.css"
+import { Alert, Modal, Tag } from "antd";
+import ReadOnlyFlow from "../ReadOnlyFlow";
+import { minutes, localTime } from "../../lib/learningDisplay";
+import styles from "./StudentAnswerModal.module.css";
 
-export default function StudentAnswerModal({
-  openStage,        // 'stage1' | 'stage2' | 'stage3' | null
-  onClose,
-  submission,
-  student,
-}) {
+function FlowAnswer({ entry }) {
+  if (entry.graph?.nodes?.length) return <ReadOnlyFlow graph={entry.graph} />;
+  if (typeof entry.imageBase64 === "string" && entry.imageBase64) {
+    const image = entry.imageBase64;
+    if (image.startsWith("data:") && !image.startsWith("data:image/")) return <Alert type="info" message="這筆圖片格式無法預覽。" />;
+    return <img className={styles.image} src={/^data:image\/|^https?:\/\//.test(image) ? image : `data:image/png;base64,${image}`} alt="學生儲存的流程圖" />;
+  }
+  if (entry.graph) return <ReadOnlyFlow graph={entry.graph} />;
+  return <Alert type="info" message="這次提交沒有可顯示的流程圖或圖片。" />;
+}
+
+export default function StudentAnswerModal({ openStage, onClose, submission, student }) {
   if (!openStage) return null;
-
-  const s1 = submission?.stages?.stage1 || {};
-  const s2 = submission?.stages?.stage2 || {};
-  const s3 = submission?.stages?.stage3 || {};
-  const titleMap = {
-    stage1: "階段一的答案",
-    stage2: "階段二的答案",
-    stage3: "階段三的答案",
-  };
-  const name = student?.name || student?.email || "學生";
-  const stageLabel = titleMap[openStage] || "作答顯示";
-
-  const title = (
-    <div className={styles.title}>
-      <h2 className={styles.titleName}>{name}</h2>
-      <h2 className={styles.titleSep}>-</h2>
-      <h2 className={styles.titleStage}>{stageLabel}</h2>
+  const stage = submission?.stages?.[openStage] || {};
+  const name = student?.name || submission?.studentName || "學生";
+  const labels = {stage1:"階段一",stage2:"階段二",stage3:"階段三"};
+  const history = (Array.isArray(submission?.stage1History) ? submission.stage1History.filter((entry) => entry && typeof entry === "object") : []).sort((a,b) => new Date(a.at) - new Date(b.at));
+  let sequence = 0;
+  return <Modal open onCancel={onClose} footer={null} centered width={840} className={styles.modal} destroyOnClose title={`${name} · ${labels[openStage]}的答案`}>
+    <div className={styles.scroller}>
+      <div className={styles.metadata}>
+        {submission?.isDemo && <Tag color="blue">示範資料</Tag>}
+        <span>分數：{typeof stage.score === "number" ? `${stage.score} / 100` : "尚未評分"}</span><span>累積用時：{minutes(stage.durationSec)} 分鐘</span>
+        <span>本題累積檢查：{submission?.attemptCount || 0} 次</span>
+      </div>
+      {openStage === "stage1" ? history.length ? history.map((entry,index) => <section key={entry.operationId || index} className={styles.version}>
+        <header><strong>{entry.kind === "legacy-latest" ? "既有最新版快照（歷史啟用前）" : `第${++sequence}次提交`}</strong>
+          {entry.isDemo && <Tag>示範提交範例</Tag>}<time>{localTime(entry.at)}</time>
+          {entry.kind === "compare" && <span>檢查並保存</span>}{typeof entry.score === "number" && <span>{entry.score} 分</span>}</header>
+        <FlowAnswer entry={entry} />
+      </section>) : <section className={styles.version}><header><strong>目前保存的最新版</strong><time>{localTime(stage.updatedAt)}</time></header>
+        <Alert type="info" message="過去僅保存最新版，沒有可還原的歷次提交；後續提交才會開始記錄歷史。" style={{marginBottom:14}} /><FlowAnswer entry={stage} />
+      </section> : <div className={styles.answer}>
+        {openStage === "stage3" && <p>程式語言：{stage.language || "未記錄"}</p>}
+        {stage.pseudocode || stage.code ? <pre>{openStage === "stage2" ? stage.pseudocode : stage.code}</pre> : <Alert type="info" message="尚無已保存的作答內容。" />}
+        <p className={styles.time}>更新時間：{localTime(stage.updatedAt)}</p>
+      </div>}
+      {(stage.feedback || stage.checkReport) && <div className={styles.report}>
+        {stage.feedback && <><h4>已保存回饋</h4><p>{stage.feedback}</p></>}
+        {stage.checkReport && <><h4>已保存檢查報告</h4><p>{stage.checkReport}</p></>}
+      </div>}
     </div>
-  );
-
-  // 根據 openStage 決定要顯示的內容
-  let content = null;
-  if (openStage === "stage1") {
-    content = (
-      <div className={styles.block}>
-        {s1.imageBase64 ? (
-          <img
-            src={s1.imageBase64}
-            alt="流程圖截圖"
-            className={styles.image}
-          />
-        ) : s1.graph ? (
-          <pre className={styles.codebox}>
-            {JSON.stringify(s1.graph, null, 2)}
-          </pre>
-        ) : (
-          <div className={styles.empty}>沒有可顯示的內容</div>
-        )}
-      </div>
-    );
-  }
-
-  if (openStage === "stage2") {
-    content = (
-      <div className={styles.block}>
-        {s2.pseudocode ? (
-          <pre className={styles.codebox}>{s2.pseudocode}</pre>
-        ) : (
-          <div className={styles.empty}>沒有可顯示的內容</div>
-        )}
-      </div>
-    );
-  }
-
-  if (openStage === "stage3") {
-    content = (
-      <div className={styles.block}>
-        <h3 className={styles.blockTitle}>程式碼</h3>
-        {s3.code ? (
-          <>
-            <div className={styles.meta}>
-              語言：{s3.language || "未標註"}
-            </div>
-            <pre className={styles.codebox}>{s3.code}</pre>
-
-            {(s3.stdout || s3.stderr) && (
-              <>
-                <h4 className={styles.blockSubTitle}>執行結果</h4>
-                {s3.stdout && (
-                  <>
-                    <div className={styles.meta}>輸出：</div>
-                    <pre className={styles.codebox}>{s3.stdout}</pre>
-                  </>
-                )}
-                {s3.stderr && (
-                  <>
-                    <div className={styles.metaError}>錯誤：</div>
-                    <pre className={styles.codeboxError}>{s3.stderr}</pre>
-                  </>
-                )}
-              </>
-            )}
-          </>
-        ) : (
-          <div className={styles.empty}>沒有可顯示的內容</div>
-        )}
-      </div>
-    );
-  }
-
-  // const current = {
-  //   stage1: { label: "階段一", children: Stage1 },
-  //   stage2: { label: "階段二", children: Stage2 },
-  //   stage3: { label: "階段三", children: Stage3 },
-  // }[openStage];
-
-  return (
-    <Modal
-      title={title}
-      open={!!openStage}
-      onCancel={onClose}
-      onOk={onClose}
-      width={760}
-      bodyStyle={{padding:24}}
-      closeIcon={<CloseOutlined style={{ color: "#3B82F6", fontSize: 20 }} />}
-      destroyOnClose
-    >
-      {content}
-    </Modal>
-  );
+  </Modal>;
 }

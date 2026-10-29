@@ -1,3 +1,4 @@
+import { submissionRequest, currentQuestionId, loadMySubmission } from "../../lib/submissions";
 import React, { useRef, useState, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { ConfigProvider, Tabs, Button, App } from "antd";
@@ -21,7 +22,8 @@ const initialEdges = []; // 空數組，不顯示任何初始邊
 
 const Answer = ({ onChecking }) => {
   const [activeKey, setActiveKey] = useState("1");
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, getToken, userId } = useAuth();
+  const saveSubmission = (url, options) => submissionRequest(url, options, userId);
   const [img, setImg] = useState({
     isLoading: false,
     error: "",
@@ -33,6 +35,28 @@ const Answer = ({ onChecking }) => {
   const [fileList, setFileList] = useState([]);
   const { message } = App.useApp(); // 使用 App 的 message API
   const [checking, setChecking] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [savedStage1, setSavedStage1] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    setSavedStage1(null);
+    setFileList([]);
+    setActiveKey("1");
+    setRestoring(true);
+    loadMySubmission(getToken).then((doc) => {
+      if (cancelled) return;
+      const stage = doc?.stages?.stage1;
+      if (!stage) return;
+      setSavedStage1(stage);
+      if (stage.graph?.nodes?.length) setActiveKey("2");
+      else if (stage.imageBase64) setFileList([{ uid: "saved", name: "已儲存流程圖", status: "done", base64: stage.imageBase64, url: stage.imageBase64 }]);
+    }).catch((error) => { if (!cancelled) message.error(error.message); })
+      .finally(() => { if (!cancelled) setRestoring(false); });
+    return () => { cancelled = true; };
+  }, [isSignedIn, userId, getToken, message]);
 
   const handleCheck = async () => {
     try {
@@ -46,7 +70,7 @@ const Answer = ({ onChecking }) => {
 
       // 準備 payload
       let payload = {
-        questionId: "Q001", // TODO: 改為動態傳入的題目 ID
+        questionId: currentQuestionId(), // TODO: 改為動態傳入的題目 ID
       };
 
       if (activeKey === "1") {
@@ -95,7 +119,7 @@ const Answer = ({ onChecking }) => {
 
       // 呼叫完整的比對 API
       const token = await getToken();
-      const res = await fetch(`/api/submissions/stage1/compare`, {
+      const res = await saveSubmission(`/api/submissions/stage1/compare`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -164,27 +188,29 @@ const Answer = ({ onChecking }) => {
         <div className={styles.flowContainer}>
           <ReactFlowDnd
             ref={flowRef}
-            initialNodes={initialNodes}
-            initialEdges={initialEdges}
+            key={savedStage1?.updatedAt || "new"}
+            initialNodes={savedStage1?.graph?.nodes || initialNodes}
+            initialEdges={savedStage1?.graph?.edges || initialEdges}
           />
         </div>
       ),
     },
   ];
   const handleSave = async () => {
+    if (saving || restoring) return;
+    setSaving(true);
     try {
       if (!isSignedIn) {
         message.error("請先登入");
         return;
       }
 
-      let payload = { questionId: "Q001", completed: false };
+      let payload = { questionId: currentQuestionId(), completed: false };
       const now = Date.now();
       const deltaSec = Math.max(
         0,
         Math.floor((now - (lastTickRef.current || now)) / 1000),
       );
-      lastTickRef.current = now;
       payload.durationDeltaSec = deltaSec;
 
       if (activeKey === "1") {
@@ -236,7 +262,7 @@ const Answer = ({ onChecking }) => {
       }
 
       const token = await getToken();
-      const res = await fetch(`/api/submissions/stage1`, {
+      const res = await saveSubmission(`/api/submissions/stage1`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -248,19 +274,22 @@ const Answer = ({ onChecking }) => {
       if (!res.ok || !data.success)
         throw new Error(data.error || `HTTP ${res.status}`);
 
+      lastTickRef.current = now;
       message.success("已儲存第一階段的作答");
     } catch (err) {
       console.error(err);
       message.error(`儲存失敗：${err.message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
   const extraButtons = (
     <div style={{ display: "flex", gap: "8px" }}>
-      <Button type="primary" className={styles.uploadButton}>
+      <Button type="primary" className={styles.uploadButton} onClick={handleSave} disabled={restoring} loading={saving}>
         上傳
       </Button>
-      <Button type="primary" className={styles.saveButton} onClick={handleSave}>
+      <Button type="primary" className={styles.saveButton} onClick={handleSave} disabled={restoring} loading={saving}>
         儲存
       </Button>
       {/* <Button danger onClick={handleReset}>

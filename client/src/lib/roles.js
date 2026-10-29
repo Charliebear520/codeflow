@@ -10,11 +10,11 @@ export const TEACHER_ORG_ROLES = ["org:teacher", "teacher", "org:admin", "admin"
 export const isTeacherOrgRole = (role) => TEACHER_ORG_ROLES.includes(role);
 
 // 同一頁面內共用一次 /api/me 結果，避免每個元件重複請求
-let mePromise = null;
+const mePromises = new Map();
 
-function fetchMeRole(getToken) {
-  if (!mePromise) {
-    mePromise = (async () => {
+function fetchMeRole(getToken, userId) {
+  if (!mePromises.has(userId)) {
+    const mePromise = (async () => {
       const token = await getToken();
       const res = await fetch("/api/me", {
         headers: { Authorization: `Bearer ${token}` },
@@ -23,15 +23,16 @@ function fetchMeRole(getToken) {
       return data?.me?.role || null;
     })().catch((err) => {
       console.error("取得使用者角色失敗:", err);
-      mePromise = null; // 失敗時允許下次重試
+      mePromises.delete(userId); // 失敗時允許下次重試
       return null;
     });
+    mePromises.set(userId, mePromise);
   }
-  return mePromise;
+  return mePromises.get(userId);
 }
 
 export function useIsTeacher() {
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, getToken, userId } = useAuth();
   const { membership, isLoaded: isOrgLoaded } = useOrganization();
   const orgTeacher = isTeacherOrgRole(membership?.role);
   const [dbRole, setDbRole] = useState(undefined); // undefined = 尚未取得
@@ -39,13 +40,14 @@ export function useIsTeacher() {
   useEffect(() => {
     if (!isOrgLoaded || orgTeacher || !isSignedIn) return;
     let cancelled = false;
-    fetchMeRole(getToken).then((role) => {
+    setDbRole(undefined);
+    fetchMeRole(getToken, userId).then((role) => {
       if (!cancelled) setDbRole(role);
     });
     return () => {
       cancelled = true;
     };
-  }, [isOrgLoaded, orgTeacher, isSignedIn, getToken]);
+  }, [isOrgLoaded, orgTeacher, isSignedIn, getToken, userId]);
 
   if (!isOrgLoaded) return { isLoaded: false, isTeacher: false };
   if (orgTeacher) return { isLoaded: true, isTeacher: true };

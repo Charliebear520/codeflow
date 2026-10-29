@@ -1,3 +1,4 @@
+import { requestHint, currentQuestionId } from "../../lib/submissions";
 import React, { useState, useEffect } from "react";
 import styles from "./topic.module.css";
 import { Image, Popover, Button, message, Modal } from "antd";
@@ -18,7 +19,7 @@ const TopicStage2 = ({
   currentStage,
   setCurrentStage,
 }) => {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, userId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [hintLevel, setHintLevel] = useState(1); // 提示層級，從1開始
   const [isHintModalVisible, setIsHintModalVisible] = useState(false);
@@ -27,76 +28,7 @@ const TopicStage2 = ({
   const [hintCache, setHintCache] = useState({});
   const [regenerating, setRegenerating] = useState(false);
 
-  // =========================
-  // ✅【新增 1】開始時間
-  const [startTime, setStartTime] = useState(null);
-
-  // =========================
-  // ✅【新增 2】進入頁面開始計時
-  useEffect(() => {
-    const now = Date.now();
-    console.log("Stage2 開始時間:", now);
-    setStartTime(now);
-  }, []);
-
-  // ✅【新增 3】離開頁面時送時間
-  useEffect(() => {
-    return () => {
-      if (!startTime) return;
-
-      const durationSec = Math.floor((Date.now() - startTime) / 1000);
-
-      console.log("送出 Stage2 時間:", durationSec);
-
-      (async () => {
-        try {
-          const token = isSignedIn ? await getToken() : null;
-          await axios.post(
-            "/api/submissions/stage2",
-            {
-              questionId:
-                localStorage.getItem("currentFlowchartQuestionId") || "Q001",
-              durationDeltaSec: durationSec,
-              completed: true,
-            },
-            {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            },
-          );
-        } catch (e) {
-          console.warn("送出 Stage2 時間失敗:", e?.message);
-        }
-      })();
-    };
-  }, [startTime, isSignedIn, getToken]);
-
-  // ✅【新增 4】防止關閉頁面沒送到
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (!startTime) return;
-
-      const durationSec = Math.floor((Date.now() - startTime) / 1000);
-
-      console.log("beforeunload 送出:", durationSec);
-
-      navigator.sendBeacon(
-        "/api/submissions/stage2",
-        JSON.stringify({
-          questionId: "Q1",
-          durationDeltaSec: durationSec,
-          completed: true,
-        }),
-      );
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [startTime]);
-
-  // 生成新題目
+  // Duration is persisted with an authenticated save, never by an unauthenticated unload beacon.
   const fetchNewQuestion = async () => {
     setLoading(true);
     try {
@@ -130,19 +62,7 @@ const TopicStage2 = ({
 
     setHintLoading(true);
     try {
-      const token = isSignedIn ? await getToken() : null;
-      const response = await axios.post(
-        "/api/generate-hint",
-        {
-          question,
-          hintLevel,
-          questionId:
-            localStorage.getItem("currentFlowchartQuestionId") || "Q001",
-        },
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
+      const response = await requestHint({ question, hintLevel, questionId: currentQuestionId(), stage: 2 }, getToken, userId);
 
       if (response.data.success) {
         const newHint = response.data.hint;

@@ -1,3 +1,4 @@
+import { submissionRequest, currentQuestionId } from "../../lib/submissions";
 import React, { useState, useEffect, useRef } from "react";
 import styles from "./check.module.css";
 // 合併所有的 Ant Design 組件
@@ -31,7 +32,8 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
   const chatBoxRef = useRef(null);
 
   // Auth 和工具
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, getToken, userId } = useAuth();
+  const saveSubmission = (url, options) => submissionRequest(url, options, userId);
   const { message } = App.useApp(); // 需要外層有 <App>
   const dispatch = useDispatch();
 
@@ -56,7 +58,7 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
 
   const preparePayload = async (stageNum) => {
     const basePayload = {
-      questionId: "Q001",
+      questionId: currentQuestionId(),
       question: question || currentQuestion || "",
     };
     if (stageNum === 1) {
@@ -140,7 +142,7 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
       if (!isSignedIn) throw new Error("請先登入");
       const payload = await preparePayload(stage);
       const token = await getToken();
-      const res = await fetch(getApiEndpoint(stage), {
+      const res = await saveSubmission(getApiEndpoint(stage), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -153,7 +155,9 @@ const Check = ({ feedback, isChecking, onTutorClick, stage, question }) => {
       if (contentType.includes("application/json")) {
         try {
           data = await res.json();
-        } catch (_) {}
+        } catch {
+          data = null;
+        }
       }
 
       if (!res.ok || !data?.success) {
@@ -211,7 +215,7 @@ ${data.checkReport || data.checkFeedback || data.feedback || "已完成檢查"}
     }
   };
 
-  const handleSend = async (textOverride = null) => {
+  const handleSend = async (textOverride = null, activityKind = "chat") => {
     const textToSend = (
       typeof textOverride === "string" ? textOverride : inputValue
     ).trim();
@@ -223,7 +227,8 @@ ${data.checkReport || data.checkFeedback || data.feedback || "已完成檢查"}
     // }
 
     // 只有「正常聊天」才算 chat
-    setChatCount((prev) => prev + 1);
+    if (activityKind === "help") setHelpCount((prev) => prev + 1);
+    else setChatCount((prev) => prev + 1);
 
     setMessages((prev) => [...prev, { sender: "user", text: textToSend }]);
     setInputValue("");
@@ -238,7 +243,7 @@ ${data.checkReport || data.checkFeedback || data.feedback || "已完成檢查"}
         return;
       }
       const token = await getToken();
-      const response = await fetch("/api/chat", {
+      const response = await saveSubmission("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -246,14 +251,16 @@ ${data.checkReport || data.checkFeedback || data.feedback || "已完成檢查"}
         },
         body: JSON.stringify({
           prompt: textToSend,
+          activityKind,
           stage,
           currentData: stageResult,
           question,
-          questionId: "Q001",
+          questionId: currentQuestionId(),
         }),
       });
 
       const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "對話尚未保存");
 
       setMessages((prev) => [
         ...prev,
@@ -376,8 +383,7 @@ ${data.checkReport || data.checkFeedback || data.feedback || "已完成檢查"}
                     type="primary"
                     disabled={isTyping}
                     onClick={() => {
-                      setHelpCount((prev) => prev + 1);
-                      handleSend("接下來我該做什麼？");
+                      handleSend("接下來我該做什麼？", "help");
                     }}
                     style={{
                       backgroundColor: "#b2c8ff",

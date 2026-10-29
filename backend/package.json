@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "nodemon --env-file .env index.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "seed:demo": "node --env-file=.env scripts/seed-demo.js",
+    "test:demo": "node --env-file=.env --test --experimental-test-isolation=none test/demo.integration.js"
   },
   "keywords": [],
   "author": "",

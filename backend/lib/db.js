@@ -106,6 +106,7 @@ export async function connectToDatabase() {
     console.log("Connecting to MongoDB...");
     dbConnectionPromise = mongoose
       .connect(uri, {
+        ...(process.env.MONGO_DB_NAME ? { dbName: process.env.MONGO_DB_NAME } : {}),
         serverSelectionTimeoutMS: 2000,
         socketTimeoutMS: 10000,
         connectTimeoutMS: 2000,
@@ -147,6 +148,7 @@ export async function ensureDbConnection(req, res, next) {
 // 診斷用：沒有 Vercel log 權限時也能從瀏覽器判斷連線問題（不含帳密，主機已遮罩）
 export const getDbStatus = () => ({
   connected: isDbReady(),
+  database: mongoose.connection.name || process.env.MONGO_DB_NAME || null,
   uriSource: resolveMongoUri().source,
   skippedLocal: getSkippedLocalKeys(),
   host: maskMongoHost(getMongoHost(getMongoUri())),

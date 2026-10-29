@@ -1,3 +1,4 @@
+import { submissionRequest, currentQuestionId, loadMySubmission } from "../../lib/submissions";
 import React, { useState, useEffect, useRef } from "react";
 import { Button, App, Spin, Splitter, Popover, Modal } from "antd";
 import {
@@ -84,7 +85,8 @@ const OnlineCoding = ({
   // 新增：儲存中 flag，避免重複點擊 (修正 saving 未定義錯誤)
   const [checking, setChecking] = useState(false);
 
-  const { getToken } = useAuth(); //額外加入
+  const { getToken, userId, isSignedIn } = useAuth(); //額外加入
+  const saveSubmission = (url, options) => submissionRequest(url, options, userId);
   const API_BASE = import.meta.env.VITE_API_BASE; //額外加入
 
   // 同步內容到 Context
@@ -122,47 +124,41 @@ const OnlineCoding = ({
 
   // 自動請求後端生成 PseudoCode
   useEffect(() => {
-    if (!question) return;
-    if (isStage3) {
-      // 第三階段：每次切換題目都清空編輯器
-      setCode("");
-      setAnswers([]);
-      setApiError("");
-      setLoading(false);
-      onChange && onChange("");
-      return;
-    }
+    if (!question || !isSignedIn) return;
+    let cancelled = false;
+    setCode("");
+    setAnswers([]);
+    setLanguage("python");
     setLoading(true);
     setApiError("");
-    fetch("/api/generate-pseudocode", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-      },
-      body: JSON.stringify({ question }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.pseudoCode && data.answers) {
-          setAnswers(data.answers);
-          // 將 pseudoCode array 轉為字串，並自動填入編輯器
-          setCode(data.pseudoCode.join("\n"));
-          onChange && onChange(data.pseudoCode.join("\n"));
-        } else {
-          setAnswers([]);
-          setCode("");
-          setApiError("後端回傳格式錯誤，請聯絡管理員。");
+    (async () => {
+      try {
+        const saved = await loadMySubmission(getToken);
+        if (cancelled) return;
+        const stage = saved?.stages?.[isStage3 ? "stage3" : "stage2"];
+        const stored = isStage3 ? stage?.code : stage?.pseudocode;
+        if (typeof stored === "string" && stored) {
+          setCode(stored);
+          if (isStage3 && stage.language) setLanguage(stage.language);
+          onChange?.(stored);
+          return;
         }
-      })
-      .catch(() => {
-        setAnswers([]);
-        setCode("");
-        setApiError("生成 PseudoCode 失敗，請稍後再試。");
-      })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line
-  }, [question]);
+        if (isStage3) { setCode(""); setAnswers([]); return; }
+        const response = await fetch("/api/generate-pseudocode", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.pseudoCode || !data.answers) throw new Error("Cannot generate pseudocode");
+        if (cancelled) return;
+        const generated = Array.isArray(data.pseudoCode) ? data.pseudoCode.join("\n") : data.pseudoCode;
+        setAnswers(data.answers); setCode(generated); onChange?.(generated);
+      } catch (error) { if (!cancelled) setApiError(error.message); }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+    // onChange is a parent callback; its identity must not reset the editor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, isStage3, getToken, isSignedIn, userId]);
 
   const handleCheck = async () => {
     setAttemptCount((prev) => prev + 1);
@@ -187,7 +183,7 @@ const OnlineCoding = ({
             question,
             code,
             language,
-            questionId: "Q001",
+            questionId: currentQuestionId(),
           }),
         });
         const data = await res.json();
@@ -378,174 +374,30 @@ const OnlineCoding = ({
   //新增「Modal 控制 state」
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const handleSaveStage2 = async () => {
-    try {
-      const token = await getToken();
-
-      if (!code) {
-        antdMessage.error("請先輸入 pseudocode");
-        return;
-      }
-
-      const now = Date.now();
-      const deltaSec = Math.max(
-        0,
-        Math.floor((now - (lastTickRef.current || now)) / 1000),
-      );
-      lastTickRef.current = now;
-
-      const res = await fetch("/api/submissions/stage2", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          questionId: "Q001",
-          pseudocode: code,
-          completed: false,
-          durationDeltaSec: deltaSec,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error);
-      }
-
-      antdMessage.success("已儲存第二階段");
-    } catch (err) {
-      console.error(err);
-      antdMessage.error("儲存失敗");
-    }
-  };
-
-  const handleSaveStage3 = async () => {
-    try {
-      const token = await getToken();
-
-      if (!code) {
-        antdMessage.error("請先輸入程式碼");
-        return;
-      }
-
-      const now = Date.now();
-      const deltaSec = Math.max(
-        0,
-        Math.floor((now - (lastTickRef.current || now)) / 1000),
-      );
-      lastTickRef.current = now;
-
-      const res = await fetch("/api/submissions/stage3", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          questionId: "Q001",
-          code: code,
-          language: language,
-          completed: false,
-          durationDeltaSec: deltaSec,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error);
-      }
-
-      antdMessage.success("已儲存第三階段");
-    } catch (err) {
-      console.error(err);
-      antdMessage.error("儲存失敗");
-    }
-  };
-
-  // 「上傳」：單純把目前內容與時間增量寫回後端，不做 AI 檢查
-  const handleUpload = async () => {
-    const token = await getToken();
+  const saveCodingStage = async (stage) => {
+    if (saving || loading) return;
+    if (!isSignedIn) { antdMessage.error("請先登入"); return; }
+    if (!code.trim()) { antdMessage.error("請先輸入作答內容"); return; }
+    setSaving(true); setApiError("");
     const now = Date.now();
-    const deltaSec = Math.max(
-      0,
-      Math.floor((now - (lastTickRef.current || now)) / 1000),
-    );
-    lastTickRef.current = now;
-
-    if (saving) return; // 防止重複點擊
-    setSaving(true);
-    setApiError("");
-
+    const deltaSec = Math.max(0, Math.floor((now - lastTickRef.current) / 1000));
     try {
-      if (!code || !question) {
-        antdMessage.info("請先輸入程式碼與確認題目");
-        return;
-      }
-
-      const questionId =
-        localStorage.getItem("currentFlowchartQuestionId") || "Q001";
-
-      let saveRes;
-      if (isStage3) {
-        console.log("[handleUpload] 儲存第三階段資料...");
-        saveRes = await fetch(`/api/submissions/stage3`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            questionId,
-            code,
-            language,
-            completed: false,
-            durationDeltaSec: deltaSec,
-          }),
-        });
-      } else {
-        console.log("[handleUpload] 儲存第二階段資料...");
-        saveRes = await fetch(`/api/submissions/stage2`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            questionId,
-            pseudocode: code,
-            completed: false,
-            durationDeltaSec: deltaSec,
-          }),
-        });
-      }
-
-      if (!saveRes.ok) {
-        const errText = await saveRes.text();
-        console.error("儲存階段 HTTP 錯誤:", errText);
-        throw new Error(`HTTP error! status: ${saveRes.status}`);
-      }
-
-      const saveData = await saveRes.json();
-      console.log("💾 上傳回傳資料:", saveData);
-
-      if (saveData.success) {
-        antdMessage.success(
-          isStage3 ? "已上傳第三階段的作答" : "已上傳第二階段的作答",
-        );
-      } else {
-        antdMessage.error(saveData.error || "上傳失敗");
-      }
-    } catch (err) {
-      console.error("handleUpload 發生錯誤:", err);
-      setApiError("上傳失敗，請稍後再試。");
-      antdMessage.error("上傳失敗，請稍後再試。");
-    } finally {
-      setSaving(false);
-    }
+      const token = await getToken();
+      const response = await saveSubmission(`/api/submissions/stage${stage}`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ questionId: currentQuestionId(), durationDeltaSec: deltaSec,
+          ...(stage === 3 ? { code, language } : { pseudocode: code }) }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || `HTTP ${response.status}`);
+      lastTickRef.current = now;
+      antdMessage.success("作答已儲存至資料庫");
+    } catch (error) { setApiError(error.message); antdMessage.error(error.message); }
+    finally { setSaving(false); }
   };
+  const handleSaveStage2 = () => saveCodingStage(2);
+  const handleSaveStage3 = () => saveCodingStage(3);
+  const handleUpload = () => saveCodingStage(isStage3 ? 3 : 2);
 
   return (
     <div className={styles.mainspace}>
@@ -789,6 +641,7 @@ const OnlineCoding = ({
               style={{ overflow: "auto" }}
             >
               <CodeMirror
+                editable={!loading}
                 value={code}
                 height="100%"
                 extensions={

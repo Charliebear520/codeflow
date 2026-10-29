@@ -1,98 +1,39 @@
-import React, { useState, useMemo } from "react";
-import styles from "./StudentsRecordsCard.module.css";
-import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { useState } from "react";
+import { Button, Tooltip } from "antd";
+import { CheckOutlined, CloseOutlined } from "@ant-design/icons";
 import StudentAnswerModal from "../StudentAnswerModal";
-import AISummaryModal from "../AISummaryModal/index.jsx";
+import AISummaryModal from "../AISummaryModal";
+import { minutes, totalDuration, savedAnswer } from "../../lib/learningDisplay";
+import styles from "./StudentsRecordsCard.module.css";
 
-// 子元件：負責顯示每一列的狀態
-function StageRow({ label, done, onView }) {
-  const Icon = done ? CheckOutlined : CloseOutlined;
+export default function StudentsRecordsCard({ student, submission }) {
+  const [openStage, setOpenStage] = useState(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   return (
-    <div className={styles.checkbox}>
-      <div className={styles.homeworkText}>{label}</div>
-      <Icon className={done ? styles.CheckOutlined : styles.CloseOutlined} />
-      <Button
-        size="small"
-        className={styles.checkButton}
-        onClick={onView}
-        disabled={!done}
-      >
-        查看
-      </Button>
-    </div>
+    <article className={styles.card}>
+      <header className={styles.heading}>
+        <div><h3>{student?.name || submission.studentName || "未命名學生"}</h3>
+          <div className={styles.meta}>{submission.isDemo && <span className={styles.demo}>示範資料</span>}<span>{submission.questionId}</span></div>
+        </div>
+        <span className={styles.time}>共計 {minutes(totalDuration(submission))} 分鐘</span>
+      </header>
+      <div className={styles.stages}>
+        {["stage1", "stage2", "stage3"].map((key, index) => {
+          const stage = submission.stages?.[key];
+          const available = savedAnswer(stage, key) || (key === "stage1" && submission.stage1History?.length > 0);
+          return <div className={styles.stage} key={key}>
+            <span>階段{["一", "二", "三"][index]}</span>
+            <Tooltip title={stage?.completed ? "已達完成標準" : available ? "已保存作答，尚未達完成標準" : "尚未作答"}>
+              {stage?.completed ? <CheckOutlined className={styles.complete} aria-label="已完成" /> : <CloseOutlined className={styles.incomplete} aria-label={available ? "尚未完成" : "尚未作答"} />}
+            </Tooltip>
+            <Button size="small" className={styles.view} disabled={!available} onClick={() => setOpenStage(key)}>查看</Button>
+          </div>;
+        })}
+      </div>
+      <Button type="primary" className={styles.summary} onClick={() => setSummaryOpen(true)}>AI 總結</Button>
+      <StudentAnswerModal openStage={openStage} onClose={() => setOpenStage(null)} student={student} submission={submission} />
+      <AISummaryModal isVisible={summaryOpen} onClose={() => setSummaryOpen(false)} studentId={student?._id}
+        studentName={student?.name || submission.studentName} submissionId={submission._id} questionId={submission.questionId} revision={submission.updatedAt} />
+    </article>
   );
 }
-
-const StudentsRecordsCard = ({ student, submission }) => {
-  // 1. 狀態管理
-  const [openStage, setOpenStage] = useState(null); // 控制作答細節彈窗
-  const [isAIModalVisible, setIsAIModalVisible] = useState(false); // 控制 AI 總結彈窗
-
-  // 2. 資料處理
-  const s1 = submission?.stages?.stage1 || {};
-  const s2 = submission?.stages?.stage2 || {};
-  const s3 = submission?.stages?.stage3 || {};
-
-  // 判斷各階段是否完成
-  const stage1Done = !!(s1.completed || s1.imageBase64 || s1?.graph?.nodes?.length);
-  const stage2Done = !!(s2.completed || (s2.pseudocode && s2.pseudocode.trim()));
-  const stage3Done = !!(s3.completed || (s3.code && s3.code.trim()));
-
-  const meta = useMemo(
-    () => [
-      { key: "stage1", label: "階段一", done: stage1Done },
-      { key: "stage2", label: "階段二", done: stage2Done },
-      { key: "stage3", label: "階段三", done: stage3Done },
-    ],
-    [stage1Done, stage2Done, stage3Done]
-  );
-
-  // 3. 事件處理
-  const showAIModal = () => setIsAIModalVisible(true);
-  const handleCloseAIModal = () => setIsAIModalVisible(false);
-
-  return (
-    <div className={styles.card}>
-      <div className={styles.substance}>
-        {/* 學生姓名顯示 */}
-        <div className={styles.studentName}>
-          {student?.name || student?.email || "未命名學生"}
-        </div>
-
-        {/* 渲染各階段列 */}
-        {meta.map((m) => (
-          <StageRow
-            key={m.key}
-            label={m.label}
-            done={m.done}
-            onView={() => setOpenStage(m.key)}
-          />
-        ))}
-
-        {/* AI 總結按鈕 */}
-        <Button className={styles.aiButton} onClick={showAIModal}>
-          AI總結
-        </Button>
-
-        {/* 彈窗元件：作答紀錄細節 */}
-        <StudentAnswerModal
-          openStage={openStage}
-          onClose={() => setOpenStage(null)}
-          submission={submission}
-          student={student}
-        />
-
-        {/* 彈窗元件：AI 總結內容 */}
-        <AISummaryModal 
-          isVisible={isAIModalVisible} 
-          onClose={handleCloseAIModal} 
-          studentId={student?._id}
-          studentName={student?.name || "學生01"} 
-        />
-      </div>
-    </div>
-  );
-};
-
-export default StudentsRecordsCard;
