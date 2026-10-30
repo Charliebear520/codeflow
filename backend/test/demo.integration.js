@@ -55,7 +55,7 @@ test("real MongoDB: seed, student write/retry/restore, scoring and teacher read 
     app.post("/api/submissions/stage1/compare", compareStage1);
     app.post("/api/submissions/stage2/compare", compareStage2);
     app.post("/api/submissions/stage3/compare", compareStage3);
-    registerActivityRoutes(app, { ensureStudent: (userId) => Students.findOne({userId}).lean(), requireDb: (req,res,next) => next(), store,
+    registerActivityRoutes(app, { ensureStudent: (userId) => Students.findOne({userId}).lean(), isDbReady: () => true, store,
       chatReply: async () => "測試對話回覆", hintReply: async () => "測試提示回覆" });
     app.use((err, req, res, next) => { res.status(err.status || 500).json({ success: false, error: err.message }); });
     await new Promise((resolve) => { server = app.listen(0, "127.0.0.1", resolve); });

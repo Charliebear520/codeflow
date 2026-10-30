@@ -133,7 +133,11 @@ const OnlineCoding = ({
     setApiError("");
     (async () => {
       try {
-        const saved = await loadMySubmission(getToken);
+        // 讀取已儲存作答失敗（例如資料庫暫時無法連線）時，不中斷，改為直接生成新的虛擬碼
+        const saved = await loadMySubmission(getToken).catch((error) => {
+          console.warn("無法讀取已儲存作答，改為重新生成：", error.message);
+          return null;
+        });
         if (cancelled) return;
         const stage = saved?.stages?.[isStage3 ? "stage3" : "stage2"];
         const stored = isStage3 ? stage?.code : stage?.pseudocode;

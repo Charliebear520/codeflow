@@ -24,6 +24,47 @@ const getGenAI = () => {
 // 匯出 getGenAI 供其他服務使用
 export { getGenAI };
 
+const DEFAULT_MODEL = "gemini-2.5-flash";
+
+// gemini-2.5-flash 預設會先「思考」，實測回應約 10 秒，超過 Vercel 的 10 秒上限；
+// 關閉思考後約 3～5 秒，互動式的助教、提示、出題都使用此設定
+const FAST_GENERATION_CONFIG = { thinkingConfig: { thinkingBudget: 0 } };
+
+// 最近一次 Gemini 呼叫失敗的原因，供 /api/status 診斷（不含金鑰）
+let lastGeminiError = null;
+
+const recordGeminiError = (error) => {
+  lastGeminiError = {
+    status: error?.status ?? null,
+    message: String(error?.message || error).slice(0, 300),
+    at: new Date().toISOString(),
+  };
+};
+
+export const getGeminiStatus = () => ({
+  apiKey: !!process.env.GEMINI_API_KEY,
+  model: DEFAULT_MODEL,
+  lastError: lastGeminiError,
+});
+
+// 統一建立模型：套用快速設定，並記錄成功 / 失敗狀態
+const getModel = (modelName = DEFAULT_MODEL) => ({
+  generateContent: async (...args) => {
+    try {
+      const model = getGenAI().getGenerativeModel({
+        model: modelName,
+        generationConfig: FAST_GENERATION_CONFIG,
+      });
+      const result = await model.generateContent(...args);
+      lastGeminiError = null;
+      return result;
+    } catch (error) {
+      recordGeminiError(error);
+      throw error;
+    }
+  },
+});
+
 /**
  * 通用的 Gemini 內容生成函數
  * @param {string} prompt - 提示詞
@@ -33,7 +74,7 @@ export { getGenAI };
 export const generateContent = async (
   prompt,
   modelName = "gemini-2.5-flash",
-  timeoutMs = 5000,
+  timeoutMs = 8000,
 ) => {
   let timer = null;
   try {
@@ -45,7 +86,7 @@ export const generateContent = async (
     });
 
     const callPromise = (async () => {
-      const model = getGenAI().getGenerativeModel({ model: modelName });
+      const model = getModel(modelName);
       const result = await model.generateContent(prompt);
       const response = await result.response;
       return response.text();
@@ -66,7 +107,7 @@ export const generateFlowchartQuestion = async () => {
     console.log("Generating flowchart question...");
 
     // 使用正式支援的模型名稱
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = getModel();
 
     const prompt = `你是一位專業的中文教育題目生成器，請**嚴格遵守**以下要求。
 
@@ -103,7 +144,7 @@ export const generateFlowchartHint = async (question, hintLevel) => {
     console.log(`Generating flowchart hint... Level: ${hintLevel}`);
 
     // 使用 Gemini 2.5 Flash 對應的正式模型名稱
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = getModel();
 
     // 根據不同層級生成不同的提示
     const promptBase = `基於以下流程圖題目：「${question}」
@@ -183,7 +224,7 @@ export const checkFlowchart = async (imageData, question) => {
       throw new Error("No image data provided");
     }
 
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = getModel();
 
     const prompt = `
 你是一位非常簡潔的國中程式設計助教。請根據這張流程圖圖片，針對下方題目，用繁體中文提供 3-5 點簡短的引導式建議。
@@ -223,7 +264,7 @@ export const checkFlowchart = async (imageData, question) => {
 
 // 第二階段：生成PseudoCode
 export const generatePseudoCode = async (prompt) => {
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = getModel();
   const result = await model.generateContent(prompt);
   const response = await result.response;
   let text = response.text().trim();
@@ -252,7 +293,7 @@ export const generatePseudoCode = async (prompt) => {
 export const checkPseudoCode = async (question, userPseudoCode) => {
   try {
     // 使用與其他地方一致、已確認可用的模型名稱
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = getModel();
     const prompt = `你是一位非常簡潔的國中程式設計助教。請幫學生檢查虛擬碼並提供簡短的引導式建議。
 
 題目：${question}
@@ -304,7 +345,7 @@ ${userPseudoCode}
 // 第三階段：檢查Code
 export const checkCode = async (question, code, language) => {
   try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = getModel();
     const languageMap = {
       python: "Python",
       javascript: "JavaScript",

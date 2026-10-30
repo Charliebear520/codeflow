@@ -68,7 +68,7 @@ import { requireTeacher } from "./lib/teacherAccess.js";
 import { registerSubmissionRoutes } from "./lib/submissionRoutes.js";
 import { submissionStore } from "./lib/submissionStore.js";
 import { registerActivityRoutes } from "./lib/activityRoutes.js";
-import { generateContent } from "./services/geminiService.js";
+import { generateContent, getGeminiStatus } from "./services/geminiService.js";
 
 // 動態導入Gemini服務的輔助函數
 const loadGeminiServices = async () => {
@@ -110,9 +110,7 @@ app.get("/api/status", (req, res) => {
       clerkSecretKey: !!process.env.CLERK_SECRET_KEY,
       clerkPublishableKey: !!process.env.CLERK_PUBLISHABLE_KEY,
     },
-    gemini: {
-      apiKey: !!process.env.GEMINI_API_KEY,
-    },
+    gemini: getGeminiStatus(),
     mongodb: getDbStatus(),
   });
 });
@@ -600,7 +598,7 @@ app.get("/api/me", async (req, res) => {
 
 // 測試 / 除錯端點在正式環境僅限教師使用（/api/test-*、/api/debug-*、/test）
 registerSubmissionRoutes(app, { ensureStudent, requireTeacher, requireDb });
-registerActivityRoutes(app, { ensureStudent, requireDb,
+registerActivityRoutes(app, { ensureStudent, isDbReady,
   chatReply: (body) => generateContent(`You are a supportive programming tutor. Reply in Traditional Chinese, guide the learner without giving a complete answer. Stage: ${body.stage || 1}. Question: ${body.question || ""}. Student message: ${body.prompt}`),
   hintReply: (body) => generateContent(`Give a concise Traditional Chinese programming hint, not a full answer. Hint level: ${body.hintLevel || 1}. Question: ${body.question}`),
 });

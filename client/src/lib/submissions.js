@@ -36,7 +36,8 @@ export async function submissionRequest(url, options, userId) {
       if (response.ok) {
         let result = null;
         try { result = await response.clone().json(); } catch { /* 不把 HTML／破損回應當成寫入確認 */ }
-        if (!result?.success || !result?.submissionId) {
+        // persisted === false：伺服器已回覆但資料庫暫時無法保存（例如助教對話），視為完成
+        if (!result?.success || (!result?.submissionId && result?.persisted !== false)) {
           throw new Error("尚無法確認儲存結果，請重試；同一操作不會重複新增");
         }
       }

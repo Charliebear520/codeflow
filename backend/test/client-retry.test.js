@@ -45,3 +45,20 @@ test("client retries keep request id/body after lost response, coalesce double c
   await submissionRequest("/api/submissions/stage3", options(40), "charlie");
   assert.equal(malformedCalls[0], malformedCalls[1]);
 });
+
+test("資料庫暫時無法保存（persisted: false）的回覆視為完成，但缺少 submissionId 的一般回應仍視為失敗", async (t) => {
+  const storage = new Map();
+  Object.defineProperty(globalThis, "sessionStorage", { configurable: true, value: {
+    getItem: (k) => storage.get(k) || null,
+    setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k),
+  } });
+  t.after(() => { delete globalThis.sessionStorage; });
+  let reply = { success: true, submissionId: null, persisted: false, result: "助教回覆" };
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(reply), { status: 200 }));
+  const options = (prompt) => ({ method: "POST", headers: {}, body: JSON.stringify({ questionId: "Q001", prompt }) });
+  const response = await submissionRequest("/api/chat", options("你好"), "dora");
+  assert.equal((await response.json()).result, "助教回覆");
+  assert.equal(storage.size, 0);
+  reply = { success: true, result: "沒有 submissionId" };
+  await assert.rejects(submissionRequest("/api/chat", options("再問一次"), "dora"));
+});
